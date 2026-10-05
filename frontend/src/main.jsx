@@ -303,7 +303,38 @@ function useMonitoringData(session, onUnauthorized) {
     }
 
     const load = async () => {
-      // 1. Try local or custom backend endpoint if available
+      // 1. Direct Supabase Cloud Fetch (24/7 Serverless dari GitHub Actions)
+      try {
+        const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || "https://hurtfiwuefjxfosvwbsj.supabase.co").replace(/\/$/, "");
+        const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1cnRmaXd1ZWZqeGZvc3Z3YnNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA5MjUwNTYsImV4cCI6MjEwNjUwMTA1Nn0.usLZoKGKfIqzeLYkJnOAXPZUsQC_pNOSR8gwfkMHYiw";
+        const isRealJwt = accessToken && accessToken.startsWith("eyJ");
+        const sbAuth = isRealJwt ? `Bearer ${accessToken}` : `Bearer ${supabaseKey}`;
+        
+        const sbResponse = await fetchWithTimeout(
+          `${supabaseUrl}/rest/v1/monitoring_current?select=payload&limit=1`,
+          {
+            headers: {
+              apikey: supabaseKey,
+              Authorization: sbAuth,
+              Accept: "application/json",
+            },
+          },
+          4_000
+        );
+
+        if (sbResponse.ok) {
+          const rows = await sbResponse.json();
+          if (!cancelled && Array.isArray(rows) && rows.length > 0 && rows[0]?.payload?.by_site) {
+            setData(rows[0].payload);
+            setError(null);
+            return;
+          }
+        }
+      } catch (sbErr) {
+        console.warn("Direct Supabase fetch fallback:", sbErr);
+      }
+
+      // 2. Fallback to local or custom backend endpoint if available
       if (endpoint) {
         try {
           const response = await fetchWithTimeout(`${endpoint}?ts=${Date.now()}`, {
@@ -311,7 +342,7 @@ function useMonitoringData(session, onUnauthorized) {
             headers: {
               Authorization: `Bearer ${accessToken}`,
             },
-          }, 4_000);
+          }, 3_000);
 
           if (response.status === 401 && !accessToken?.startsWith("local_")) {
             onUnauthorized?.();
@@ -327,40 +358,12 @@ function useMonitoringData(session, onUnauthorized) {
             }
           }
         } catch (err) {
-          // Backend not reachable, fall back to direct Supabase 24/7 fetch
+          // Both sources failed
         }
-      }
-
-      // 2. Direct Supabase Cloud Fetch (24/7 Serverless)
-      try {
-        const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || "https://hurtfiwuefjxfosvwbsj.supabase.co").replace(/\/$/, "");
-        const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1cnRmaXd1ZWZqeGZvc3Z3YnNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA5MjUwNTYsImV4cCI6MjEwNjUwMTA1Nn0.usLZoKGKfIqzeLYkJnOAXPZUsQC_pNOSR8gwfkMHYiw";
-        const sbResponse = await fetchWithTimeout(
-          `${supabaseUrl}/rest/v1/monitoring_current?select=payload&limit=1`,
-          {
-            headers: {
-              apikey: supabaseKey,
-              Authorization: `Bearer ${accessToken}`,
-              Accept: "application/json",
-            },
-          },
-          8_000
-        );
-
-        if (sbResponse.ok) {
-          const rows = await sbResponse.json();
-          if (!cancelled && Array.isArray(rows) && rows.length > 0 && rows[0]?.payload?.by_site) {
-            setData(rows[0].payload);
-            setError(null);
-            return;
-          }
-        }
-      } catch (sbErr) {
-        console.warn("Direct Supabase fetch error:", sbErr);
       }
 
       if (!cancelled) {
-        setError("Tidak dapat memuat data monitoring dari server maupun database cloud");
+        setError("Tidak dapat memuat data monitoring dari database cloud maupun server lokal");
       }
     };
 
