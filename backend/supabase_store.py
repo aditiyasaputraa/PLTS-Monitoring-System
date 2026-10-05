@@ -267,16 +267,37 @@ class SupabaseStore:
 
     def get_current_row(self) -> dict[str, Any] | None:
         client, config = self._require()
-        with self._lock:
-            response = (
-                client.table(config.current_table)
-                .select("id,run_id,scraped_at,payload,summary,updated_at")
-                .eq("id", 1)
-                .limit(1)
-                .execute()
-            )
-        rows = response.data or []
-        return rows[0] if rows else None
+        try:
+            with self._lock:
+                response = (
+                    client.table(config.current_table)
+                    .select("id,run_id,scraped_at,payload,summary,updated_at")
+                    .eq("id", 1)
+                    .limit(1)
+                    .execute()
+                )
+            rows = response.data or []
+            return rows[0] if rows else None
+        except Exception as exc:
+            try:
+                import requests
+                url = f"{config.url.rstrip('/')}/rest/v1/{config.current_table}?id=eq.1&select=id,run_id,scraped_at,payload,summary,updated_at"
+                res = requests.get(
+                    url,
+                    headers={
+                        "apikey": config.secret_key,
+                        "Authorization": f"Bearer {config.secret_key}",
+                        "Accept": "application/json",
+                    },
+                    timeout=8,
+                )
+                if res.ok:
+                    data = res.json()
+                    if isinstance(data, list) and len(data) > 0:
+                        return data[0]
+            except Exception:
+                pass
+            raise exc
 
     def get_history(self, limit: int = 24, include_payload: bool = False) -> list[dict[str, Any]]:
         client, config = self._require()

@@ -21,6 +21,7 @@ from Crypto.Util.Padding import pad
 _DNS_FALLBACKS = {
     "sg5.fusionsolar.huawei.com": "119.8.160.213",
     "energy.kehua.com": "47.242.3.236",
+    "hurtfiwuefjxfosvwbsj.supabase.co": "104.18.38.10",
 }
 _orig_getaddrinfo = socket.getaddrinfo
 

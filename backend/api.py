@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import secrets
+import socket
 import threading
 import traceback
 from contextlib import asynccontextmanager
@@ -11,6 +12,23 @@ from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
+
+_DNS_FALLBACKS = {
+    "sg5.fusionsolar.huawei.com": "119.8.160.213",
+    "energy.kehua.com": "47.242.3.236",
+    "hurtfiwuefjxfosvwbsj.supabase.co": "104.18.38.10",
+}
+_orig_getaddrinfo = socket.getaddrinfo
+
+def _safe_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+    try:
+        return _orig_getaddrinfo(host, port, family, type, proto, flags)
+    except socket.gaierror:
+        if isinstance(host, str) and host in _DNS_FALLBACKS:
+            return _orig_getaddrinfo(_DNS_FALLBACKS[host], port, family, type, proto, flags)
+        raise
+
+socket.getaddrinfo = _safe_getaddrinfo
 
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
