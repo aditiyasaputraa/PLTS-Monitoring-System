@@ -1,6 +1,10 @@
 ﻿{
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "services": {
+    "app": {
+      "root": ".",
+      "framework": "fastapi"
+    },
     "plts-monitoring-api": {
       "root": "backend",
       "framework": "fastapi",
