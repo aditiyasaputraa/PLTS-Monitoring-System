@@ -12,9 +12,26 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, quote, urlencode, urlparse
 
+import socket
 import requests
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
+
+_DNS_FALLBACKS = {
+    "sg5.fusionsolar.huawei.com": "119.8.160.213",
+    "energy.kehua.com": "47.242.3.236",
+}
+_orig_getaddrinfo = socket.getaddrinfo
+
+def _safe_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+    try:
+        return _orig_getaddrinfo(host, port, family, type, proto, flags)
+    except socket.gaierror:
+        if isinstance(host, str) and host in _DNS_FALLBACKS:
+            return _orig_getaddrinfo(_DNS_FALLBACKS[host], port, family, type, proto, flags)
+        raise
+
+socket.getaddrinfo = _safe_getaddrinfo
 
 
 DROP_REQUEST_HEADERS = {

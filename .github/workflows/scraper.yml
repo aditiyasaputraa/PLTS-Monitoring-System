@@ -24,6 +24,13 @@ jobs:
         run: |
           pip install -r backend/requirements.txt
 
+      - name: Configure DNS & Hosts for Vendor Endpoints
+        run: |
+          echo "nameserver 8.8.8.8" | sudo tee -a /etc/resolv.conf
+          echo "nameserver 1.1.1.1" | sudo tee -a /etc/resolv.conf
+          echo "119.8.160.213 sg5.fusionsolar.huawei.com" | sudo tee -a /etc/hosts
+          echo "47.242.3.236 energy.kehua.com" | sudo tee -a /etc/hosts
+
       - name: Run PLTS Scraper & Save to Supabase
         env:
           PYTHONPATH: backend
