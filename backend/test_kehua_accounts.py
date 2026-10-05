@@ -36,6 +36,20 @@ class KehuaAccountsTests(unittest.TestCase):
         self.assertEqual(accounts[1]["station_id"], "17483")
         self.assertEqual(accounts[1]["area_code"], "2054")
 
+    def test_loads_second_account_from_simple_env(self):
+        with patch.dict(os.environ, {
+            "KEHUA_USERNAME": "primary-user",
+            "KEHUA_PASSWORD": "primary-password",
+            "KEHUA_USERNAME_2": "second-user",
+            "KEHUA_PASSWORD_2": "second-password",
+        }, clear=True):
+            accounts = load_kehua_accounts_from_env()
+
+        self.assertEqual(len(accounts), 2)
+        self.assertEqual(accounts[0]["username"], "primary-user")
+        self.assertEqual(accounts[1]["username"], "second-user")
+        self.assertFalse(accounts[1]["use_shared_cookies"])
+
     def test_rewrites_account_identifiers_and_resigns_the_request(self):
         call = {
             "site": "kehua",
