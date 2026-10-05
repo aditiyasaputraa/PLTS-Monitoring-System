@@ -368,6 +368,7 @@ def ready() -> JSONResponse:
 
 
 @app.get("/api/status")
+@app.get("/status")
 def status(_: dict[str, Any] = Depends(require_authenticated_user)) -> dict[str, Any]:
     response: dict[str, Any] = {
         "scraper": get_state(),
@@ -389,6 +390,7 @@ def status(_: dict[str, Any] = Depends(require_authenticated_user)) -> dict[str,
 
 
 @app.get("/api/current")
+@app.get("/current")
 def current(_: dict[str, Any] = Depends(require_authenticated_user)) -> JSONResponse:
     row = None
     try:
