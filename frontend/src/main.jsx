@@ -24,8 +24,8 @@ function phpApiUrl(action) {
 
 function authConfig() {
   return {
-    url: (import.meta.env.VITE_SUPABASE_URL || "").replace(/\/$/, ""),
-    key: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "",
+    url: (import.meta.env.VITE_SUPABASE_URL || "https://hurtfiwuefjxfosvwbsj.supabase.co").replace(/\/$/, ""),
+    key: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1cnRmaXd1ZWZqeGZvc3Z3YnNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA5MjUwNTYsImV4cCI6MjEwNjUwMTA1Nn0.usLZoKGKfIqzeLYkJnOAXPZUsQC_pNOSR8gwfkMHYiw",
   };
 }
 
