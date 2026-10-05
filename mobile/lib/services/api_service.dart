@@ -35,7 +35,8 @@ class ApiService {
     return "http://127.0.0.1:8000";
   }
 
-  static String activeBaseUrl = defaultBaseUrl;
+  static const String cloudflareTunnelUrl = "https://milton-badge-trusted-creates.trycloudflare.com";
+  static String activeBaseUrl = cloudflareTunnelUrl;
 
   /// Mengambil data pemantauan real-time dari backend FastAPI.
   static Future<MonitoringResult> fetchMonitoringData({String? customUrl}) async {
@@ -129,3 +130,4 @@ class ApiService {
     );
   }
 }
+
