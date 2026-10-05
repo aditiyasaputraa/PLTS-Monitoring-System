@@ -35,7 +35,7 @@ class ApiService {
     return "http://127.0.0.1:8000";
   }
 
-  static const String cloudflareTunnelUrl = "https://milton-badge-trusted-creates.trycloudflare.com";
+  static const String cloudflareTunnelUrl = "https://shaped-twin-forth-said.trycloudflare.com";
   static String activeBaseUrl = cloudflareTunnelUrl;
 
   static MonitoringResult _parsePayload(Map<String, dynamic> data) {
@@ -75,28 +75,27 @@ class ApiService {
   static Future<MonitoringResult> fetchMonitoringData({String? customUrl}) async {
     final primary = (customUrl ?? activeBaseUrl).replaceAll(RegExp(r'/+$'), '');
     
-    final List<String> candidates;
-    if (kIsWeb) {
-      candidates = [
-        primary,
-        if (primary != 'http://localhost:8000') 'http://localhost:8000',
-        if (primary != 'http://127.0.0.1:8000') 'http://127.0.0.1:8000',
-      ];
-    } else {
-      candidates = [
-        primary,
-        if (primary != 'http://127.0.0.1:8000') 'http://127.0.0.1:8000',
-        if (primary != 'http://10.0.2.2:8000') 'http://10.0.2.2:8000',
-        if (primary != 'http://10.20.107.91:8000') 'http://10.20.107.91:8000',
-      ];
-    }
+    // Urutan prioritas koneksi yang cerdas dan cepat
+    final Set<String> candidatesSet = {
+      primary,
+      cloudflareTunnelUrl,
+      if (kIsWeb) ...[
+        'http://localhost:8000',
+        'http://127.0.0.1:8000',
+      ] else ...[
+        'http://10.20.107.91:8000',
+        'http://10.0.2.2:8000',
+        'http://127.0.0.1:8000',
+      ],
+    };
+    final candidates = candidatesSet.where((u) => u.isNotEmpty).toList();
 
     final token = AuthService.currentUser?.token;
     final authHeader = 'Bearer ${token != null && token.isNotEmpty ? token : "local_mobile"}';
 
     String lastError = "";
 
-    // 1. Coba koneksi ke server backend (FastAPI / Tunnel)
+    // 1. Coba koneksi ke server backend (FastAPI / Cloudflare Tunnel)
     for (final url in candidates) {
       try {
         final uri = Uri.parse('$url/api/current?ts=${DateTime.now().millisecondsSinceEpoch}');
@@ -112,7 +111,7 @@ class ApiService {
           activeBaseUrl = url;
           final Map<String, dynamic> data = json.decode(utf8.decode(response.bodyBytes));
           return _parsePayload(data);
-        } else if (response.statusCode == 401) {
+        } else if (response.statusCode == 401 && token != null && token.startsWith('eyJ')) {
           return MonitoringResult(
             stations: [],
             summary: null,
@@ -129,15 +128,17 @@ class ApiService {
 
     // 2. Jika backend lokal mati, otomatis ambil langsung dari Supabase Database Cloud (24/7)
     try {
+      final isRealJwt = token != null && token.startsWith('eyJ');
+      final sbAuth = isRealJwt ? 'Bearer $token' : 'Bearer ${AuthService.supabaseAnonKey}';
       final supabaseUri = Uri.parse('${AuthService.supabaseUrl}/rest/v1/monitoring_current?select=payload&limit=1');
       final supabaseRes = await http.get(
         supabaseUri,
         headers: {
           'apikey': AuthService.supabaseAnonKey,
-          if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+          'Authorization': sbAuth,
           'Accept': 'application/json',
         },
-      ).timeout(const Duration(seconds: 6));
+      ).timeout(const Duration(seconds: 5));
 
       if (supabaseRes.statusCode == 200) {
         final decoded = json.decode(utf8.decode(supabaseRes.bodyBytes));
