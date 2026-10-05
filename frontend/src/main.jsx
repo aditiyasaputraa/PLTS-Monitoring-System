@@ -292,12 +292,7 @@ function useMonitoringData(session, onUnauthorized) {
     const base = apiBase();
     const pollInterval = Math.max(15_000, Number(import.meta.env.VITE_POLL_INTERVAL_MS || 60_000));
 
-    if (!base) {
-      setError("VITE_API_URL is not configured for this deployment");
-      return undefined;
-    }
-
-    const endpoint = `${base}/api/current`;
+    const endpoint = base ? `${base}/api/current` : null;
     const accessToken = session?.access_token;
 
     if (!accessToken) {
@@ -307,35 +302,64 @@ function useMonitoringData(session, onUnauthorized) {
     }
 
     const load = async () => {
+      // 1. Try local or custom backend endpoint if available
+      if (endpoint) {
+        try {
+          const response = await fetchWithTimeout(`${endpoint}?ts=${Date.now()}`, {
+            cache: "no-store",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          }, 4_000);
+
+          if (response.status === 401 && !accessToken?.startsWith("local_")) {
+            onUnauthorized?.();
+            throw new Error("Session expired. Please sign in again.");
+          }
+
+          if (response.ok) {
+            const json = await response.json();
+            if (!cancelled && json?.by_site) {
+              setData(json);
+              setError(null);
+              return;
+            }
+          }
+        } catch (err) {
+          // Backend not reachable, fall back to direct Supabase 24/7 fetch
+        }
+      }
+
+      // 2. Direct Supabase Cloud Fetch (24/7 Serverless)
       try {
-        const response = await fetchWithTimeout(`${endpoint}?ts=${Date.now()}`, {
-          cache: "no-store",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
+        const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || "https://hurtfiwuefjxfosvwbsj.supabase.co").replace(/\/$/, "");
+        const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1cnRmaXd1ZWZqeGZvc3Z3YnNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA5MjUwNTYsImV4cCI6MjEwNjUwMTA1Nn0.usLZoKGKfIqzeLYkJnOAXPZUsQC_pNOSR8gwfkMHYiw";
+        const sbResponse = await fetchWithTimeout(
+          `${supabaseUrl}/rest/v1/monitoring_current?select=payload&limit=1`,
+          {
+            headers: {
+              apikey: supabaseKey,
+              Authorization: `Bearer ${accessToken}`,
+              Accept: "application/json",
+            },
           },
-        }, 12_000);
-        if (response.status === 401) {
-          if (accessToken?.startsWith("local_")) {
-            console.warn("Backend requires cloud token, using local monitoring data");
-            setData(MOCK_MONITORING_DATA);
+          8_000
+        );
+
+        if (sbResponse.ok) {
+          const rows = await sbResponse.json();
+          if (!cancelled && Array.isArray(rows) && rows.length > 0 && rows[0]?.payload?.by_site) {
+            setData(rows[0].payload);
             setError(null);
             return;
           }
-          onUnauthorized?.();
-          throw new Error("Session expired. Please sign in again.");
         }
-        if (!response.ok) throw new Error(`Monitoring API returned ${response.status}`);
-        const json = await response.json();
-        if (!cancelled) {
-          setData(json);
-          setError(null);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          console.warn("Backend API not reachable, falling back to local dataset:", err);
-          setData(MOCK_MONITORING_DATA);
-          setError(null);
-        }
+      } catch (sbErr) {
+        console.warn("Direct Supabase fetch error:", sbErr);
+      }
+
+      if (!cancelled) {
+        setError("Tidak dapat memuat data monitoring dari server maupun database cloud");
       }
     };
 
