@@ -1,0 +1,39 @@
+﻿name: PLTS Automated Scraper
+
+on:
+  schedule:
+    # Runs every 15 minutes (UTC)
+    - cron: '*/15 * * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  scrape-and-update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: 'backend/requirements.txt'
+
+      - name: Install dependencies
+        run: |
+          pip install -r backend/requirements.txt
+
+      - name: Run Scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          HUAWEI_USERNAME: ${{ secrets.HUAWEI_USERNAME }}
+          HUAWEI_PASSWORD: ${{ secrets.HUAWEI_PASSWORD }}
+          KEHUA_USERNAME: ${{ secrets.KEHUA_USERNAME }}
+          KEHUA_PASSWORD: ${{ secrets.KEHUA_PASSWORD }}
+          KEHUA_ACCOUNTS_JSON: ${{ secrets.KEHUA_ACCOUNTS_JSON }}
+          HUAWEI_COOKIES_JSON: ${{ secrets.HUAWEI_COOKIES_JSON }}
+          KEHUA_COOKIES_JSON: ${{ secrets.KEHUA_COOKIES_JSON }}
+        run: |
+          python backend/scrape_monitoring.py
