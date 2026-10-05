@@ -71,11 +71,44 @@ class ApiService {
     );
   }
 
-  /// Mengambil data pemantauan real-time dari backend FastAPI atau langsung dari Supabase Cloud (24/7).
+  /// Mengambil data pemantauan real-time langsung dari Supabase Cloud (24/7 dari GitHub Actions)
+  /// dengan fallback ke server backend lokal jika diperlukan.
   static Future<MonitoringResult> fetchMonitoringData({String? customUrl}) async {
+    final token = AuthService.currentUser?.token;
+    final isRealJwt = token != null && token.startsWith('eyJ');
+    final sbAuth = isRealJwt ? 'Bearer $token' : 'Bearer ${AuthService.supabaseAnonKey}';
+
+    String lastError = "";
+
+    // 1. Prioritas Utama: Ambil langsung dari Supabase Cloud (24/7 Serverless dari GitHub Actions)
+    try {
+      final supabaseUri = Uri.parse('${AuthService.supabaseUrl}/rest/v1/monitoring_current?select=payload&limit=1');
+      final supabaseRes = await http.get(
+        supabaseUri,
+        headers: {
+          'apikey': AuthService.supabaseAnonKey,
+          'Authorization': sbAuth,
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 4));
+
+      if (supabaseRes.statusCode == 200) {
+        final decoded = json.decode(utf8.decode(supabaseRes.bodyBytes));
+        if (decoded is List && decoded.isNotEmpty) {
+          final first = decoded.first;
+          if (first is Map<String, dynamic> && first['payload'] is Map<String, dynamic>) {
+            return _parsePayload(Map<String, dynamic>.from(first['payload']));
+          }
+        }
+      } else {
+        lastError = "Supabase Cloud: status ${supabaseRes.statusCode}";
+      }
+    } catch (e) {
+      lastError = "Koneksi Supabase Cloud: $e";
+    }
+
+    // 2. Fallback: Coba koneksi ke backend lokal atau tunnel jika ada
     final primary = (customUrl ?? activeBaseUrl).replaceAll(RegExp(r'/+$'), '');
-    
-    // Urutan prioritas koneksi yang cerdas dan cepat
     final Set<String> candidatesSet = {
       primary,
       cloudflareTunnelUrl,
@@ -89,13 +122,8 @@ class ApiService {
       ],
     };
     final candidates = candidatesSet.where((u) => u.isNotEmpty).toList();
-
-    final token = AuthService.currentUser?.token;
     final authHeader = 'Bearer ${token != null && token.isNotEmpty ? token : "local_mobile"}';
 
-    String lastError = "";
-
-    // 1. Coba koneksi ke server backend (FastAPI / Cloudflare Tunnel)
     for (final url in candidates) {
       try {
         final uri = Uri.parse('$url/api/current?ts=${DateTime.now().millisecondsSinceEpoch}');
@@ -105,61 +133,21 @@ class ApiService {
             'Authorization': authHeader,
             'Accept': 'application/json',
           },
-        ).timeout(const Duration(seconds: 4));
+        ).timeout(const Duration(seconds: 3));
 
         if (response.statusCode == 200) {
           activeBaseUrl = url;
           final Map<String, dynamic> data = json.decode(utf8.decode(response.bodyBytes));
           return _parsePayload(data);
-        } else if (response.statusCode == 401 && token != null && token.startsWith('eyJ')) {
-          return MonitoringResult(
-            stations: [],
-            summary: null,
-            hasError: true,
-            message: "Sesi login tidak valid atau telah berakhir. Silakan keluar dan login kembali.",
-          );
-        } else {
-          lastError = "Server $url merespons status ${response.statusCode}";
         }
-      } catch (e) {
-        lastError = "Koneksi ke $url: ${e.toString()}";
-      }
-    }
-
-    // 2. Jika backend lokal mati, otomatis ambil langsung dari Supabase Database Cloud (24/7)
-    try {
-      final isRealJwt = token != null && token.startsWith('eyJ');
-      final sbAuth = isRealJwt ? 'Bearer $token' : 'Bearer ${AuthService.supabaseAnonKey}';
-      final supabaseUri = Uri.parse('${AuthService.supabaseUrl}/rest/v1/monitoring_current?select=payload&limit=1');
-      final supabaseRes = await http.get(
-        supabaseUri,
-        headers: {
-          'apikey': AuthService.supabaseAnonKey,
-          'Authorization': sbAuth,
-          'Accept': 'application/json',
-        },
-      ).timeout(const Duration(seconds: 5));
-
-      if (supabaseRes.statusCode == 200) {
-        final decoded = json.decode(utf8.decode(supabaseRes.bodyBytes));
-        if (decoded is List && decoded.isNotEmpty) {
-          final first = decoded.first;
-          if (first is Map<String, dynamic> && first['payload'] is Map<String, dynamic>) {
-            return _parsePayload(Map<String, dynamic>.from(first['payload']));
-          }
-        }
-      } else {
-        lastError = "Supabase REST merespons status ${supabaseRes.statusCode}";
-      }
-    } catch (e) {
-      lastError = "Koneksi Supabase Cloud: ${e.toString()}";
+      } catch (_) {}
     }
 
     return MonitoringResult(
       stations: [],
       summary: null,
       hasError: true,
-      message: "Gagal terhubung ke backend API ($activeBaseUrl) maupun cloud Supabase. ($lastError)",
+      message: "Gagal memuat data monitoring dari Supabase Cloud maupun server lokal. ($lastError)",
     );
   }
 }
