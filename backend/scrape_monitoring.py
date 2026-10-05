@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
 import os
@@ -1795,27 +1796,30 @@ def run_once(args: argparse.Namespace) -> dict[str, Any]:
     out_dir = Path(args.out_dir)
     results = []
 
-    for site_name, paths in requested_sites.items():
+    def scrape_single_site(site_name: str, paths: dict[str, Path | None]) -> dict[str, Any]:
         if site_name not in sites_config:
             raise SystemExit(f"Unknown site {site_name}. Available: {', '.join(sites_config)}")
         cookies_file = Path(paths["cookies"]) if paths["cookies"] else None
         accounts = load_kehua_accounts_from_env() if site_name == "kehua" else []
         if accounts:
-            account_results = [
-                scrape_site(
-                    site_name,
-                    sites_config[site_name],
-                    Path(paths["blueprint"]),
-                    cookies_file if account.get("use_shared_cookies") else None,
-                    args.timeout,
-                    args.delay,
-                    account=account,
-                )
-                for account in accounts
-            ]
-            result = combine_account_results(site_name, account_results)
+            with ThreadPoolExecutor(max_workers=max(1, len(accounts))) as acc_exec:
+                acc_futures = [
+                    acc_exec.submit(
+                        scrape_site,
+                        site_name,
+                        sites_config[site_name],
+                        Path(paths["blueprint"]),
+                        cookies_file if account.get("use_shared_cookies") else None,
+                        args.timeout,
+                        args.delay,
+                        account=account,
+                    )
+                    for account in accounts
+                ]
+                account_results = [f.result() for f in acc_futures]
+            return combine_account_results(site_name, account_results)
         else:
-            result = scrape_site(
+            return scrape_site(
                 site_name,
                 sites_config[site_name],
                 Path(paths["blueprint"]),
@@ -1823,8 +1827,19 @@ def run_once(args: argparse.Namespace) -> dict[str, Any]:
                 args.timeout,
                 args.delay,
             )
-        results.append(result)
 
+    # Scrape all platforms concurrently in parallel for maximum speed
+    with ThreadPoolExecutor(max_workers=max(1, len(requested_sites))) as site_exec:
+        futures = {
+            site_exec.submit(scrape_single_site, site_name, paths): site_name
+            for site_name, paths in requested_sites.items()
+        }
+        site_results_map = {futures[f]: f.result() for f in futures}
+
+    results = [site_results_map[s_name] for s_name in requested_sites.keys() if s_name in site_results_map]
+
+    for result in results:
+        site_name = result["site"]
         site_latest = out_dir / "latest" / site_name
         site_history = out_dir / "history" / run_id / site_name
         write_json(site_latest / "all_responses.json", result)

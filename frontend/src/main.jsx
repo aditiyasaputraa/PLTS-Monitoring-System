@@ -281,6 +281,7 @@ function toMwh(value) {
 function useMonitoringData(session, onUnauthorized) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+  const loadRef = useRef(null);
 
   useEffect(() => {
     if (session?.isDemo) {
@@ -363,6 +364,7 @@ function useMonitoringData(session, onUnauthorized) {
       }
     };
 
+    loadRef.current = load;
     load();
     const timer = window.setInterval(load, pollInterval);
 
@@ -372,7 +374,9 @@ function useMonitoringData(session, onUnauthorized) {
     };
   }, [session?.access_token, onUnauthorized]);
 
-  return { data, error };
+  const refresh = useCallback(() => loadRef.current?.(), []);
+
+  return { data, error, refresh };
 }
 
 function App() {
@@ -420,12 +424,54 @@ function App() {
 }
 
 function Dashboard({ session, onSignOut, showWelcome, onWelcomeClose }) {
-  const { data, error } = useMonitoringData(session, onSignOut);
+  const { data, error, refresh } = useMonitoringData(session, onSignOut);
   const [activeTab, setActiveTab] = useState(() => readUiState().activeTab);
   const [selectedId, setSelectedId] = useState(() => readUiState().selectedId);
   const [sitesOpen, setSitesOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [welcomeClosing, setWelcomeClosing] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncNotice, setSyncNotice] = useState(null);
+
+  const handleSyncNow = useCallback(async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    setSyncNotice("Memulai penarikan data paralel (~7 detik)...");
+
+    const base = apiBase();
+    const token = session?.access_token;
+
+    try {
+      if (base) {
+        await fetchWithTimeout(
+          `${base}/api/sync`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token || "local_session"}`,
+            },
+          },
+          10_000
+        );
+      }
+    } catch (e) {
+      console.warn("Direct /api/sync warning:", e);
+    }
+
+    let count = 0;
+    const interval = setInterval(async () => {
+      count++;
+      setSyncNotice(`Sinkronisasi vendor... (${count * 2}s)`);
+      await refresh();
+      if (count >= 4) {
+        clearInterval(interval);
+        setIsSyncing(false);
+        setSyncNotice("Data berhasil diperbarui!");
+        setTimeout(() => setSyncNotice(null), 3000);
+      }
+    }, 2000);
+  }, [isSyncing, session?.access_token, refresh]);
 
   const sites = useMemo(() => {
     if (!data?.by_site) return [];
@@ -529,6 +575,8 @@ function Dashboard({ session, onSignOut, showWelcome, onWelcomeClose }) {
         setSitesOpen={setSitesOpen}
         mobileMenuOpen={mobileMenuOpen}
         setMobileMenuOpen={setMobileMenuOpen}
+        onSyncNow={handleSyncNow}
+        isSyncing={isSyncing}
       />
       <SitesPanel
         open={sitesOpen}
@@ -537,7 +585,14 @@ function Dashboard({ session, onSignOut, showWelcome, onWelcomeClose }) {
         onClose={() => setSitesOpen(false)}
         onSelect={selectSite}
       />
-      <MobileNavPanel open={mobileMenuOpen} activeTab={activeTab} onClose={() => setMobileMenuOpen(false)} onSelectTab={selectTab} />
+      <MobileNavPanel
+        open={mobileMenuOpen}
+        activeTab={activeTab}
+        onClose={() => setMobileMenuOpen(false)}
+        onSelectTab={selectTab}
+        onSyncNow={handleSyncNow}
+        isSyncing={isSyncing}
+      />
       <main className="workspace">
         <HeroPanel fleet={fleet} selected={selected} />
         {activeTab === "Overview" && (
@@ -551,6 +606,41 @@ function Dashboard({ session, onSignOut, showWelcome, onWelcomeClose }) {
         {activeTab === "Energy" && <EnergyTab location={selected} fleet={fleet} />}
         {activeTab === "Revenue" && <RevenueTab location={selected} fleet={fleet} />}
       </main>
+      {syncNotice && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: "24px",
+            right: "24px",
+            zIndex: 9999,
+            background: "rgba(15, 23, 42, 0.95)",
+            backdropFilter: "blur(12px)",
+            border: "1px solid rgba(16, 185, 129, 0.4)",
+            color: "#10b981",
+            padding: "10px 18px",
+            borderRadius: "10px",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
+            fontSize: "13px",
+            fontWeight: 500,
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+          }}
+        >
+          {isSyncing && (
+            <svg
+              style={{ width: "16px", height: "16px", animation: "spin 1s linear infinite" }}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+            >
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+            </svg>
+          )}
+          <span>{syncNotice}</span>
+        </div>
+      )}
       {showWelcome && <WelcomeModal user={session.user} closing={welcomeClosing} onClose={closeWelcome} />}
     </Shell>
   );
@@ -671,7 +761,7 @@ function Shell({ children }) {
   );
 }
 
-function TopNav({ activeTab, onSelectTab, updatedAt, userEmail, isDemo, onSignOut, sitesOpen, setSitesOpen, mobileMenuOpen, setMobileMenuOpen }) {
+function TopNav({ activeTab, onSelectTab, updatedAt, userEmail, isDemo, onSignOut, sitesOpen, setSitesOpen, mobileMenuOpen, setMobileMenuOpen, onSyncNow, isSyncing }) {
   const updated = updatedAt ? new Date(updatedAt).toLocaleString("en-GB", { hour12: false }) : "-";
   return (
     <nav className="top-nav surface">
@@ -706,9 +796,51 @@ function TopNav({ activeTab, onSelectTab, updatedAt, userEmail, isDemo, onSignOu
           </button>
         ))}
       </div>
-      <div className="sync-pill">
-        <span>Last sync</span>
-        <strong>{updated}</strong>
+      <div className="sync-pill" style={{ display: "inline-flex", alignItems: "center", gap: "10px" }}>
+        <div>
+          <span>Last sync</span>
+          <strong>{updated}</strong>
+        </div>
+        <button
+          type="button"
+          onClick={onSyncNow}
+          disabled={isSyncing}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "6px",
+            background: isSyncing
+              ? "rgba(16, 185, 129, 0.2)"
+              : "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+            color: "#ffffff",
+            border: "1px solid rgba(16, 185, 129, 0.4)",
+            borderRadius: "6px",
+            padding: "4px 10px",
+            fontSize: "12px",
+            fontWeight: "600",
+            cursor: isSyncing ? "wait" : "pointer",
+            transition: "all 0.2s ease",
+            boxShadow: "0 2px 6px rgba(16, 185, 129, 0.25)",
+          }}
+          title="Tarik data terbaru dari Huawei & Kehua secara paralel (~7 detik)"
+        >
+          <svg
+            style={{
+              width: "13px",
+              height: "13px",
+              animation: isSyncing ? "spin 1s linear infinite" : "none",
+            }}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+          </svg>
+          <span>{isSyncing ? "Menarik..." : "Tarik Data"}</span>
+        </button>
       </div>
       <button type="button" className="logout-button" title={userEmail || "Signed in"} onClick={onSignOut}>
         Sign out
@@ -767,7 +899,7 @@ function SitesPanel({ open, locations, selectedId, onClose, onSelect }) {
   );
 }
 
-function MobileNavPanel({ open, activeTab, onClose, onSelectTab }) {
+function MobileNavPanel({ open, activeTab, onClose, onSelectTab, onSyncNow, isSyncing }) {
   return (
     <>
       <button type="button" className={`panel-backdrop ${open ? "open" : ""}`} aria-label="Close navigation menu" tabIndex={open ? 0 : -1} onClick={onClose} />
@@ -783,6 +915,40 @@ function MobileNavPanel({ open, activeTab, onClose, onSelectTab }) {
           {TABS.map((tab) => (
             <button key={tab} type="button" className={activeTab === tab ? "active" : ""} onClick={() => onSelectTab(tab)}>{tab}</button>
           ))}
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              onSyncNow?.();
+            }}
+            disabled={isSyncing}
+            style={{
+              marginTop: "12px",
+              background: isSyncing ? "rgba(16, 185, 129, 0.2)" : "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+              color: "#fff",
+              border: "1px solid rgba(16, 185, 129, 0.4)",
+              fontWeight: 600,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+            }}
+          >
+            <svg
+              style={{
+                width: "14px",
+                height: "14px",
+                animation: isSyncing ? "spin 1s linear infinite" : "none",
+              }}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+            >
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+            </svg>
+            <span>{isSyncing ? "Menarik Data..." : "Tarik Data Sekarang"}</span>
+          </button>
         </div>
       </aside>
     </>

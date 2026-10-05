@@ -521,5 +521,23 @@ def refresh(
     )
 
 
+@app.post("/api/sync")
+def sync_vendor(
+    background_tasks: BackgroundTasks,
+    _: dict[str, Any] = Depends(require_authenticated_user),
+) -> JSONResponse:
+    state = get_state()
+    if state.get("running"):
+        return JSONResponse(
+            status_code=200,
+            content={"status": "busy", "message": "Scrape is already in progress"},
+        )
+    background_tasks.add_task(scrape_now)
+    return JSONResponse(
+        status_code=202,
+        content={"status": "started", "message": "Vendor sync started in parallel"},
+    )
+
+
 # Register history CSV export routes after the core app and auth dependencies exist.
 import history_export_api  # noqa: E402,F401

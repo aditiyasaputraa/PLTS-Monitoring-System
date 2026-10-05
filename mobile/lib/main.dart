@@ -1,4 +1,5 @@
-﻿import 'dart:async';
+import 'dart:async';
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:plts_mobile/models/monitoring_data.dart';
@@ -404,6 +405,7 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   bool _isLoading = true;
+  bool _isSyncing = false;
   String? _statusMessage;
   List<StationModel> _stations = [];
   FleetSummary? _summary;
@@ -430,6 +432,54 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _refreshTimer?.cancel();
     _urlController.dispose();
     super.dispose();
+  }
+
+  Future<void> _syncVendorData() async {
+    if (_isSyncing) return;
+    setState(() => _isSyncing = true);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+            ),
+            SizedBox(width: 12),
+            Text("Menarik data terbaru dari vendor Huawei & Kehua..."),
+          ],
+        ),
+        duration: Duration(seconds: 4),
+      ),
+    );
+
+    try {
+      final token = AuthService.currentUser?.token;
+      final uri = Uri.parse('${ApiService.activeBaseUrl}/api/sync');
+      await http.post(
+        uri,
+        headers: {
+          if (token != null) 'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 10));
+    } catch (_) {}
+
+    await Future.delayed(const Duration(seconds: 2));
+    await _loadData();
+
+    if (mounted) {
+      setState(() => _isSyncing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Data berhasil diperbarui!"),
+          backgroundColor: Color(0xFF0D9488),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   Future<void> _loadData({bool isBackground = false}) async {
@@ -610,15 +660,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
         actions: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0D9488),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                elevation: 1,
+              ),
+              icon: _isSyncing
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    )
+                  : const Icon(Icons.sync_rounded, size: 16),
+              label: Text(
+                _isSyncing ? "Menarik..." : "Tarik Data",
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+              onPressed: _isSyncing ? null : _syncVendorData,
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.tune_rounded),
             tooltip: "Pengaturan Koneksi API",
             onPressed: _showApiSettingsDialog,
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            tooltip: "Refresh Data",
-            onPressed: () => _loadData(),
           ),
           IconButton(
             icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
