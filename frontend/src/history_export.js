@@ -376,18 +376,34 @@ async function download(form, button, stationDropdown) {
 }
 
 function mountHeaderTrigger(trigger) {
-  const topNav = document.querySelector(".top-nav");
+  const slot = document.querySelector("#top-nav-export-slot");
+  const controls = document.querySelector(".top-nav-controls");
   const hasSession = Boolean(readSession()?.access_token);
-  if (!topNav || !hasSession) {
+
+  if ((!slot && !controls) || !hasSession) {
     trigger.hidden = true;
     return;
   }
 
-  const logoutButton = topNav.querySelector(".logout-button");
-  if (trigger.parentElement !== topNav || trigger.nextElementSibling !== logoutButton) {
-    topNav.insertBefore(trigger, logoutButton || topNav.querySelector(".mobile-menu-trigger") || null);
+  if (slot) {
+    if (trigger.parentElement !== slot) {
+      slot.appendChild(trigger);
+    }
+    trigger.hidden = false;
+    return;
   }
-  trigger.hidden = false;
+
+  if (controls) {
+    const logoutButton = controls.querySelector(".logout-icon-btn, .logout-button");
+    if (trigger.parentElement !== controls || (logoutButton && trigger.nextElementSibling !== logoutButton)) {
+      if (logoutButton) {
+        controls.insertBefore(trigger, logoutButton);
+      } else {
+        controls.appendChild(trigger);
+      }
+    }
+    trigger.hidden = false;
+  }
 }
 
 function buildWidget() {

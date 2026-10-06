@@ -474,8 +474,11 @@ function Dashboard({ session, onSignOut }) {
               <span>{isSyncing ? "Menarik..." : "Tarik Data"}</span>
             </button>
 
+            {/* Export Slot */}
+            <div id="top-nav-export-slot" style={{ display: "inline-flex", alignItems: "center" }} />
+
             {/* Logout Icon */}
-            <button type="button" className="logout-icon-btn" title="Sign Out" onClick={onSignOut}>
+            <button type="button" className="logout-icon-btn logout-button" title="Sign Out" onClick={onSignOut}>
               <LogOutIcon style={{ width: "16px", height: "16px" }} />
             </button>
           </div>
@@ -503,7 +506,14 @@ function Dashboard({ session, onSignOut }) {
               <CalendarIcon style={{ width: "13px", height: "13px", color: "#6a7c70" }} />
               <span>{formattedUpdatedDate}</span>
             </div>
-            <button type="button" className="action-btn-outline" onClick={() => alert("Fitur export Excel aktif di menu Energy & Revenue!")}>
+            <button
+              type="button"
+              className="action-btn-outline"
+              onClick={() => {
+                const trigger = document.querySelector(".history-export-trigger");
+                if (trigger) trigger.click();
+              }}
+            >
               <DownloadIcon style={{ width: "13px", height: "13px" }} />
               <span>Export</span>
             </button>
