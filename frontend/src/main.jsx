@@ -1112,8 +1112,14 @@ function MonthlyProductionChart({ currentMonthKwh }) {
 function formatStationLabel(name) {
   if (!name) return "";
   const n = String(name).trim();
-  if (n.length > 21) {
-    return `${n.slice(0, 19)}...`;
+  if (n.includes("Rawa Badak")) return "SDN Rawa Badak Sela...";
+  if (n.includes("SMAN 75")) return "SMAN 75 Jakarta Uta...";
+  if (n.includes("GOR Sekda")) return "GOR Sekda Saefullah";
+  if (n.includes("SDN 09")) return "SDN 09 JAKUT";
+  if (n.includes("SMPN 282")) return "SMPN 282 JAKUT";
+  if (n.includes("Sukapura")) return "SDN Sukapura 02";
+  if (n.length > 20) {
+    return `${n.slice(0, 18)}...`;
   }
   return n;
 }
@@ -1142,19 +1148,23 @@ function TodayEnergyBySiteChart({ locations, selectedId, onSelect }) {
 
   const yTicks = [yMax, yMax * 0.75, yMax * 0.5, yMax * 0.25, 0];
   const plotTop = 15;
-  const plotBottom = 165;
+  const plotBottom = 160;
   const plotHeight = plotBottom - plotTop;
+  const plotLeft = 35;
+  const plotRight = 715;
+  const slotWidth = (plotRight - plotLeft) / Math.max(sitesData.length, 1);
+  const barWidth = 44;
 
   return (
     <div style={{ width: "100%", height: "230px", position: "relative", marginTop: "10px" }}>
-      <svg viewBox="0 0 540 195" style={{ width: "100%", height: "100%", overflow: "visible" }}>
+      <svg viewBox="0 0 740 190" style={{ width: "100%", height: "100%", overflow: "visible" }}>
         {/* Y Grid lines and tick labels */}
         {yTicks.map((tickVal) => {
           const y = plotBottom - (tickVal / yMax) * plotHeight;
           return (
             <g key={tickVal}>
-              <line x1="30" y1={y} x2="525" y2={y} stroke="#edf2ec" strokeWidth="1" />
-              <text x="22" y={y + 3.5} fill="#7d8f82" fontSize="9.5" fontWeight="500" textAnchor="end">
+              <line x1="30" y1={y} x2={plotRight} y2={y} stroke="#edf2ec" strokeWidth="1" />
+              <text x="24" y={y + 3.5} fill="#7d8f82" fontSize="9.5" fontWeight="500" textAnchor="end">
                 {tickVal}
               </text>
             </g>
@@ -1163,8 +1173,8 @@ function TodayEnergyBySiteChart({ locations, selectedId, onSelect }) {
 
         {/* Bars for 6 sites */}
         {sitesData.map((site, idx) => {
-          const barWidth = 36;
-          const x = 52 + idx * 78;
+          const slotCenter = plotLeft + idx * slotWidth + slotWidth / 2;
+          const barX = slotCenter - barWidth / 2;
           const barHeight = Math.max((site.val / yMax) * plotHeight, 2.5);
           const barY = plotBottom - barHeight;
           const isSelected = site.uid === selectedId;
@@ -1175,8 +1185,9 @@ function TodayEnergyBySiteChart({ locations, selectedId, onSelect }) {
               style={{ cursor: "pointer" }}
               onClick={() => onSelect && onSelect(site.uid)}
             >
+              <title>{site.name}: {site.val} kWh</title>
               <rect
-                x={x}
+                x={barX}
                 y={barY}
                 width={barWidth}
                 height={barHeight}
@@ -1187,10 +1198,10 @@ function TodayEnergyBySiteChart({ locations, selectedId, onSelect }) {
                 style={{ transition: "all 0.2s ease" }}
               />
               <text
-                x={x + barWidth / 2}
-                y="182"
+                x={slotCenter}
+                y="176"
                 fill="#586b5e"
-                fontSize="8"
+                fontSize="7.2"
                 fontWeight={isSelected ? "700" : "500"}
                 textAnchor="middle"
               >
