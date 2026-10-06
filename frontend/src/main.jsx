@@ -1156,7 +1156,7 @@ function TodayEnergyBySiteChart({ locations, selectedId, onSelect }) {
   const barWidth = 44;
 
   return (
-    <div style={{ width: "100%", height: "230px", position: "relative", marginTop: "10px" }}>
+    <div className="today-energy-chart-wrap">
       <svg viewBox="0 0 740 190" style={{ width: "100%", height: "100%", overflow: "visible" }}>
         {/* Y Grid lines and tick labels */}
         {yTicks.map((tickVal) => {

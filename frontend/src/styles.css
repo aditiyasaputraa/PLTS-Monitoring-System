@@ -615,7 +615,7 @@ button {
 /* Row 3: Overview & Today's Energy by Site */
 .grid-row-overview {
   display: grid;
-  grid-template-columns: 420px 1fr;
+  grid-template-columns: 460px 1fr;
   gap: 20px;
   align-items: stretch;
 }
@@ -629,31 +629,38 @@ button {
 .overview-left-kpis {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
+  height: 100%;
 }
 
 .overview-kpis-top-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  grid-template-rows: 1fr 1fr;
+  gap: 14px;
+  flex: 2;
 }
 
 .overview-kpis-bottom-row {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  gap: 12px;
+  grid-template-rows: 1fr;
+  gap: 14px;
+  flex: 1;
 }
 
 .kpi-mini-card {
   background: #ffffff;
   border: 1px solid #e2e8df;
-  border-radius: 14px;
+  border-radius: 16px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
-  padding: 16px 18px;
+  padding: 16px 20px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 6px;
+  height: 100%;
+  box-sizing: border-box;
 }
 
 .kpi-mini-card.accent-mint {
@@ -707,6 +714,18 @@ button {
   border-radius: 16px;
   padding: 24px 28px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.today-energy-chart-wrap {
+  width: 100%;
+  flex: 1;
+  min-height: 220px;
+  display: flex;
+  align-items: center;
+  position: relative;
+  margin-top: 10px;
 }
 
 
