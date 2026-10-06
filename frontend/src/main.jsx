@@ -957,7 +957,15 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt }) {
                 <LeafIcon style={{ width: "12px", height: "12px", color: "#10b981" }} />
               </div>
               <div className="total-stat-num">
-                {formatNumber(selected?.cumulative_income ?? 0, 0)} <small>IDR</small>
+                {selected?.source === "kehua" ? (
+                  <span title="Tidak tersedia di vendor Kehua" style={{ fontSize: "13px", color: "#8a998f", fontWeight: 700 }}>
+                    - <small style={{ fontSize: "10px", color: "#b45309", fontWeight: 600, display: "block" }}>Tidak tersedia di vendor Kehua</small>
+                  </span>
+                ) : (
+                  <>
+                    {formatNumber(selected?.cumulative_income ?? 0, 0)} <small>IDR</small>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -1915,8 +1923,48 @@ function EnergyView({ location, fleet, locations }) {
   );
 }
 
-function RevenueProductionChart({ series, period }) {
+function RevenueProductionChart({ series, period, isKehua }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
+
+  if (isKehua || series?.available === false) {
+    return (
+      <div style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "100%",
+        minHeight: "260px",
+        background: "#fafbfa",
+        borderRadius: "14px",
+        border: "1px dashed #cbd5cb",
+        padding: "28px 20px",
+        textAlign: "center",
+        boxSizing: "border-box",
+      }}>
+        <div style={{
+          width: "44px",
+          height: "44px",
+          borderRadius: "50%",
+          background: "#fef3c7",
+          color: "#d97706",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          marginBottom: "12px",
+          fontSize: "20px",
+        }}>
+          ⚠️
+        </div>
+        <h4 style={{ margin: "0 0 6px", fontSize: "15px", color: "#16231a", fontWeight: 700 }}>
+          Tidak Tersedia di Vendor Kehua
+        </h4>
+        <p style={{ margin: 0, fontSize: "13px", color: "#6e8074", maxWidth: "440px", lineHeight: 1.5 }}>
+          {series?.reason || "Data kurva grafik pendapatan tidak tersedia dari vendor Kehua karena tarif dasar listrik (feed-in tariff) belum dikonfigurasi di portal Kehua."}
+        </p>
+      </div>
+    );
+  }
 
   const labels = series?.labels || [];
   const values = series?.values || [];
@@ -2106,11 +2154,12 @@ function RevenueView({ location, fleet, locations }) {
   const activeStation = location || locations.find((l) => l.source === "huawei") || locations?.[0] || {};
   const stationName = activeStation.name || "GOR Sekda Saefullah";
   const platformName = activeStation.source || "huawei";
+  const isKehua = (activeStation.source || "").toLowerCase() === "kehua";
 
-  const todayRev = Number(activeStation.daily_income ?? (Number(activeStation.today_energy_kwh || 0) * 1444.7));
-  const monthRev = Number(activeStation.monthly_income ?? (Number(activeStation.monthly_energy_kwh || 0) * 1444.7));
-  const yearRev = Number(activeStation.yearly_income ?? (Number(activeStation.yearly_energy_kwh || 0) * 1444.7));
-  const lifetimeRev = Number(activeStation.cumulative_income ?? activeStation.total_income ?? (Number(activeStation.total_energy_kwh || 0) * 1444.7));
+  const todayRev = isKehua ? 0 : Number(activeStation.daily_income || 0);
+  const monthRev = isKehua ? 0 : Number(activeStation.monthly_income || 0);
+  const yearRev = isKehua ? 0 : Number(activeStation.yearly_income || 0);
+  const lifetimeRev = isKehua ? 0 : Number(activeStation.cumulative_income ?? activeStation.total_income ?? 0);
 
   const fleetMonthRev = Number(fleet.monthlyIncome || 893619);
   const fleetYearRev = Number(fleet.yearlyIncome || 75428228);
@@ -2119,36 +2168,42 @@ function RevenueView({ location, fleet, locations }) {
   const series = useMemo(() => getRevenueSeries(activeStation, period), [activeStation, period]);
 
   const curveSubtitle = useMemo(() => {
+    if (isKehua) return `${stationName} · Tidak tersedia di vendor Kehua`;
     if (period === "year") return `${stationName} · Revenue recorded in each month`;
     if (period === "month") return `${stationName} · Revenue through the latest reported day`;
     return `${stationName} · Available lifetime revenue history`;
-  }, [stationName, period]);
+  }, [stationName, period, isKehua]);
 
   const curveTitle = useMemo(() => {
+    if (isKehua) return "Revenue tidak tersedia";
     if (period === "year") return "Monthly revenue this year";
     if (period === "month") return "Daily revenue this month";
     return "Revenue by year";
-  }, [period]);
+  }, [period, isKehua]);
 
   const recordCount = useMemo(() => {
+    if (isKehua) return "-";
     if (period === "year") return "12 / 12";
     if (period === "month") return `${series?.values?.length || 31} / 31`;
     return `${series?.values?.length || 2} / ${series?.values?.length || 2}`;
-  }, [period, series]);
+  }, [period, series, isKehua]);
 
   const highestVal = useMemo(() => {
+    if (isKehua) return 0;
     const vals = (series?.values || []).map((v) => Number(v) || 0);
     return vals.length > 0 ? Math.max(...vals) : 0;
-  }, [series]);
+  }, [series, isKehua]);
 
   const latestVal = useMemo(() => {
+    if (isKehua) return 0;
     const vals = (series?.values || []).map((v) => Number(v) || 0);
     if (!vals.length) return 0;
     const nonZero = [...vals].reverse().find((v) => v > 0);
     return nonZero !== undefined ? nonZero : 0;
-  }, [series]);
+  }, [series, isKehua]);
 
   const formatMoneyCompact = (num) => {
+    if (!num || num === 0) return "0 IDR";
     if (num >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(2)}B IDR`;
     if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(2)}M IDR`;
     if (num >= 1_000) return `${(num / 1_000).toFixed(2)}K IDR`;
@@ -2169,9 +2224,16 @@ function RevenueView({ location, fleet, locations }) {
             <span className="rev-kpi-label">TODAY</span>
             <span className="rev-kpi-dash" />
           </div>
-          <div className="rev-kpi-val">
-            Rp {formatIdrNumber(todayRev)} <span className="rev-kpi-curr">IDR</span>
-          </div>
+          {isKehua ? (
+            <div className="rev-kpi-val" style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+              <span style={{ color: "#8a998f" }}>-</span>
+              <span style={{ fontSize: "11px", color: "#b45309", fontWeight: 600 }}>Tidak tersedia di vendor Kehua</span>
+            </div>
+          ) : (
+            <div className="rev-kpi-val">
+              Rp {formatIdrNumber(todayRev)} <span className="rev-kpi-curr">IDR</span>
+            </div>
+          )}
         </div>
 
         {/* THIS MONTH */}
@@ -2180,9 +2242,16 @@ function RevenueView({ location, fleet, locations }) {
             <span className="rev-kpi-label">THIS MONTH</span>
             <span className="rev-kpi-dash" />
           </div>
-          <div className="rev-kpi-val">
-            Rp {formatIdrNumber(monthRev)} <span className="rev-kpi-curr">IDR</span>
-          </div>
+          {isKehua ? (
+            <div className="rev-kpi-val" style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+              <span style={{ color: "#8a998f" }}>-</span>
+              <span style={{ fontSize: "11px", color: "#b45309", fontWeight: 600 }}>Tidak tersedia di vendor Kehua</span>
+            </div>
+          ) : (
+            <div className="rev-kpi-val">
+              Rp {formatIdrNumber(monthRev)} <span className="rev-kpi-curr">IDR</span>
+            </div>
+          )}
         </div>
 
         {/* THIS YEAR */}
@@ -2191,9 +2260,16 @@ function RevenueView({ location, fleet, locations }) {
             <span className="rev-kpi-label">THIS YEAR</span>
             <span className="rev-kpi-dash" />
           </div>
-          <div className="rev-kpi-val">
-            Rp {formatIdrNumber(yearRev)} <span className="rev-kpi-curr">IDR</span>
-          </div>
+          {isKehua ? (
+            <div className="rev-kpi-val" style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+              <span style={{ color: "#8a998f" }}>-</span>
+              <span style={{ fontSize: "11px", color: "#b45309", fontWeight: 600 }}>Tidak tersedia di vendor Kehua</span>
+            </div>
+          ) : (
+            <div className="rev-kpi-val">
+              Rp {formatIdrNumber(yearRev)} <span className="rev-kpi-curr">IDR</span>
+            </div>
+          )}
         </div>
 
         {/* LIFETIME */}
@@ -2202,9 +2278,16 @@ function RevenueView({ location, fleet, locations }) {
             <span className="rev-kpi-label">LIFETIME</span>
             <span className="rev-kpi-dash" />
           </div>
-          <div className="rev-kpi-val">
-            Rp {formatIdrNumber(lifetimeRev)} <span className="rev-kpi-curr">IDR</span>
-          </div>
+          {isKehua ? (
+            <div className="rev-kpi-val" style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+              <span style={{ color: "#8a998f" }}>-</span>
+              <span style={{ fontSize: "11px", color: "#b45309", fontWeight: 600 }}>Tidak tersedia di vendor Kehua</span>
+            </div>
+          ) : (
+            <div className="rev-kpi-val">
+              Rp {formatIdrNumber(lifetimeRev)} <span className="rev-kpi-curr">IDR</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -2248,7 +2331,7 @@ function RevenueView({ location, fleet, locations }) {
 
             {/* Inner Chart Box */}
             <div className="energy-chart-stage">
-              <RevenueProductionChart series={series} period={period} />
+              <RevenueProductionChart series={series} period={period} isKehua={isKehua} />
             </div>
 
             {/* 3 Stats underneath chart */}
@@ -2259,11 +2342,11 @@ function RevenueView({ location, fleet, locations }) {
               </div>
               <div className="curve-stat-box">
                 <span className="curve-stat-label">HIGHEST</span>
-                <span className="curve-stat-value">{formatMoneyCompact(highestVal)}</span>
+                <span className="curve-stat-value">{isKehua ? "-" : formatMoneyCompact(highestVal)}</span>
               </div>
               <div className="curve-stat-box">
                 <span className="curve-stat-label">LATEST</span>
-                <span className="curve-stat-value">{formatMoneyCompact(latestVal)}</span>
+                <span className="curve-stat-value">{isKehua ? "-" : formatMoneyCompact(latestVal)}</span>
               </div>
             </div>
           </div>
@@ -2277,24 +2360,50 @@ function RevenueView({ location, fleet, locations }) {
               <h3 className="rev-card-title">Selected site revenue</h3>
               <span className="rev-dash-indicator" />
             </div>
-            <div className="totals-grid-2x2">
-              <div>
-                <span className="total-item-label">CURRENCY</span>
-                <div className="total-item-val">IDR</div>
+            {isKehua ? (
+              <div style={{ padding: "6px 0" }}>
+                <div style={{ display: "inline-block", background: "#fef3c7", border: "1px solid #fde68a", color: "#b45309", padding: "5px 10px", borderRadius: "8px", fontSize: "11px", fontWeight: 700, marginBottom: "14px" }}>
+                  ⚠️ Tidak tersedia di vendor Kehua
+                </div>
+                <div className="totals-grid-2x2">
+                  <div>
+                    <span className="total-item-label">CURRENCY</span>
+                    <div className="total-item-val" style={{ color: "#8a998f" }}>-</div>
+                  </div>
+                  <div>
+                    <span className="total-item-label">TODAY</span>
+                    <div className="total-item-val" style={{ color: "#8a998f" }}>-</div>
+                  </div>
+                  <div>
+                    <span className="total-item-label">THIS YEAR</span>
+                    <div className="total-item-val" style={{ color: "#8a998f" }}>-</div>
+                  </div>
+                  <div>
+                    <span className="total-item-label">LIFETIME</span>
+                    <div className="total-item-val" style={{ color: "#8a998f" }}>-</div>
+                  </div>
+                </div>
               </div>
-              <div>
-                <span className="total-item-label">TODAY</span>
-                <div className="total-item-val">Rp {formatIdrNumber(todayRev)}</div>
+            ) : (
+              <div className="totals-grid-2x2">
+                <div>
+                  <span className="total-item-label">CURRENCY</span>
+                  <div className="total-item-val">IDR</div>
+                </div>
+                <div>
+                  <span className="total-item-label">TODAY</span>
+                  <div className="total-item-val">Rp {formatIdrNumber(todayRev)}</div>
+                </div>
+                <div>
+                  <span className="total-item-label">THIS YEAR</span>
+                  <div className="total-item-val">Rp {formatIdrNumber(yearRev)}</div>
+                </div>
+                <div>
+                  <span className="total-item-label">LIFETIME</span>
+                  <div className="total-item-val">Rp {formatIdrNumber(lifetimeRev)}</div>
+                </div>
               </div>
-              <div>
-                <span className="total-item-label">THIS YEAR</span>
-                <div className="total-item-val">Rp {formatIdrNumber(yearRev)}</div>
-              </div>
-              <div>
-                <span className="total-item-label">LIFETIME</span>
-                <div className="total-item-val">Rp {formatIdrNumber(lifetimeRev)}</div>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Card 2: Fleet Revenue Reference */}
