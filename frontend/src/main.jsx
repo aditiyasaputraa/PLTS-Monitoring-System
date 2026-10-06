@@ -13,7 +13,14 @@ const UI_STATE_STORAGE_KEY = "plts-monitoring.ui-state";
 
 function apiBase() {
   const configuredApiBase = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
-  return configuredApiBase || (import.meta.env.DEV ? "http://localhost:8000" : "");
+  if (configuredApiBase) return configuredApiBase;
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host === "localhost" || host === "127.0.0.1" || host === "::1" || host.endsWith(".test") || host.endsWith(".local")) {
+      return "http://localhost:8000";
+    }
+  }
+  return import.meta.env.DEV ? "http://localhost:8000" : "";
 }
 
 function authConfig() {

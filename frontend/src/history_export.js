@@ -9,7 +9,21 @@ const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
 function apiBase() {
   const configured = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
-  return configured || (import.meta.env.DEV ? "http://localhost:8000" : "");
+  if (configured) return configured;
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host === "localhost" || host === "127.0.0.1" || host === "::1" || host.endsWith(".test") || host.endsWith(".local")) {
+      return "http://localhost:8000";
+    }
+  }
+  return import.meta.env.DEV ? "http://localhost:8000" : "";
+}
+
+function authConfig() {
+  return {
+    url: (import.meta.env.VITE_SUPABASE_URL || "https://hurtfiwuefjxfosvwbsj.supabase.co").replace(/\/$/, ""),
+    key: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1cnRmaXd1ZWZqeGZvc3Z3YnNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA5MjUwNTYsImV4cCI6MjEwNjUwMTA1Nn0.usLZoKGKfIqzeLYkJnOAXPZUsQC_pNOSR8gwfkMHYiw",
+  };
 }
 
 function readSession() {
@@ -257,12 +271,13 @@ function field(label, control, className = "") {
 
 async function authorizedFetch(path, options = {}) {
   const session = readSession();
-  if (!session?.access_token) throw new Error("Please sign in before downloading history.");
   const base = apiBase();
   if (!base) throw new Error("VITE_API_URL is not configured.");
 
   const headers = new Headers(options.headers || {});
-  headers.set("Authorization", `Bearer ${session.access_token}`);
+  if (session?.access_token) {
+    headers.set("Authorization", `Bearer ${session.access_token}`);
+  }
   const response = await fetch(`${base}${path}`, { ...options, headers, cache: "no-store" });
   if (response.status === 401) throw new Error("Your session expired. Please sign in again.");
   return response;
@@ -270,16 +285,45 @@ async function authorizedFetch(path, options = {}) {
 
 async function loadStations(dropdown) {
   dropdown.setOptions([{ value: "", label: "All sites", meta: "Fleet" }]);
-  const response = await authorizedFetch(`/api/current?ts=${Date.now()}`);
-  if (!response.ok) throw new Error(`Unable to load stations (${response.status}).`);
-  const data = await response.json();
+  let data = null;
+
+  const base = apiBase();
+  if (base) {
+    try {
+      const response = await authorizedFetch(`/api/current?ts=${Date.now()}`);
+      if (response.ok) {
+        data = await response.json();
+      }
+    } catch (_) {}
+  }
+
+  if (!data?.by_site) {
+    try {
+      const { url, key } = authConfig();
+      const sbRes = await fetch(`${url}/rest/v1/monitoring_current?select=payload&limit=1`, {
+        headers: {
+          apikey: key,
+          Authorization: `Bearer ${key}`,
+          Accept: "application/json",
+        },
+      });
+      if (sbRes.ok) {
+        const rows = await sbRes.json();
+        data = rows?.[0]?.payload;
+      }
+    } catch (_) {}
+  }
+
+  if (!data?.by_site) return;
+
   const stations = [];
   Object.entries(data?.by_site || {}).forEach(([platform, site]) => {
     (site?.stations || []).forEach((station) => {
-      if (station?.station_id === undefined || station?.station_id === null) return;
+      const stId = station?.station_id ?? station?.station_numeric_id ?? station?.id;
+      if (stId === undefined || stId === null) return;
       stations.push({
-        value: `${platform}::${String(station.station_id)}`,
-        label: station.name || String(station.station_id),
+        value: `${platform}::${String(stId)}`,
+        label: station.name || station.station_name || String(stId),
         meta: platform,
       });
     });
@@ -303,6 +347,126 @@ function closeModal(modal) {
   document.body.classList.remove("history-export-open");
 }
 
+async function exportDirectFromSupabase({ startDate, endDate, resolution, platform, stationId, safeScope, fileFormat }) {
+  const { url, key } = authConfig();
+
+  // 1. Try querying daily or hourly table
+  const table = resolution === "hourly" ? "monitoring_site_hourly" : "monitoring_site_daily";
+  let endpoint = `${url}/rest/v1/${table}?select=*`;
+  if (resolution === "hourly") {
+    endpoint += `&bucket_hour=gte.${startDate}T00:00:00Z&bucket_hour=lte.${endDate}T23:59:59Z&order=bucket_hour.asc`;
+  } else {
+    endpoint += `&bucket_date=gte.${startDate}&bucket_date=lte.${endDate}&order=bucket_date.asc`;
+  }
+  if (platform) endpoint += `&platform=eq.${platform}`;
+  if (stationId) endpoint += `&station_id=eq.${stationId}`;
+
+  let rows = [];
+  try {
+    const res = await fetch(endpoint, {
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        Accept: "application/json",
+      },
+    });
+    if (res.ok) {
+      rows = await res.json();
+    }
+  } catch (_) {}
+
+  if (Array.isArray(rows) && rows.length > 0) {
+    const colKeys = Object.keys(rows[0]);
+    const csvLines = [colKeys.join(",")];
+    rows.forEach((r) => {
+      const line = colKeys.map((k) => {
+        const val = r[k];
+        if (val === null || val === undefined) return '""';
+        if (typeof val === "number") return val;
+        return `"${String(val).replace(/"/g, '""')}"`;
+      });
+      csvLines.push(line.join(","));
+    });
+    const blob = new Blob([csvLines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+    const filename = `PLTS-History_${safeScope}_${resolution}_${startDate}_to_${endDate}.csv`;
+    const downloadUrl = URL.createObjectURL(blob);
+    const anchor = el("a", { href: downloadUrl, download: filename });
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+    return;
+  }
+
+  // 2. Fallback to current monitoring snapshot
+  const curRes = await fetch(`${url}/rest/v1/monitoring_current?select=payload&limit=1`, {
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      Accept: "application/json",
+    },
+  });
+  if (curRes.ok) {
+    const curRows = await curRes.json();
+    const bySite = curRows?.[0]?.payload?.by_site || {};
+    const stations = [];
+    Object.entries(bySite).forEach(([plat, site]) => {
+      if (platform && plat !== platform) return;
+      (site.stations || []).forEach((st) => {
+        const stId = String(st.station_id ?? st.station_numeric_id ?? st.id);
+        if (stationId && stId !== String(stationId)) return;
+        stations.push({
+          platform: plat,
+          station_id: stId,
+          station_name: st.name || st.station_name || `Station ${stId}`,
+          status: st.status || "normal",
+          current_power_kw: st.inverter_power_kw ?? st.current_power_kw ?? 0,
+          today_energy_kwh: st.today_energy_kwh ?? st.daily_energy_kwh ?? 0,
+          monthly_energy_kwh: st.monthly_energy_kwh ?? st.month_energy_kwh ?? 0,
+          total_energy_kwh: st.total_energy_kwh ?? st.cumulative_energy_kwh ?? 0,
+          capacity_kwp: st.capacity_kwp ?? st.installed_capacity ?? 0,
+          address: st.address || "",
+          latitude: st.latitude || "",
+          longitude: st.longitude || "",
+        });
+      });
+    });
+
+    if (stations.length > 0) {
+      const headers = ["Platform", "Station ID", "Station Name", "Status", "Current Power (kW)", "Daily Energy (kWh)", "Monthly Energy (kWh)", "Total Energy (kWh)", "Capacity (kWp)", "Address", "Latitude", "Longitude"];
+      const csvLines = [headers.join(",")];
+      stations.forEach((s) => {
+        const row = [
+          `"${s.platform}"`,
+          `"${s.station_id}"`,
+          `"${(s.station_name || "").replace(/"/g, '""')}"`,
+          `"${s.status}"`,
+          Number(s.current_power_kw || 0).toFixed(2),
+          Number(s.today_energy_kwh || 0).toFixed(2),
+          Number(s.monthly_energy_kwh || 0).toFixed(2),
+          Number(s.total_energy_kwh || 0).toFixed(2),
+          Number(s.capacity_kwp || 0).toFixed(1),
+          `"${(s.address || "").replace(/"/g, '""')}"`,
+          s.latitude,
+          s.longitude,
+        ];
+        csvLines.push(row.join(","));
+      });
+      const blob = new Blob([csvLines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+      const filename = `PLTS-Monitoring_${safeScope}_${startDate}_to_${endDate}.csv`;
+      const downloadUrl = URL.createObjectURL(blob);
+      const anchor = el("a", { href: downloadUrl, download: filename });
+      document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+      return;
+    }
+  }
+
+  throw new Error("No data available to download for this selection.");
+}
+
 async function download(form, button, stationDropdown) {
   setError();
   const formData = new FormData(form);
@@ -321,8 +485,10 @@ async function download(form, button, stationDropdown) {
     resolution,
     format: fileFormat,
   });
+  let platform = "";
+  let stationId = "";
   if (stationValue) {
-    const [platform, stationId] = stationValue.split("::");
+    [platform, stationId] = stationValue.split("::");
     const selectedStation = stationDropdown?.getSelected?.();
     if (platform) params.set("platform", platform);
     if (stationId) params.set("station_id", stationId);
@@ -333,42 +499,67 @@ async function download(form, button, stationDropdown) {
   const originalText = button.textContent;
   button.textContent = `Preparing ${fileFormat.toUpperCase()}...`;
   try {
-    const response = await authorizedFetch(`/api/history/export?${params.toString()}`);
-    if (!response.ok) {
-      const payload = await response.json().catch(() => ({}));
-      const detail = typeof payload.detail === "string" ? payload.detail : `Export failed (${response.status}).`;
-      throw new Error(detail);
+    const base = apiBase();
+    let downloaded = false;
+
+    if (base) {
+      try {
+        const response = await authorizedFetch(`/api/history/export?${params.toString()}`);
+        if (response.ok) {
+          const blob = await response.blob();
+          const disposition = response.headers.get("Content-Disposition") || "";
+          const match = disposition.match(/filename="?([^";]+)"?/i);
+          const selectedStation = stationDropdown?.getSelected?.();
+          const scope = stationValue ? (selectedStation?.label || "selected-site") : "all-sites";
+          const safeScope = scope
+            .normalize("NFKD")
+            .replace(/[^A-Za-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "") || "history";
+          const now = new Date();
+          const parts = new Intl.DateTimeFormat("en-CA", {
+            timeZone: "Asia/Jakarta",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+          }).formatToParts(now);
+          const part = (type) => parts.find((item) => item.type === type)?.value || "00";
+          const exportedStamp = `${part("year")}-${part("month")}-${part("day")}_${part("hour")}-${part("minute")}-WIB`;
+          const fallbackFilename = `PLTS-History_${safeScope}_${resolution}_${startDate}_to_${endDate}_Exported-${exportedStamp}.${fileFormat}`;
+          const filename = match?.[1] || fallbackFilename;
+          const url = URL.createObjectURL(blob);
+          const anchor = el("a", { href: url, download: filename });
+          document.body.append(anchor);
+          anchor.click();
+          anchor.remove();
+          window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+          downloaded = true;
+        }
+      } catch (backendErr) {
+        console.warn("Backend export failed, attempting direct Supabase fallback:", backendErr);
+      }
     }
 
-    const blob = await response.blob();
-    const disposition = response.headers.get("Content-Disposition") || "";
-    const match = disposition.match(/filename="?([^";]+)"?/i);
-    const selectedStation = stationDropdown?.getSelected?.();
-    const scope = stationValue ? (selectedStation?.label || "selected-site") : "all-sites";
-    const safeScope = scope
-      .normalize("NFKD")
-      .replace(/[^A-Za-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "") || "history";
-    const now = new Date();
-    const parts = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Asia/Jakarta",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).formatToParts(now);
-    const part = (type) => parts.find((item) => item.type === type)?.value || "00";
-    const exportedStamp = `${part("year")}-${part("month")}-${part("day")}_${part("hour")}-${part("minute")}-WIB`;
-    const fallbackFilename = `PLTS-History_${safeScope}_${resolution}_${startDate}_to_${endDate}_Exported-${exportedStamp}.${fileFormat}`;
-    const filename = match?.[1] || fallbackFilename;
-    const url = URL.createObjectURL(blob);
-    const anchor = el("a", { href: url, download: filename });
-    document.body.append(anchor);
-    anchor.click();
-    anchor.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    if (!downloaded) {
+      const selectedStation = stationDropdown?.getSelected?.();
+      const scope = stationValue ? (selectedStation?.label || "selected-site") : "all-sites";
+      const safeScope = scope
+        .normalize("NFKD")
+        .replace(/[^A-Za-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "") || "history";
+
+      await exportDirectFromSupabase({
+        startDate,
+        endDate,
+        resolution,
+        platform,
+        stationId,
+        safeScope,
+        fileFormat,
+      });
+    }
   } finally {
     button.disabled = false;
     button.textContent = originalText;
