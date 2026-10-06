@@ -527,6 +527,19 @@ button {
   border-radius: 12px;
 }
 
+.offline-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 12px;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
 .site-geo-row {
   display: flex;
   align-items: center;
@@ -783,6 +796,14 @@ button {
   color: #0e623e;
 }
 
+.spec-val.offline {
+  color: #b91c1c;
+}
+
+.spec-val.abnormal {
+  color: #d97706;
+}
+
 .spec-address-box {
   background: #f4f7f4;
   border: 1px solid #e1e8e2;
@@ -867,6 +888,10 @@ button {
 .station-map-marker:hover, .station-map-marker.selected {
   transform: scale(1.35);
   box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.4), 0 4px 12px rgba(0,0,0,0.4);
+}
+
+.station-map-marker.offline:hover, .station-map-marker.offline.selected {
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.4), 0 4px 12px rgba(0,0,0,0.4);
 }
 
 /* SVG Chart Tooltips */

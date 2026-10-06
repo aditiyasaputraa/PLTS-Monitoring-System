@@ -683,10 +683,17 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt }) {
             <span className="card-eyebrow">SELECTED SITE</span>
             <div className="site-name-status-row">
               <span className="site-selected-title">{selected?.name || "SDN 09 JAKUT"}</span>
-              <span className="online-pill">
-                <span className="pulse-dot" style={{ width: "5px", height: "5px" }} />
-                Online
-              </span>
+              {selected?.status === "offline" || selected?.status === "disconnected" ? (
+                <span className="offline-pill">
+                  <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#ef4444" }} />
+                  Offline
+                </span>
+              ) : (
+                <span className="online-pill">
+                  <span className="pulse-dot" style={{ width: "5px", height: "5px" }} />
+                  Online
+                </span>
+              )}
             </div>
             <div className="site-geo-row">
               <span>📍 {selected?.address?.includes("Jakarta") ? "Jakarta Utara" : (selected?.address || "Jakarta Utara")}</span>
@@ -900,7 +907,9 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt }) {
             </div>
             <div className="spec-row">
               <span className="spec-label">Status</span>
-              <span className="spec-val normal">normal</span>
+              <span className={`spec-val ${selected?.status === "offline" || selected?.status === "disconnected" ? "offline" : (selected?.status === "abnormal" ? "abnormal" : "normal")}`}>
+                {selected?.status || "normal"}
+              </span>
             </div>
             <div className="spec-row">
               <span className="spec-label">Capacity</span>
@@ -1222,6 +1231,7 @@ function MiniStationMap({ location }) {
   const mapRef = useRef(null);
   const lat = Number(location?.latitude) || -6.12775;
   const lng = Number(location?.longitude) || 106.858751;
+  const isOffline = location?.status === "offline" || location?.status === "disconnected";
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -1244,7 +1254,7 @@ function MiniStationMap({ location }) {
       map.doubleClickZoom.enable();
 
       const el = document.createElement("div");
-      el.className = "station-map-marker online selected";
+      el.className = `station-map-marker ${isOffline ? "offline" : "online"} selected`;
       new maplibregl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
 
       mapRef.current = map;
@@ -1259,7 +1269,7 @@ function MiniStationMap({ location }) {
         mapRef.current = null;
       };
     } catch (_) {}
-  }, [lat, lng]);
+  }, [lat, lng, isOffline]);
 
   useEffect(() => {
     if (!containerRef.current) return;
