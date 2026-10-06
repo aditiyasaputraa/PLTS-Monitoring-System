@@ -405,7 +405,18 @@ function Dashboard({ session, onSignOut }) {
                 className="site-picker-btn"
                 onClick={() => setSiteDropdownOpen(!siteDropdownOpen)}
               >
-                <BuildingIcon style={{ width: "13px", height: "13px", color: "#34d399" }} />
+                <span
+                  style={{
+                    width: "7px",
+                    height: "7px",
+                    borderRadius: "50%",
+                    flexShrink: 0,
+                    background: selected?.status === "offline" || selected?.status === "disconnected" ? "#ef4444" : "#10b981",
+                    boxShadow: selected?.status === "offline" || selected?.status === "disconnected"
+                      ? "0 0 6px rgba(239, 68, 68, 0.7)"
+                      : "0 0 6px rgba(16, 185, 129, 0.7)",
+                  }}
+                />
                 <span>{selected?.name ? (selected.name.length > 14 ? `${selected.name.slice(0, 14)}...` : selected.name) : "All PLTS"}</span>
                 <span style={{ fontSize: "10px", opacity: 0.6 }}>▾</span>
               </button>
@@ -419,36 +430,55 @@ function Dashboard({ session, onSignOut }) {
                   border: "1px solid rgba(255,255,255,0.12)",
                   borderRadius: "12px",
                   boxShadow: "0 10px 25px rgba(0,0,0,0.4)",
-                  width: "220px",
+                  width: "245px",
                   zIndex: 200,
                   overflow: "hidden",
                   padding: "4px",
                 }}>
-                  {locations.map((loc) => (
-                    <button
-                      key={loc.uid}
-                      type="button"
-                      onClick={() => handleSelectSite(loc.uid)}
-                      style={{
-                        width: "100%",
-                        textAlign: "left",
-                        padding: "8px 12px",
-                        background: loc.uid === selected?.uid ? "rgba(16,185,129,0.18)" : "transparent",
-                        color: loc.uid === selected?.uid ? "#34d399" : "#ffffff",
-                        border: "none",
-                        borderRadius: "8px",
-                        fontSize: "12px",
-                        fontWeight: loc.uid === selected?.uid ? "700" : "500",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                      }}
-                    >
-                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{loc.name}</span>
-                      <small style={{ color: "#7d8f82", fontSize: "10px" }}>{loc.source}</small>
-                    </button>
-                  ))}
+                  {locations.map((loc) => {
+                    const isLocOffline = loc.status === "offline" || loc.status === "disconnected";
+                    const isLocSelected = loc.uid === selected?.uid;
+                    return (
+                      <button
+                        key={loc.uid}
+                        type="button"
+                        onClick={() => handleSelectSite(loc.uid)}
+                        style={{
+                          width: "100%",
+                          textAlign: "left",
+                          padding: "8px 12px",
+                          background: isLocSelected ? "rgba(16,185,129,0.18)" : "transparent",
+                          color: isLocSelected ? "#34d399" : "#ffffff",
+                          border: "none",
+                          borderRadius: "8px",
+                          fontSize: "12px",
+                          fontWeight: isLocSelected ? "700" : "500",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: "8px",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, overflow: "hidden" }}>
+                          <span
+                            style={{
+                              width: "7px",
+                              height: "7px",
+                              borderRadius: "50%",
+                              flexShrink: 0,
+                              background: isLocOffline ? "#ef4444" : "#10b981",
+                              boxShadow: isLocOffline
+                                ? "0 0 6px rgba(239, 68, 68, 0.7)"
+                                : "0 0 6px rgba(16, 185, 129, 0.7)",
+                            }}
+                          />
+                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{loc.name}</span>
+                        </div>
+                        <small style={{ color: "#7d8f82", fontSize: "10px", flexShrink: 0 }}>{loc.source}</small>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
