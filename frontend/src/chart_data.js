@@ -193,10 +193,24 @@ export function getRevenueSeries(location, period) {
   }[period];
 
   if (location?.source !== "huawei") {
+    // Fallback: estimate revenue from energy using standard Indonesian solar tariff (Rp 1,444.7 / kWh)
+    const energyPeriod = period === "lifetime" ? "year" : (period === "today" ? "today" : period);
+    const energySeries = getEnergySeries(location, energyPeriod);
+    if (energySeries?.available) {
+      const tariff = 1444.7;
+      return makeSeries({
+        labels: energySeries.labels,
+        values: energySeries.values.map((v) => (v !== null ? Math.round(v * tariff) : null)),
+        unit: "IDR",
+        kind: "bar",
+        title: config?.title || "Revenue history",
+        caption: `${config?.caption || "Estimated revenue"} (PLN tariff Rp 1,444.7/kWh)`,
+      });
+    }
     return unavailable({
       unit,
       title: config?.title || "Revenue history",
-      reason: "Kehua does not provide a historical revenue series for this station.",
+      reason: "Historical revenue series is unavailable for this station.",
     });
   }
 

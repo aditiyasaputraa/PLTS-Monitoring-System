@@ -1148,3 +1148,137 @@ button {
   margin: 0 0 20px;
 }
 
+/* ==================== REVENUE TAB STYLES ==================== */
+
+.revenue-view-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.revenue-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 1080px) {
+  .revenue-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .revenue-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.rev-kpi-card {
+  background: #ffffff;
+  border: 1px solid #e2e8df;
+  border-radius: 16px;
+  padding: 20px 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+}
+
+.rev-kpi-card.rev-kpi-lifetime {
+  background: #eaf5ec;
+  border: 1px solid #c7e5ce;
+}
+
+.rev-kpi-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.rev-kpi-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #65776a;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.rev-kpi-lifetime .rev-kpi-label {
+  color: #1b5e20;
+}
+
+.rev-kpi-dash {
+  width: 22px;
+  height: 3px;
+  background: #c5d0c7;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.rev-kpi-lifetime .rev-kpi-dash {
+  background: #1b5e20;
+}
+
+.rev-kpi-val {
+  font-size: 26px;
+  font-weight: 800;
+  color: #16231a;
+  line-height: 1.1;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.rev-kpi-lifetime .rev-kpi-val {
+  color: #125e22;
+}
+
+.rev-kpi-curr {
+  font-size: 11px;
+  font-weight: 700;
+  color: #65776a;
+  text-transform: uppercase;
+}
+
+.rev-kpi-lifetime .rev-kpi-curr {
+  color: #2e7d32;
+}
+
+.rev-selected-card {
+  background: #eaf5ec;
+  border: 1px solid #c7e5ce;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.rev-fleet-card {
+  background: #ffffff;
+  border: 1px solid #e2e8df;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.rev-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.rev-card-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #16231a;
+  margin: 0;
+}
+
+.rev-dash-indicator {
+  width: 24px;
+  height: 4px;
+  background: #1b5e20;
+  border-radius: 2px;
+}
+

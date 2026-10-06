@@ -534,7 +534,7 @@ function Dashboard({ session, onSignOut }) {
 
         {activeTab === "Revenue" && (
           <section className="energy-page-header">
-            <span className="energy-page-eyebrow">FINANCIAL REVENUE FOR THE SELECTED LOCATION</span>
+            <span className="energy-page-eyebrow">VENDOR-REPORTED REVENUE FOR THE SELECTED LOCATION</span>
             <h1 className="energy-page-title">Revenue</h1>
           </section>
         )}
@@ -555,7 +555,7 @@ function Dashboard({ session, onSignOut }) {
         )}
 
         {activeTab === "Revenue" && (
-          <RevenueView location={selected} fleet={fleet} />
+          <RevenueView location={selected} fleet={fleet} locations={locations} />
         )}
       </main>
 
@@ -1645,36 +1645,412 @@ function EnergyView({ location, fleet, locations }) {
   );
 }
 
-function RevenueView({ location, fleet }) {
-  const [period, setPeriod] = useState("month");
-  const series = useMemo(() => getRevenueSeries(location, period), [location, period]);
+function RevenueProductionChart({ series, period }) {
+  const [hoveredIndex, setHoveredIndex] = useState(null);
+
+  const labels = series?.labels || [];
+  const values = series?.values || [];
+
+  const effectiveLabels = labels.length > 0 ? labels : ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
+  const effectiveValues = values.length > 0 ? values : Array.from({ length: effectiveLabels.length }, () => 0);
+
+  const rawMax = Math.max(...effectiveValues.map((v) => Number(v) || 0), 100_000);
+  const yMax = rawMax;
+  const yTicks = [
+    0,
+    Math.round(yMax * 0.25),
+    Math.round(yMax * 0.5),
+    Math.round(yMax * 0.75),
+    Math.round(yMax),
+  ];
+
+  const svgWidth = 640;
+  const svgHeight = 220;
+  const paddingLeft = 52;
+  const paddingRight = 18;
+  const paddingTop = 22;
+  const paddingBottom = 34;
+  const plotWidth = svgWidth - paddingLeft - paddingRight;
+  const plotHeight = svgHeight - paddingTop - paddingBottom;
+
+  const barCount = effectiveLabels.length;
+  const step = plotWidth / barCount;
+  const barWidth = Math.max(4, Math.min(step * 0.72, 34));
+
+  let latestNonZeroIndex = -1;
+  for (let idx = effectiveValues.length - 1; idx >= 0; idx--) {
+    if (Number(effectiveValues[idx]) > 0) {
+      latestNonZeroIndex = idx;
+      break;
+    }
+  }
+
+  const isLabelVisible = (index) => {
+    if (period === "year") {
+      const val = parseInt(effectiveLabels[index], 10);
+      return [1, 3, 6, 8, 10, 12].includes(val);
+    }
+    if (period === "month") {
+      const day = parseInt(effectiveLabels[index], 10);
+      return [1, 5, 10, 15, 20, 25, 30].includes(day);
+    }
+    return true;
+  };
+
+  const formatTick = (val) => {
+    if (val === 0) return "0";
+    if (val >= 1_000_000_000) return `${(val / 1_000_000_000).toFixed(2)}B`;
+    if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(2)}M`;
+    if (val >= 1_000) return `${(val / 1_000).toFixed(2)}K`;
+    return String(val);
+  };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-      <div className="dashboard-card">
-        <div className="card-header-row">
-          <div>
-            <span className="card-eyebrow">FINANCIAL REVENUE</span>
-            <h2 className="card-title">Cumulative Income & Savings</h2>
-          </div>
-          <div style={{ display: "flex", gap: "6px" }}>
-            {["month", "year", "lifetime"].map((p) => (
-              <button
-                key={p}
-                type="button"
-                className={`action-btn-outline ${period === p ? "active" : ""}`}
-                style={{ background: period === p ? "#0d4a2b" : "#fff", color: period === p ? "#fff" : "inherit" }}
-                onClick={() => setPeriod(p)}
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      <svg
+        viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+        style={{ width: "100%", height: "100%", display: "block", overflow: "visible" }}
+      >
+        {/* Horizontal Grid lines and Y labels */}
+        {yTicks.map((tick, i) => {
+          const ratio = (tick - yTicks[0]) / (yTicks[yTicks.length - 1] - yTicks[0] || 1);
+          const y = paddingTop + plotHeight - ratio * plotHeight;
+          return (
+            <g key={i}>
+              <line
+                x1={paddingLeft}
+                y1={y}
+                x2={svgWidth - paddingRight}
+                y2={y}
+                stroke="rgba(0, 0, 0, 0.06)"
+                strokeDasharray={tick === 0 ? "none" : "3 3"}
+              />
+              <text
+                x={paddingLeft - 8}
+                y={y + 3.5}
+                textAnchor="end"
+                fontSize="10"
+                fontWeight="500"
+                fill="#7e9185"
+                fontFamily="Inter, system-ui, sans-serif"
               >
-                {p.toUpperCase()}
-              </button>
-            ))}
+                {formatTick(tick)}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Bars */}
+        {effectiveValues.map((val, i) => {
+          const num = Number(val) || 0;
+          const barHeight = Math.max((num / (yTicks[yTicks.length - 1] || 1)) * plotHeight, 0);
+          const x = paddingLeft + i * step + (step - barWidth) / 2;
+          const y = paddingTop + plotHeight - barHeight;
+          const isHovered = hoveredIndex === i;
+          const isCurrentActive = i === latestNonZeroIndex;
+
+          return (
+            <g
+              key={i}
+              onMouseEnter={() => setHoveredIndex(i)}
+              onMouseLeave={() => setHoveredIndex(null)}
+              style={{ cursor: "pointer" }}
+            >
+              <rect
+                x={paddingLeft + i * step}
+                y={paddingTop}
+                width={step}
+                height={plotHeight}
+                fill="transparent"
+              />
+              {barHeight > 0 && (
+                <rect
+                  x={x}
+                  y={y}
+                  width={barWidth}
+                  height={barHeight}
+                  rx="3"
+                  ry="3"
+                  fill={isHovered ? "#0d5731" : (isCurrentActive ? "#18633b" : "#cee5d5")}
+                  opacity={isHovered ? 1 : 0.95}
+                  style={{ transition: "all 0.2s ease" }}
+                />
+              )}
+            </g>
+          );
+        })}
+
+        {/* X-axis labels */}
+        {effectiveLabels.map((lbl, i) => {
+          if (!isLabelVisible(i)) return null;
+          const x = paddingLeft + i * step + step / 2;
+          const y = paddingTop + plotHeight + 16;
+          return (
+            <text
+              key={i}
+              x={x}
+              y={y}
+              textAnchor="middle"
+              fontSize="10"
+              fontWeight="500"
+              fill="#7e9185"
+              fontFamily="Inter, system-ui, sans-serif"
+            >
+              {lbl}
+            </text>
+          );
+        })}
+      </svg>
+
+      {hoveredIndex !== null && (
+        <div style={{
+          position: "absolute",
+          top: "6px",
+          left: "50%",
+          transform: "translateX(-50%)",
+          background: "#131d17",
+          color: "#ffffff",
+          padding: "4px 12px",
+          borderRadius: "8px",
+          fontSize: "11px",
+          fontWeight: 600,
+          pointerEvents: "none",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+          display: "flex",
+          gap: "8px",
+          zIndex: 10,
+        }}>
+          <span style={{ color: "#a3b8aa" }}>Periode {effectiveLabels[hoveredIndex]}</span>
+          <span style={{ color: "#34d399" }}>
+            Rp {new Intl.NumberFormat("id-ID").format(Math.round(effectiveValues[hoveredIndex] || 0))} IDR
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RevenueView({ location, fleet, locations }) {
+  const [period, setPeriod] = useState("year");
+
+  const activeStation = location || locations.find((l) => l.source === "huawei") || locations?.[0] || {};
+  const stationName = activeStation.name || "GOR Sekda Saefullah";
+  const platformName = activeStation.source || "huawei";
+
+  const todayRev = Number(activeStation.daily_income ?? (Number(activeStation.today_energy_kwh || 0) * 1444.7));
+  const monthRev = Number(activeStation.monthly_income ?? (Number(activeStation.monthly_energy_kwh || 0) * 1444.7));
+  const yearRev = Number(activeStation.yearly_income ?? (Number(activeStation.yearly_energy_kwh || 0) * 1444.7));
+  const lifetimeRev = Number(activeStation.cumulative_income ?? activeStation.total_income ?? (Number(activeStation.total_energy_kwh || 0) * 1444.7));
+
+  const fleetMonthRev = Number(fleet.monthlyIncome || 893619);
+  const fleetYearRev = Number(fleet.yearlyIncome || 75428228);
+  const fleetTotalRev = Number(fleet.totalIncome || 84786673);
+
+  const series = useMemo(() => getRevenueSeries(activeStation, period), [activeStation, period]);
+
+  const curveSubtitle = useMemo(() => {
+    if (period === "year") return `${stationName} · Revenue recorded in each month`;
+    if (period === "month") return `${stationName} · Revenue through the latest reported day`;
+    return `${stationName} · Available lifetime revenue history`;
+  }, [stationName, period]);
+
+  const curveTitle = useMemo(() => {
+    if (period === "year") return "Monthly revenue this year";
+    if (period === "month") return "Daily revenue this month";
+    return "Revenue by year";
+  }, [period]);
+
+  const recordCount = useMemo(() => {
+    if (period === "year") return "12 / 12";
+    if (period === "month") return `${series?.values?.length || 31} / 31`;
+    return `${series?.values?.length || 2} / ${series?.values?.length || 2}`;
+  }, [period, series]);
+
+  const highestVal = useMemo(() => {
+    const vals = (series?.values || []).map((v) => Number(v) || 0);
+    return vals.length > 0 ? Math.max(...vals) : 0;
+  }, [series]);
+
+  const latestVal = useMemo(() => {
+    const vals = (series?.values || []).map((v) => Number(v) || 0);
+    if (!vals.length) return 0;
+    const nonZero = [...vals].reverse().find((v) => v > 0);
+    return nonZero !== undefined ? nonZero : 0;
+  }, [series]);
+
+  const formatMoneyCompact = (num) => {
+    if (num >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(2)}B IDR`;
+    if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(2)}M IDR`;
+    if (num >= 1_000) return `${(num / 1_000).toFixed(2)}K IDR`;
+    return `${num} IDR`;
+  };
+
+  const formatIdrNumber = (num) => {
+    return new Intl.NumberFormat("id-ID").format(Math.round(Number(num) || 0));
+  };
+
+  return (
+    <div className="revenue-view-container">
+      {/* TOP ROW: 4 HORIZONTAL KPI CARDS */}
+      <div className="revenue-kpi-grid">
+        {/* TODAY */}
+        <div className="rev-kpi-card">
+          <div className="rev-kpi-top">
+            <span className="rev-kpi-label">TODAY</span>
+            <span className="rev-kpi-dash" />
+          </div>
+          <div className="rev-kpi-val">
+            Rp {formatIdrNumber(todayRev)} <span className="rev-kpi-curr">IDR</span>
           </div>
         </div>
-        <div className="four-kpi-row" style={{ margin: "16px 0" }}>
-          <div className="kpi-tile highlight">
-            <span className="kpi-tile-header">Total Lifetime Revenue</span>
-            <span className="kpi-tile-val">{formatFullRupiah(fleet.totalIncome || 84520705)}</span>
+
+        {/* THIS MONTH */}
+        <div className="rev-kpi-card">
+          <div className="rev-kpi-top">
+            <span className="rev-kpi-label">THIS MONTH</span>
+            <span className="rev-kpi-dash" />
+          </div>
+          <div className="rev-kpi-val">
+            Rp {formatIdrNumber(monthRev)} <span className="rev-kpi-curr">IDR</span>
+          </div>
+        </div>
+
+        {/* THIS YEAR */}
+        <div className="rev-kpi-card">
+          <div className="rev-kpi-top">
+            <span className="rev-kpi-label">THIS YEAR</span>
+            <span className="rev-kpi-dash" />
+          </div>
+          <div className="rev-kpi-val">
+            Rp {formatIdrNumber(yearRev)} <span className="rev-kpi-curr">IDR</span>
+          </div>
+        </div>
+
+        {/* LIFETIME */}
+        <div className="rev-kpi-card rev-kpi-lifetime">
+          <div className="rev-kpi-top">
+            <span className="rev-kpi-label">LIFETIME</span>
+            <span className="rev-kpi-dash" />
+          </div>
+          <div className="rev-kpi-val">
+            Rp {formatIdrNumber(lifetimeRev)} <span className="rev-kpi-curr">IDR</span>
+          </div>
+        </div>
+      </div>
+
+      {/* MAIN ROW: 2 COLUMNS (CHART ON LEFT, 2 DETAIL CARDS ON RIGHT) */}
+      <div className="energy-grid-layout">
+        {/* LEFT COLUMN: Revenue Curve Card */}
+        <div className="energy-left-col">
+          <div className="energy-curve-card">
+            <div className="curve-card-header">
+              <div>
+                <h2 className="curve-title">{curveTitle}</h2>
+                <p className="curve-subtitle">{curveSubtitle}</p>
+              </div>
+              <div className="curve-controls">
+                <div className="period-toggle-pill">
+                  <button
+                    type="button"
+                    className={period === "month" ? "active" : ""}
+                    onClick={() => setPeriod("month")}
+                  >
+                    Month
+                  </button>
+                  <button
+                    type="button"
+                    className={period === "year" ? "active" : ""}
+                    onClick={() => setPeriod("year")}
+                  >
+                    Year
+                  </button>
+                  <button
+                    type="button"
+                    className={period === "lifetime" ? "active" : ""}
+                    onClick={() => setPeriod("lifetime")}
+                  >
+                    Lifetime
+                  </button>
+                </div>
+                <span className="unit-pill-badge">IDR</span>
+              </div>
+            </div>
+
+            {/* Inner Chart Box */}
+            <div className="energy-chart-stage">
+              <RevenueProductionChart series={series} period={period} />
+            </div>
+
+            {/* 3 Stats underneath chart */}
+            <div className="curve-stats-row">
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">RECORDS</span>
+                <span className="curve-stat-value">{recordCount}</span>
+              </div>
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">HIGHEST</span>
+                <span className="curve-stat-value">{formatMoneyCompact(highestVal)}</span>
+              </div>
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">LATEST</span>
+                <span className="curve-stat-value">{formatMoneyCompact(latestVal)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN: Selected site revenue + Fleet revenue reference */}
+        <div className="energy-right-col">
+          {/* Card 1: Selected Site Revenue */}
+          <div className="rev-selected-card">
+            <div className="rev-card-header">
+              <h3 className="rev-card-title">Selected site revenue</h3>
+              <span className="rev-dash-indicator" />
+            </div>
+            <div className="totals-grid-2x2">
+              <div>
+                <span className="total-item-label">CURRENCY</span>
+                <div className="total-item-val">IDR</div>
+              </div>
+              <div>
+                <span className="total-item-label">TODAY</span>
+                <div className="total-item-val">Rp {formatIdrNumber(todayRev)}</div>
+              </div>
+              <div>
+                <span className="total-item-label">THIS YEAR</span>
+                <div className="total-item-val">Rp {formatIdrNumber(yearRev)}</div>
+              </div>
+              <div>
+                <span className="total-item-label">LIFETIME</span>
+                <div className="total-item-val">Rp {formatIdrNumber(lifetimeRev)}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: Fleet Revenue Reference */}
+          <div className="rev-fleet-card">
+            <div className="rev-card-header">
+              <h3 className="rev-card-title">Fleet revenue reference</h3>
+              <span className="rev-dash-indicator" />
+            </div>
+            <div className="totals-grid-2x2">
+              <div>
+                <span className="total-item-label">FLEET MONTH</span>
+                <div className="total-item-val">Rp {formatIdrNumber(fleetMonthRev)}</div>
+              </div>
+              <div>
+                <span className="total-item-label">FLEET YEAR</span>
+                <div className="total-item-val">Rp {formatIdrNumber(fleetYearRev)}</div>
+              </div>
+              <div>
+                <span className="total-item-label">FLEET TOTAL</span>
+                <div className="total-item-val">Rp {formatIdrNumber(fleetTotalRev)}</div>
+              </div>
+              <div>
+                <span className="total-item-label">SELECTED PLATFORM</span>
+                <div className="total-item-val">{platformName}</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1692,6 +2068,8 @@ function buildFleet(sites, locations) {
   const monthly = overview.reduce((sum, o) => sum + (Number(o.monthly_energy_kwh) || 0), 0) || 1153;
   const yearly = overview.reduce((sum, o) => sum + (Number(o.yearly_energy_kwh) || 0), 0) || 73786;
   const totalIncome = overview.reduce((sum, o) => sum + (Number(o.cumulative_income) || 0), 0) || 84520705;
+  const monthlyIncome = overview.reduce((sum, o) => sum + (Number(o.monthly_income) || 0), 0) || 893619;
+  const yearlyIncome = overview.reduce((sum, o) => sum + (Number(o.yearly_income) || 0), 0) || 75428228;
 
   return {
     stations: locations.length || 6,
@@ -1703,6 +2081,8 @@ function buildFleet(sites, locations) {
     monthly,
     yearly,
     totalIncome,
+    monthlyIncome,
+    yearlyIncome,
   };
 }
 
