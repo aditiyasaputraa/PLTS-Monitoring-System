@@ -950,11 +950,53 @@ button {
   gap: 20px;
 }
 
+.energy-row-main {
+  display: grid;
+  grid-template-columns: 1.55fr 1fr;
+  gap: 20px;
+  align-items: stretch;
+}
+
+@media (max-width: 1080px) {
+  .energy-row-main {
+    grid-template-columns: 1fr;
+  }
+}
+
+.energy-kpi-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100%;
+}
+
+.energy-kpi-stack .kpi-card-white,
+.energy-kpi-stack .kpi-card-lifetime {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.energy-row-bottom {
+  display: grid;
+  grid-template-columns: 1.55fr 1fr;
+  gap: 20px;
+  align-items: stretch;
+}
+
+@media (max-width: 1080px) {
+  .energy-row-bottom {
+    grid-template-columns: 1fr;
+  }
+}
+
 .energy-grid-layout {
   display: grid;
   grid-template-columns: 1.55fr 1fr;
   gap: 20px;
-  align-items: start;
+  align-items: stretch;
 }
 
 @media (max-width: 1080px) {
@@ -1091,6 +1133,11 @@ button {
   border-radius: 16px;
   padding: 24px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .selected-totals-title {
@@ -1204,6 +1251,11 @@ button {
   border-radius: 16px;
   padding: 24px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .fleet-ref-title {

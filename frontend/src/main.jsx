@@ -1579,92 +1579,67 @@ function EnergyView({ location, fleet, locations }) {
 
   return (
     <div className="energy-view-container">
-      <div className="energy-grid-layout">
-        {/* LEFT COLUMN: Production Curve Card + Selected Site Totals */}
-        <div className="energy-left-col">
-          {/* Card 1: Production Curve */}
-          <div className="energy-curve-card">
-            <div className="curve-card-header">
-              <div>
-                <h2 className="curve-title">{curveTitle}</h2>
-                <p className="curve-subtitle">{curveSubtitle}</p>
-              </div>
-              <div className="curve-controls">
-                <div className="period-toggle-pill">
-                  <button
-                    type="button"
-                    className={period === "today" ? "active" : ""}
-                    onClick={() => setPeriod("today")}
-                  >
-                    Today
-                  </button>
-                  <button
-                    type="button"
-                    className={period === "month" ? "active" : ""}
-                    onClick={() => setPeriod("month")}
-                  >
-                    Month
-                  </button>
-                  <button
-                    type="button"
-                    className={period === "year" ? "active" : ""}
-                    onClick={() => setPeriod("year")}
-                  >
-                    Year
-                  </button>
-                </div>
-                <span className="unit-pill-badge">KWH</span>
-              </div>
+      {/* ROW 1: PRODUCTION CURVE (LEFT) + 4 VERTICAL KPI CARDS (RIGHT) */}
+      <div className="energy-row-main">
+        {/* Left: Production Curve Card */}
+        <div className="energy-curve-card">
+          <div className="curve-card-header">
+            <div>
+              <h2 className="curve-title">{curveTitle}</h2>
+              <p className="curve-subtitle">{curveSubtitle}</p>
             </div>
-
-            {/* Inner Chart Box */}
-            <div className="energy-chart-stage">
-              <EnergyProductionChart series={series} period={period} />
-            </div>
-
-            {/* 3 Stats underneath chart */}
-            <div className="curve-stats-row">
-              <div className="curve-stat-box">
-                <span className="curve-stat-label">RECORDS</span>
-                <span className="curve-stat-value">{recordCount}</span>
+            <div className="curve-controls">
+              <div className="period-toggle-pill">
+                <button
+                  type="button"
+                  className={period === "today" ? "active" : ""}
+                  onClick={() => setPeriod("today")}
+                >
+                  Today
+                </button>
+                <button
+                  type="button"
+                  className={period === "month" ? "active" : ""}
+                  onClick={() => setPeriod("month")}
+                >
+                  Month
+                </button>
+                <button
+                  type="button"
+                  className={period === "year" ? "active" : ""}
+                  onClick={() => setPeriod("year")}
+                >
+                  Year
+                </button>
               </div>
-              <div className="curve-stat-box">
-                <span className="curve-stat-label">HIGHEST</span>
-                <span className="curve-stat-value">{formatNumber(highestVal, 1)} kWh</span>
-              </div>
-              <div className="curve-stat-box">
-                <span className="curve-stat-label">LATEST</span>
-                <span className="curve-stat-value">{formatNumber(latestVal, 1)} kWh</span>
-              </div>
+              <span className="unit-pill-badge">KWH</span>
             </div>
           </div>
 
-          {/* Card 2: Selected Site Totals */}
-          <div className="selected-totals-card">
-            <h3 className="selected-totals-title">Selected site totals</h3>
-            <div className="totals-grid-2x2">
-              <div>
-                <span className="total-item-label">DAILY MWH</span>
-                <div className="total-item-val">{todayMwh} MWh</div>
-              </div>
-              <div>
-                <span className="total-item-label">MONTHLY MWH</span>
-                <div className="total-item-val">{monthMwh} MWh</div>
-              </div>
-              <div>
-                <span className="total-item-label">YEARLY MWH</span>
-                <div className="total-item-val">{yearMwh} MWh</div>
-              </div>
-              <div>
-                <span className="total-item-label">TOTAL MWH</span>
-                <div className="total-item-val">{lifetimeMwh} MWh</div>
-              </div>
+          {/* Inner Chart Box */}
+          <div className="energy-chart-stage">
+            <EnergyProductionChart series={series} period={period} />
+          </div>
+
+          {/* 3 Stats underneath chart */}
+          <div className="curve-stats-row">
+            <div className="curve-stat-box">
+              <span className="curve-stat-label">RECORDS</span>
+              <span className="curve-stat-value">{recordCount}</span>
+            </div>
+            <div className="curve-stat-box">
+              <span className="curve-stat-label">HIGHEST</span>
+              <span className="curve-stat-value">{formatNumber(highestVal, 1)} kWh</span>
+            </div>
+            <div className="curve-stat-box">
+              <span className="curve-stat-label">LATEST</span>
+              <span className="curve-stat-value">{formatNumber(latestVal, 1)} kWh</span>
             </div>
           </div>
         </div>
 
-        {/* RIGHT COLUMN: 4 KPI Cards + Fleet Reference */}
-        <div className="energy-right-col">
+        {/* Right: 4 KPI Cards (Stack) */}
+        <div className="energy-kpi-stack">
           {/* Card 1: TODAY */}
           <div className="kpi-card-white">
             <span className="kpi-header-label">TODAY</span>
@@ -1700,27 +1675,53 @@ function EnergyView({ location, fleet, locations }) {
             </div>
             <div className="kpi-subtext">{lifetimeMwh} MWH</div>
           </div>
+        </div>
+      </div>
 
-          {/* Card 5: Fleet Reference */}
-          <div className="fleet-ref-card">
-            <h3 className="fleet-ref-title">Fleet reference</h3>
-            <div className="totals-grid-2x2">
-              <div>
-                <span className="total-item-label">FLEET TODAY</span>
-                <div className="total-item-val">{fleetTodayKwh} kWh</div>
-              </div>
-              <div>
-                <span className="total-item-label">FLEET MONTH</span>
-                <div className="total-item-val">{fleetMonthKwh} kWh</div>
-              </div>
-              <div>
-                <span className="total-item-label">FLEET YEAR</span>
-                <div className="total-item-val">{fleetYearKwh} kWh</div>
-              </div>
-              <div>
-                <span className="total-item-label">FLEET LIFETIME</span>
-                <div className="total-item-val">{fleetLifetimeKwh} kWh</div>
-              </div>
+      {/* ROW 2: SELECTED SITE TOTALS (LEFT) + FLEET REFERENCE (RIGHT) */}
+      <div className="energy-row-bottom">
+        {/* Left: Selected Site Totals */}
+        <div className="selected-totals-card">
+          <h3 className="selected-totals-title">Selected site totals</h3>
+          <div className="totals-grid-2x2">
+            <div>
+              <span className="total-item-label">DAILY MWH</span>
+              <div className="total-item-val">{todayMwh} MWh</div>
+            </div>
+            <div>
+              <span className="total-item-label">MONTHLY MWH</span>
+              <div className="total-item-val">{monthMwh} MWh</div>
+            </div>
+            <div>
+              <span className="total-item-label">YEARLY MWH</span>
+              <div className="total-item-val">{yearMwh} MWh</div>
+            </div>
+            <div>
+              <span className="total-item-label">TOTAL MWH</span>
+              <div className="total-item-val">{lifetimeMwh} MWh</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right: Fleet Reference */}
+        <div className="fleet-ref-card">
+          <h3 className="fleet-ref-title">Fleet reference</h3>
+          <div className="totals-grid-2x2">
+            <div>
+              <span className="total-item-label">FLEET TODAY</span>
+              <div className="total-item-val">{fleetTodayKwh} kWh</div>
+            </div>
+            <div>
+              <span className="total-item-label">FLEET MONTH</span>
+              <div className="total-item-val">{fleetMonthKwh} kWh</div>
+            </div>
+            <div>
+              <span className="total-item-label">FLEET YEAR</span>
+              <div className="total-item-val">{fleetYearKwh} kWh</div>
+            </div>
+            <div>
+              <span className="total-item-label">FLEET LIFETIME</span>
+              <div className="total-item-val">{fleetLifetimeKwh} kWh</div>
             </div>
           </div>
         </div>
