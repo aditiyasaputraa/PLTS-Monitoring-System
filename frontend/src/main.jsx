@@ -1387,10 +1387,10 @@ function EnergyProductionChart({ series, period }) {
   };
 
   return (
-    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+    <div style={{ position: "relative", width: "100%", height: "100%", flex: 1, display: "flex", alignItems: "center" }}>
       <svg
         viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-        style={{ width: "100%", height: "100%", display: "block", overflow: "visible" }}
+        style={{ width: "100%", height: "100%", maxHeight: "300px", display: "block", overflow: "visible" }}
       >
         <defs>
           <linearGradient id="energyBarGrad" x1="0" y1="0" x2="0" y2="1">
@@ -1791,10 +1791,10 @@ function RevenueProductionChart({ series, period }) {
   };
 
   return (
-    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+    <div style={{ position: "relative", width: "100%", height: "100%", flex: 1, display: "flex", alignItems: "center" }}>
       <svg
         viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-        style={{ width: "100%", height: "100%", display: "block", overflow: "visible" }}
+        style={{ width: "100%", height: "100%", maxHeight: "300px", display: "block", overflow: "visible" }}
       >
         {/* Horizontal Grid lines and Y labels */}
         {yTicks.map((tick, i) => {
