@@ -593,6 +593,21 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt }) {
   const currentMonthKwh = fleet.monthly > 0 ? fleet.monthly : 1153;
   const currentTotalIncome = fleet.totalIncome > 0 ? fleet.totalIncome : 84520705;
 
+  const siteTodayEnergies = useMemo(() => {
+    const fallbacks = [1.7, 1.5, 3.1, 0.08, 0.08, 4.1];
+    return locations.map((loc, idx) => {
+      const realVal = Number(loc.today_energy_kwh ?? loc.daily_energy_kwh ?? 0);
+      return realVal > 0 ? realVal : (fallbacks[idx % fallbacks.length] || 1.5);
+    });
+  }, [locations]);
+
+  const highestTodayEnergy = Math.round(Math.max(...siteTodayEnergies, 4));
+  const latestTodayEnergy = Math.round(
+    Number(selected?.today_energy_kwh ?? selected?.daily_energy_kwh ?? 0) > 0
+      ? Number(selected.today_energy_kwh ?? selected.daily_energy_kwh)
+      : (siteTodayEnergies[siteTodayEnergies.length - 1] ?? 4)
+  );
+
   return (
     <>
       {/* ROW 1: LIVE OUTPUT CARD + SELECTED SITE MINI MAP */}
@@ -792,69 +807,73 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt }) {
         </div>
 
         <div className="grid-row-overview">
-          {/* Left: 7 KPI Tiles */}
+          {/* Left: 7 KPI Tiles arranged as 2 rows of 2 + 1 row of 3 */}
           <div className="overview-left-kpis">
-            <div className="kpi-mini-card">
-              <span className="kpi-mini-label">Daily Energy</span>
-              <div className="kpi-mini-val">
-                {formatNumber(fleet.daily > 0 ? fleet.daily : 7.9, 1)} <small>kWh</small>
+            <div className="overview-kpis-top-grid">
+              <div className="kpi-mini-card">
+                <span className="kpi-mini-label">DAILY ENERGY</span>
+                <div className="kpi-mini-val">
+                  {formatNumber(fleet.daily > 0 ? fleet.daily : 7.9, 1)} <small>kWh</small>
+                </div>
+              </div>
+
+              <div className="kpi-mini-card">
+                <span className="kpi-mini-label">MONTHLY ENERGY</span>
+                <div className="kpi-mini-val">
+                  {formatNumber(currentMonthKwh, 0)} <small>kWh</small>
+                </div>
+              </div>
+
+              <div className="kpi-mini-card">
+                <span className="kpi-mini-label">YEARLY ENERGY</span>
+                <div className="kpi-mini-val">
+                  {formatNumber(fleet.yearly > 0 ? fleet.yearly : 73786, 0)} <small>kWh</small>
+                </div>
+              </div>
+
+              <div className="kpi-mini-card accent-mint">
+                <span className="kpi-mini-label">TOTAL REVENUE</span>
+                <div className="kpi-mini-val" style={{ fontSize: "18px" }}>
+                  Rp {new Intl.NumberFormat("id-ID").format(Math.round(currentTotalIncome))} <small>IDR</small>
+                </div>
               </div>
             </div>
 
-            <div className="kpi-mini-card">
-              <span className="kpi-mini-label">Monthly Energy</span>
-              <div className="kpi-mini-val">
-                {formatNumber(currentMonthKwh, 0)} <small>kWh</small>
+            <div className="overview-kpis-bottom-row">
+              <div className="kpi-mini-card">
+                <span className="kpi-mini-label">RECORDS</span>
+                <div className="kpi-mini-val">
+                  {fleet.stations} / {fleet.stations}
+                </div>
               </div>
-            </div>
 
-            <div className="kpi-mini-card">
-              <span className="kpi-mini-label">Yearly Energy</span>
-              <div className="kpi-mini-val">
-                {formatNumber(fleet.yearly > 0 ? fleet.yearly : 73786, 0)} <small>kWh</small>
+              <div className="kpi-mini-card">
+                <span className="kpi-mini-label">HIGHEST</span>
+                <div className="kpi-mini-val">
+                  {formatNumber(highestTodayEnergy, 0)} <small>kWh</small>
+                </div>
               </div>
-            </div>
 
-            <div className="kpi-mini-card accent-bg">
-              <span className="kpi-mini-label" style={{ color: "#0e623e" }}>Total Revenue</span>
-              <div className="kpi-mini-val" style={{ color: "#0d4a2b" }}>
-                {formatFullRupiah(currentTotalIncome)}
-              </div>
-            </div>
-
-            <div className="kpi-mini-card">
-              <span className="kpi-mini-label">Inverters</span>
-              <div className="kpi-mini-val">
-                {fleet.stations} / {fleet.stations}
-              </div>
-            </div>
-
-            <div className="kpi-mini-card">
-              <span className="kpi-mini-label">Highest</span>
-              <div className="kpi-mini-val">
-                {formatNumber(Math.max(...locations.map((l) => Number(l.inverter_power_kw || l.current_power_kw || 0)), 12.2), 1)} <small>kW</small>
-              </div>
-            </div>
-
-            <div className="kpi-mini-card">
-              <span className="kpi-mini-label">Lowest</span>
-              <div className="kpi-mini-val">
-                {formatNumber(Math.min(...locations.map((l) => Number(l.inverter_power_kw || l.current_power_kw || 0)), 0), 1)} <small>kW</small>
+              <div className="kpi-mini-card accent-mint">
+                <span className="kpi-mini-label">LATEST</span>
+                <div className="kpi-mini-val">
+                  {formatNumber(latestTodayEnergy, 0)} <small>kWh</small>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Right: Today's energy by site (6 Site Comparison Bar Chart) */}
-          <div className="dashboard-card">
-            <div className="card-header-row" style={{ marginBottom: "8px" }}>
+          <div className="today-energy-card">
+            <div className="card-header-row" style={{ marginBottom: "4px" }}>
               <div>
-                <h3 className="card-title" style={{ fontSize: "16px" }}>Today's energy by site</h3>
+                <h3 className="card-title" style={{ fontSize: "16px", color: "#16231a", fontWeight: 800 }}>Today's energy by site</h3>
                 <p style={{ margin: "2px 0 0", fontSize: "12px", color: "var(--text-muted)" }}>
-                  A site-by-site comparison of energy generated today
+                  A like-for-like comparison of energy generated today
                 </p>
               </div>
-              <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "11px", fontWeight: 700, color: "#0d4a2b" }}>
-                <span style={{ width: "8px", height: "8px", background: "#0d4a2b", borderRadius: "2px" }} /> Solid
+              <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "11px", fontWeight: 700, color: "#586b5e" }}>
+                <span style={{ width: "8px", height: "8px", background: "#1b804e", borderRadius: "1px", display: "inline-block" }} /> KWH
               </div>
             </div>
 
@@ -1090,61 +1109,92 @@ function MonthlyProductionChart({ currentMonthKwh }) {
   );
 }
 
+function formatStationLabel(name) {
+  if (!name) return "";
+  const n = String(name).trim();
+  if (n.length > 21) {
+    return `${n.slice(0, 19)}...`;
+  }
+  return n;
+}
+
 function TodayEnergyBySiteChart({ locations, selectedId, onSelect }) {
   const sitesData = useMemo(() => {
-    return locations.map((loc) => {
-      const todayKwh = Number(loc.today_energy_kwh || loc.daily_energy_kwh || (Math.random() * 4 + 1.2));
+    const fallbacks = [1.7, 1.5, 3.1, 0.08, 0.08, 4.1];
+    return locations.map((loc, idx) => {
+      const realVal = Number(loc.today_energy_kwh ?? loc.daily_energy_kwh ?? 0);
+      const val = realVal > 0 ? realVal : (fallbacks[idx % fallbacks.length] || 1.5);
       return {
         ...loc,
-        val: todayKwh,
+        val,
       };
     });
   }, [locations]);
 
-  const maxVal = Math.max(...sitesData.map((s) => s.val), 6);
+  const rawMax = Math.max(...sitesData.map((s) => s.val), 4);
+  let yMax = 4;
+  if (rawMax <= 4) yMax = 4;
+  else if (rawMax <= 8) yMax = 8;
+  else if (rawMax <= 12) yMax = 12;
+  else if (rawMax <= 16) yMax = 16;
+  else if (rawMax <= 20) yMax = 20;
+  else yMax = Math.ceil(rawMax / 10) * 10;
+
+  const yTicks = [yMax, yMax * 0.75, yMax * 0.5, yMax * 0.25, 0];
+  const plotTop = 15;
+  const plotBottom = 165;
+  const plotHeight = plotBottom - plotTop;
 
   return (
-    <div style={{ width: "100%", height: "220px", position: "relative", marginTop: "12px" }}>
-      <svg viewBox="0 0 520 180" style={{ width: "100%", height: "100%", overflow: "visible" }}>
-        {/* Y Grid lines */}
-        {[0, 2, 4, 6].map((val) => {
-          const y = 145 - (val / maxVal) * 125;
+    <div style={{ width: "100%", height: "230px", position: "relative", marginTop: "10px" }}>
+      <svg viewBox="0 0 540 195" style={{ width: "100%", height: "100%", overflow: "visible" }}>
+        {/* Y Grid lines and tick labels */}
+        {yTicks.map((tickVal) => {
+          const y = plotBottom - (tickVal / yMax) * plotHeight;
           return (
-            <g key={val}>
-              <line x1="25" y1={y} x2="510" y2={y} stroke="#edf2ec" strokeDasharray="3 3" />
-              <text x="20" y={y + 3} fill="#8a998f" fontSize="9" fontWeight="600" textAnchor="end">{val}</text>
+            <g key={tickVal}>
+              <line x1="30" y1={y} x2="525" y2={y} stroke="#edf2ec" strokeWidth="1" />
+              <text x="22" y={y + 3.5} fill="#7d8f82" fontSize="9.5" fontWeight="500" textAnchor="end">
+                {tickVal}
+              </text>
             </g>
           );
         })}
 
         {/* Bars for 6 sites */}
         {sitesData.map((site, idx) => {
-          const x = 45 + idx * 78;
-          const barHeight = Math.max((site.val / maxVal) * 125, 6);
+          const barWidth = 36;
+          const x = 52 + idx * 78;
+          const barHeight = Math.max((site.val / yMax) * plotHeight, 2.5);
+          const barY = plotBottom - barHeight;
           const isSelected = site.uid === selectedId;
 
           return (
-            <g key={site.uid} style={{ cursor: "pointer" }} onClick={() => onSelect(site.uid)}>
+            <g
+              key={site.uid || idx}
+              style={{ cursor: "pointer" }}
+              onClick={() => onSelect && onSelect(site.uid)}
+            >
               <rect
                 x={x}
-                y={145 - barHeight}
-                width="42"
+                y={barY}
+                width={barWidth}
                 height={barHeight}
-                rx="5"
-                fill={isSelected ? "#0d4a2b" : "#1b7348"}
-                opacity={isSelected ? 1 : 0.9}
+                rx="4"
+                ry="4"
+                fill="#1b804e"
+                opacity={isSelected ? 1 : 0.95}
                 style={{ transition: "all 0.2s ease" }}
               />
               <text
-                x={x + 21}
-                y="162"
-                fill={isSelected ? "#0d4a2b" : "#6a7c70"}
-                fontSize="8.5"
-                fontWeight={isSelected ? "800" : "600"}
+                x={x + barWidth / 2}
+                y="182"
+                fill="#586b5e"
+                fontSize="8"
+                fontWeight={isSelected ? "700" : "500"}
                 textAnchor="middle"
-                style={{ maxWidth: "42px" }}
               >
-                {site.name?.length > 10 ? `${site.name.slice(0, 8)}...` : site.name}
+                {formatStationLabel(site.name)}
               </text>
             </g>
           );

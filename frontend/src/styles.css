@@ -615,8 +615,9 @@ button {
 /* Row 3: Overview & Today's Energy by Site */
 .grid-row-overview {
   display: grid;
-  grid-template-columns: 360px 1fr;
+  grid-template-columns: 420px 1fr;
   gap: 20px;
+  align-items: stretch;
 }
 
 @media (max-width: 1080px) {
@@ -626,51 +627,88 @@ button {
 }
 
 .overview-left-kpis {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.overview-kpis-top-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.overview-kpis-bottom-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
 }
 
 .kpi-mini-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-card);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-card);
-  padding: 14px;
+  background: #ffffff;
+  border: 1px solid #e2e8df;
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  padding: 16px 18px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  justify-content: center;
+  gap: 6px;
 }
 
-.kpi-mini-card.full-span {
-  grid-column: span 2;
-}
-
-.kpi-mini-card.accent-bg {
-  background: #eaf4ed;
-  border-color: #c9e3cf;
+.kpi-mini-card.accent-mint {
+  background: #eaf5ec;
+  border-color: #c7e5ce;
 }
 
 .kpi-mini-label {
   font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  color: #637768;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #65776a;
   text-transform: uppercase;
+}
+
+.kpi-mini-card.accent-mint .kpi-mini-label {
+  color: #1b5e20;
 }
 
 .kpi-mini-val {
   font-size: 20px;
   font-weight: 800;
-  color: var(--text-main);
+  color: #16231a;
+  line-height: 1.1;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.kpi-mini-card.accent-mint .kpi-mini-val {
+  color: #125e22;
 }
 
 .kpi-mini-val small {
   font-size: 11px;
   font-weight: 600;
-  color: var(--text-muted);
-  margin-left: 2px;
+  color: #65776a;
+  text-transform: uppercase;
 }
+
+.kpi-mini-card.accent-mint .kpi-mini-val small {
+  color: #2e7d32;
+}
+
+.today-energy-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: #ffffff;
+  border: 1px solid #e2e8df;
+  border-radius: 16px;
+  padding: 24px 28px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
 
 /* Row 4: Selected Location & Fleet Register Map */
 .grid-row-bottom {
