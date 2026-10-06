@@ -1098,13 +1098,12 @@ button {
 .energy-chart-stage {
   background: #edf2ea;
   border-radius: 12px;
-  padding: 18px 16px 14px;
+  padding: 10px 12px 6px;
   margin-bottom: 16px;
   flex: 1;
-  min-height: 250px;
+  min-height: 270px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
 }
 
 .curve-stats-row {

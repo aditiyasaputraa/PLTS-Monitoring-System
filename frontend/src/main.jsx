@@ -1361,18 +1361,18 @@ function EnergyProductionChart({ series, period }) {
         Math.round(yMax * 10) / 10,
       ];
 
-  const svgWidth = 640;
-  const svgHeight = 220;
-  const paddingLeft = 40;
-  const paddingRight = 18;
-  const paddingTop = 22;
-  const paddingBottom = 34;
+  const svgWidth = 720;
+  const svgHeight = 290;
+  const paddingLeft = 36;
+  const paddingRight = 14;
+  const paddingTop = 14;
+  const paddingBottom = 26;
   const plotWidth = svgWidth - paddingLeft - paddingRight;
   const plotHeight = svgHeight - paddingTop - paddingBottom;
 
   const barCount = effectiveLabels.length;
   const step = plotWidth / barCount;
-  const barWidth = Math.max(3, Math.min(step * 0.65, 24));
+  const barWidth = Math.max(5, Math.min(step * 0.72, 28));
 
   const isLabelVisible = (index) => {
     if (period === "today") {
@@ -1387,10 +1387,10 @@ function EnergyProductionChart({ series, period }) {
   };
 
   return (
-    <div style={{ position: "relative", width: "100%", height: "100%", flex: 1, display: "flex", alignItems: "center" }}>
+    <div style={{ position: "relative", width: "100%", height: "100%", flex: 1, display: "flex", alignItems: "stretch" }}>
       <svg
         viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-        style={{ width: "100%", height: "100%", maxHeight: "300px", display: "block", overflow: "visible" }}
+        style={{ width: "100%", height: "100%", display: "block", overflow: "visible" }}
       >
         <defs>
           <linearGradient id="energyBarGrad" x1="0" y1="0" x2="0" y2="1">
@@ -1749,18 +1749,18 @@ function RevenueProductionChart({ series, period }) {
     Math.round(yMax),
   ];
 
-  const svgWidth = 640;
-  const svgHeight = 220;
-  const paddingLeft = 52;
-  const paddingRight = 18;
-  const paddingTop = 22;
-  const paddingBottom = 34;
+  const svgWidth = 720;
+  const svgHeight = 290;
+  const paddingLeft = 48;
+  const paddingRight = 14;
+  const paddingTop = 14;
+  const paddingBottom = 26;
   const plotWidth = svgWidth - paddingLeft - paddingRight;
   const plotHeight = svgHeight - paddingTop - paddingBottom;
 
   const barCount = effectiveLabels.length;
   const step = plotWidth / barCount;
-  const barWidth = Math.max(4, Math.min(step * 0.72, 34));
+  const barWidth = Math.max(5, Math.min(step * 0.72, 28));
 
   let latestNonZeroIndex = -1;
   for (let idx = effectiveValues.length - 1; idx >= 0; idx--) {
@@ -1791,10 +1791,10 @@ function RevenueProductionChart({ series, period }) {
   };
 
   return (
-    <div style={{ position: "relative", width: "100%", height: "100%", flex: 1, display: "flex", alignItems: "center" }}>
+    <div style={{ position: "relative", width: "100%", height: "100%", flex: 1, display: "flex", alignItems: "stretch" }}>
       <svg
         viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-        style={{ width: "100%", height: "100%", maxHeight: "300px", display: "block", overflow: "visible" }}
+        style={{ width: "100%", height: "100%", display: "block", overflow: "visible" }}
       >
         {/* Horizontal Grid lines and Y labels */}
         {yTicks.map((tick, i) => {
