@@ -79,6 +79,36 @@ export function getEnergySeries(location, period) {
 
   if (source === "huawei") {
     if (period === "today") {
+      const p5 = location?.daily_power_5min;
+      if (Array.isArray(p5?.x) && Array.isArray(p5?.generation_power_kw) && p5.generation_power_kw.length >= 24) {
+        const hourlyLabels = [];
+        const hourlyValues = [];
+        const step = Math.floor(p5.generation_power_kw.length / 24);
+        for (let h = 0; h < 24; h++) {
+          const hourStr = String(h).padStart(2, "0");
+          hourlyLabels.push(`${hourStr}:00`);
+          let sum = 0;
+          let count = 0;
+          for (let m = 0; m < step; m++) {
+            const idx = h * step + m;
+            const kw = Number(p5.generation_power_kw[idx]);
+            if (Number.isFinite(kw)) {
+              sum += kw;
+              count += 1;
+            }
+          }
+          const kwh = count > 0 ? (sum / step) : 0;
+          hourlyValues.push(Math.round(kwh * 100) / 100);
+        }
+        return makeSeries({
+          labels: hourlyLabels,
+          values: hourlyValues,
+          unit: "kWh",
+          kind: "bar",
+          title,
+          caption: "Hourly generation reported by FusionSolar",
+        });
+      }
       return makeSeries({
         labels: location?.daily_power_5min?.x,
         values: location?.daily_power_5min?.generation_power_kw,

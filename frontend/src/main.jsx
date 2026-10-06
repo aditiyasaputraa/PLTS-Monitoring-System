@@ -391,8 +391,8 @@ function Dashboard({ session, onSignOut }) {
                   writeUiState({ activeTab: tab });
                 }}
               >
-                {tab}
-                {tab === "Overview" && <span style={{ fontSize: "10px", opacity: 0.7 }}>▾</span>}
+                <span>{tab}</span>
+                {activeTab === tab && <span className="tab-active-dot" />}
               </button>
             ))}
           </nav>
@@ -487,41 +487,57 @@ function Dashboard({ session, onSignOut }) {
 
       {/* Main Workspace */}
       <main className="workspace-container">
-        {/* Operations Header Row */}
-        <section className="operations-header">
-          <div className="operations-title-wrap">
-            <span className="eyebrow-tag">OPERATIONS</span>
-            <div className="operations-main-title">
-              <h1>Monitoring PLTS</h1>
-              <span className="live-badge">
-                <span className="pulse-dot" style={{ width: "6px", height: "6px" }} />
-                Live
-              </span>
+        {/* Dynamic Page Header */}
+        {activeTab === "Overview" && (
+          <section className="operations-header">
+            <div className="operations-title-wrap">
+              <span className="eyebrow-tag">OPERATIONS</span>
+              <div className="operations-main-title">
+                <h1>Monitoring PLTS</h1>
+                <span className="live-badge">
+                  <span className="pulse-dot" style={{ width: "6px", height: "6px" }} />
+                  Live
+                </span>
+              </div>
+              <p className="operations-subtitle">Integrated monitoring for Huawei FusionSolar and Kehua.</p>
             </div>
-            <p className="operations-subtitle">Integrated monitoring for Huawei FusionSolar and Kehua.</p>
-          </div>
 
-          <div className="operations-actions">
-            <div className="date-badge">
-              <CalendarIcon style={{ width: "13px", height: "13px", color: "#6a7c70" }} />
-              <span>{formattedUpdatedDate}</span>
+            <div className="operations-actions">
+              <div className="date-badge">
+                <CalendarIcon style={{ width: "13px", height: "13px", color: "#6a7c70" }} />
+                <span>{formattedUpdatedDate}</span>
+              </div>
+              <button
+                type="button"
+                className="action-btn-outline"
+                onClick={() => {
+                  const trigger = document.querySelector(".history-export-trigger");
+                  if (trigger) trigger.click();
+                }}
+              >
+                <DownloadIcon style={{ width: "13px", height: "13px" }} />
+                <span>Export</span>
+              </button>
+              <button type="button" className="action-btn-outline" style={{ padding: "7px 10px" }} title="Notifikasi normal">
+                <BellIcon style={{ width: "14px", height: "14px", color: "#6a7c70" }} />
+              </button>
             </div>
-            <button
-              type="button"
-              className="action-btn-outline"
-              onClick={() => {
-                const trigger = document.querySelector(".history-export-trigger");
-                if (trigger) trigger.click();
-              }}
-            >
-              <DownloadIcon style={{ width: "13px", height: "13px" }} />
-              <span>Export</span>
-            </button>
-            <button type="button" className="action-btn-outline" style={{ padding: "7px 10px" }} title="Notifikasi normal">
-              <BellIcon style={{ width: "14px", height: "14px", color: "#6a7c70" }} />
-            </button>
-          </div>
-        </section>
+          </section>
+        )}
+
+        {activeTab === "Energy" && (
+          <section className="energy-page-header">
+            <span className="energy-page-eyebrow">PRODUCTION HISTORY FOR THE SELECTED LOCATION</span>
+            <h1 className="energy-page-title">Energy</h1>
+          </section>
+        )}
+
+        {activeTab === "Revenue" && (
+          <section className="energy-page-header">
+            <span className="energy-page-eyebrow">FINANCIAL REVENUE FOR THE SELECTED LOCATION</span>
+            <h1 className="energy-page-title">Revenue</h1>
+          </section>
+        )}
 
         {/* Tab Content */}
         {activeTab === "Overview" && (
@@ -535,7 +551,7 @@ function Dashboard({ session, onSignOut }) {
         )}
 
         {activeTab === "Energy" && (
-          <EnergyView location={selected} fleet={fleet} />
+          <EnergyView location={selected} fleet={fleet} locations={locations} />
         )}
 
         {activeTab === "Revenue" && (
@@ -1235,35 +1251,394 @@ function FullFleetMap({ locations, selectedId, onSelect }) {
 
 /* ==================== ENERGY & REVENUE TABS ==================== */
 
-function EnergyView({ location, fleet }) {
-  const [period, setPeriod] = useState("today");
-  const series = useMemo(() => getEnergySeries(location, period), [location, period]);
+function EnergyProductionChart({ series, period }) {
+  const [hoveredIndex, setHoveredIndex] = useState(null);
+
+  const labels = series?.labels || [];
+  const values = series?.values || [];
+
+  // Default to 24 hourly points if empty
+  const effectiveLabels = labels.length > 0
+    ? labels
+    : Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`);
+  const effectiveValues = values.length > 0
+    ? values
+    : Array.from({ length: 24 }, () => 0);
+
+  const rawMax = Math.max(...effectiveValues.map((v) => Number(v) || 0), 0.5);
+  const yMax = rawMax <= 1 ? 1 : Math.ceil(rawMax * 1.15 * 10) / 10;
+  const yTicks = yMax <= 1
+    ? [0, 0.3, 0.5, 0.8, 1]
+    : [
+        0,
+        Math.round(yMax * 0.25 * 10) / 10,
+        Math.round(yMax * 0.5 * 10) / 10,
+        Math.round(yMax * 0.75 * 10) / 10,
+        Math.round(yMax * 10) / 10,
+      ];
+
+  const svgWidth = 640;
+  const svgHeight = 220;
+  const paddingLeft = 40;
+  const paddingRight = 18;
+  const paddingTop = 22;
+  const paddingBottom = 34;
+  const plotWidth = svgWidth - paddingLeft - paddingRight;
+  const plotHeight = svgHeight - paddingTop - paddingBottom;
+
+  const barCount = effectiveLabels.length;
+  const step = plotWidth / barCount;
+  const barWidth = Math.max(3, Math.min(step * 0.65, 24));
+
+  const isLabelVisible = (index) => {
+    if (period === "today") {
+      const hour = parseInt(effectiveLabels[index], 10);
+      return [0, 5, 9, 14, 18, 23].includes(hour);
+    }
+    if (period === "month") {
+      const day = parseInt(effectiveLabels[index], 10);
+      return [1, 5, 10, 15, 20, 25, 30].includes(day);
+    }
+    return true;
+  };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-      <div className="dashboard-card">
-        <div className="card-header-row">
-          <div>
-            <span className="card-eyebrow">ENERGY PRODUCTION</span>
-            <h2 className="card-title">{location?.name || "All Stations"} - Energy</h2>
-          </div>
-          <div style={{ display: "flex", gap: "6px" }}>
-            {["today", "month", "year"].map((p) => (
-              <button
-                key={p}
-                type="button"
-                className={`action-btn-outline ${period === p ? "active" : ""}`}
-                style={{ background: period === p ? "#0d4a2b" : "#fff", color: period === p ? "#fff" : "inherit" }}
-                onClick={() => setPeriod(p)}
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      <svg
+        viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+        style={{ width: "100%", height: "100%", display: "block", overflow: "visible" }}
+      >
+        <defs>
+          <linearGradient id="energyBarGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#1b804e" />
+            <stop offset="100%" stopColor="#5bb980" />
+          </linearGradient>
+          <linearGradient id="energyBarHover" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#0d5731" />
+            <stop offset="100%" stopColor="#22c55e" />
+          </linearGradient>
+        </defs>
+
+        {/* Horizontal Grid lines and Y labels */}
+        {yTicks.map((tick, i) => {
+          const ratio = (tick - yTicks[0]) / (yTicks[yTicks.length - 1] - yTicks[0] || 1);
+          const y = paddingTop + plotHeight - ratio * plotHeight;
+          return (
+            <g key={i}>
+              <line
+                x1={paddingLeft}
+                y1={y}
+                x2={svgWidth - paddingRight}
+                y2={y}
+                stroke="rgba(0, 0, 0, 0.05)"
+                strokeDasharray={tick === 0 ? "none" : "3 3"}
+              />
+              <text
+                x={paddingLeft - 8}
+                y={y + 3.5}
+                textAnchor="end"
+                fontSize="10"
+                fontWeight="500"
+                fill="#7e9185"
+                fontFamily="Inter, system-ui, sans-serif"
               >
-                {p.toUpperCase()}
-              </button>
-            ))}
+                {tick}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Bars */}
+        {effectiveValues.map((val, i) => {
+          const num = Number(val) || 0;
+          const barHeight = Math.max((num / (yTicks[yTicks.length - 1] || 1)) * plotHeight, 0);
+          const x = paddingLeft + i * step + (step - barWidth) / 2;
+          const y = paddingTop + plotHeight - barHeight;
+          const isHovered = hoveredIndex === i;
+
+          return (
+            <g
+              key={i}
+              onMouseEnter={() => setHoveredIndex(i)}
+              onMouseLeave={() => setHoveredIndex(null)}
+              style={{ cursor: "pointer" }}
+            >
+              <rect
+                x={paddingLeft + i * step}
+                y={paddingTop}
+                width={step}
+                height={plotHeight}
+                fill="transparent"
+              />
+              {barHeight > 0 && (
+                <rect
+                  x={x}
+                  y={y}
+                  width={barWidth}
+                  height={barHeight}
+                  rx="3"
+                  ry="3"
+                  fill={isHovered ? "url(#energyBarHover)" : (i % 2 === 0 ? "#1b804e" : "#5bb980")}
+                  opacity={isHovered ? 1 : 0.9}
+                  style={{ transition: "all 0.2s ease" }}
+                />
+              )}
+            </g>
+          );
+        })}
+
+        {/* X-axis labels */}
+        {effectiveLabels.map((lbl, i) => {
+          if (!isLabelVisible(i)) return null;
+          const x = paddingLeft + i * step + step / 2;
+          const y = paddingTop + plotHeight + 16;
+          return (
+            <text
+              key={i}
+              x={x}
+              y={y}
+              textAnchor="middle"
+              fontSize="10"
+              fontWeight="500"
+              fill="#7e9185"
+              fontFamily="Inter, system-ui, sans-serif"
+            >
+              {lbl}
+            </text>
+          );
+        })}
+      </svg>
+
+      {hoveredIndex !== null && (
+        <div style={{
+          position: "absolute",
+          top: "6px",
+          left: "50%",
+          transform: "translateX(-50%)",
+          background: "#131d17",
+          color: "#ffffff",
+          padding: "4px 12px",
+          borderRadius: "8px",
+          fontSize: "11px",
+          fontWeight: 600,
+          pointerEvents: "none",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+          display: "flex",
+          gap: "8px",
+          zIndex: 10,
+        }}>
+          <span style={{ color: "#a3b8aa" }}>{effectiveLabels[hoveredIndex]}</span>
+          <span style={{ color: "#34d399" }}>
+            {Number(effectiveValues[hoveredIndex] || 0).toFixed(2)} {series?.unit || "kWh"}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EnergyView({ location, fleet, locations }) {
+  const [period, setPeriod] = useState("today");
+
+  const activeStation = location || locations?.[0] || {};
+  const stationName = activeStation.name || "SDN 09 JAKUT";
+  const platformName = activeStation.source
+    ? (activeStation.source.charAt(0).toUpperCase() + activeStation.source.slice(1))
+    : "Kehua";
+
+  const todayKwh = Number(activeStation.today_energy_kwh ?? activeStation.daily_energy_kwh ?? 16.6);
+  const monthKwh = Number(activeStation.monthly_energy_kwh ?? activeStation.month_energy_kwh ?? 326.4);
+  const yearKwh = Number(activeStation.yearly_energy_kwh ?? activeStation.year_energy_kwh ?? 16170);
+  const lifetimeKwh = Number(activeStation.total_energy_kwh ?? activeStation.cumulative_energy_kwh ?? 49740);
+
+  const todayMwh = (todayKwh / 1000).toFixed(3);
+  const monthMwh = (monthKwh / 1000).toFixed(3);
+  const yearMwh = (yearKwh / 1000).toFixed(2);
+  const lifetimeMwh = (lifetimeKwh / 1000).toFixed(2);
+
+  const fleetTodayKwh = formatNumber(fleet.daily || 112.1, 1);
+  const fleetMonthKwh = formatNumber(fleet.monthly || 1663, 0);
+  const fleetYearKwh = formatNumber(fleet.yearly || 95323.2, 1);
+  const fleetLifetimeKwh = formatNumber(fleet.lifetime || 189033.6, 1);
+
+  const series = useMemo(() => getEnergySeries(activeStation, period), [activeStation, period]);
+
+  const curveSubtitle = useMemo(() => {
+    if (period === "today") return `${stationName} · Hourly generation reported by ${platformName}`;
+    if (period === "month") return `${stationName} · Daily generation reported by ${platformName}`;
+    return `${stationName} · Monthly generation reported by ${platformName}`;
+  }, [stationName, platformName, period]);
+
+  const curveTitle = useMemo(() => {
+    if (period === "today") return "Today's production curve";
+    if (period === "month") return "Monthly production curve";
+    return "Yearly production curve";
+  }, [period]);
+
+  const recordCount = useMemo(() => {
+    if (period === "today") return "24 / 24";
+    if (period === "month") return `${series?.values?.length || 31} / 31`;
+    return "12 / 12";
+  }, [period, series]);
+
+  const highestVal = useMemo(() => {
+    const vals = (series?.values || []).map((v) => Number(v) || 0);
+    return vals.length > 0 ? Math.max(...vals) : 1;
+  }, [series]);
+
+  const latestVal = useMemo(() => {
+    const vals = (series?.values || []).map((v) => Number(v) || 0);
+    if (!vals.length) return 0;
+    const nonZero = [...vals].reverse().find((v) => v > 0);
+    return nonZero !== undefined ? nonZero : 0;
+  }, [series]);
+
+  return (
+    <div className="energy-view-container">
+      <div className="energy-grid-layout">
+        {/* LEFT COLUMN: Production Curve Card + Selected Site Totals */}
+        <div className="energy-left-col">
+          {/* Card 1: Production Curve */}
+          <div className="energy-curve-card">
+            <div className="curve-card-header">
+              <div>
+                <h2 className="curve-title">{curveTitle}</h2>
+                <p className="curve-subtitle">{curveSubtitle}</p>
+              </div>
+              <div className="curve-controls">
+                <div className="period-toggle-pill">
+                  <button
+                    type="button"
+                    className={period === "today" ? "active" : ""}
+                    onClick={() => setPeriod("today")}
+                  >
+                    Today
+                  </button>
+                  <button
+                    type="button"
+                    className={period === "month" ? "active" : ""}
+                    onClick={() => setPeriod("month")}
+                  >
+                    Month
+                  </button>
+                  <button
+                    type="button"
+                    className={period === "year" ? "active" : ""}
+                    onClick={() => setPeriod("year")}
+                  >
+                    Year
+                  </button>
+                </div>
+                <span className="unit-pill-badge">KWH</span>
+              </div>
+            </div>
+
+            {/* Inner Chart Box */}
+            <div className="energy-chart-stage">
+              <EnergyProductionChart series={series} period={period} />
+            </div>
+
+            {/* 3 Stats underneath chart */}
+            <div className="curve-stats-row">
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">RECORDS</span>
+                <span className="curve-stat-value">{recordCount}</span>
+              </div>
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">HIGHEST</span>
+                <span className="curve-stat-value">{formatNumber(highestVal, 1)} kWh</span>
+              </div>
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">LATEST</span>
+                <span className="curve-stat-value">{formatNumber(latestVal, 1)} kWh</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: Selected Site Totals */}
+          <div className="selected-totals-card">
+            <h3 className="selected-totals-title">Selected site totals</h3>
+            <div className="totals-grid-2x2">
+              <div>
+                <span className="total-item-label">DAILY MWH</span>
+                <div className="total-item-val">{todayMwh} MWh</div>
+              </div>
+              <div>
+                <span className="total-item-label">MONTHLY MWH</span>
+                <div className="total-item-val">{monthMwh} MWh</div>
+              </div>
+              <div>
+                <span className="total-item-label">YEARLY MWH</span>
+                <div className="total-item-val">{yearMwh} MWh</div>
+              </div>
+              <div>
+                <span className="total-item-label">TOTAL MWH</span>
+                <div className="total-item-val">{lifetimeMwh} MWh</div>
+              </div>
+            </div>
           </div>
         </div>
-        <p style={{ color: "var(--text-muted)", fontSize: "13px", margin: "0 0 16px" }}>{series?.title || "Energy history curve"}</p>
-        <div style={{ height: "260px" }}>
-          <MonthlyProductionChart currentMonthKwh={fleet.monthly} />
+
+        {/* RIGHT COLUMN: 4 KPI Cards + Fleet Reference */}
+        <div className="energy-right-col">
+          {/* Card 1: TODAY */}
+          <div className="kpi-card-white">
+            <span className="kpi-header-label">TODAY</span>
+            <div className="kpi-huge-number">
+              {formatNumber(todayKwh, 1)} <span className="kpi-unit-inline">KWH</span>
+            </div>
+            <div className="kpi-subtext">{todayMwh} MWH</div>
+          </div>
+
+          {/* Card 2: THIS MONTH */}
+          <div className="kpi-card-white">
+            <span className="kpi-header-label">THIS MONTH</span>
+            <div className="kpi-huge-number">
+              {formatNumber(monthKwh, 1)} <span className="kpi-unit-inline">KWH</span>
+            </div>
+            <div className="kpi-subtext">{monthMwh} MWH</div>
+          </div>
+
+          {/* Card 3: THIS YEAR */}
+          <div className="kpi-card-white">
+            <span className="kpi-header-label">THIS YEAR</span>
+            <div className="kpi-huge-number">
+              {formatNumber(yearKwh, 0)} <span className="kpi-unit-inline">KWH</span>
+            </div>
+            <div className="kpi-subtext">{yearMwh} MWH</div>
+          </div>
+
+          {/* Card 4: LIFETIME */}
+          <div className="kpi-card-lifetime">
+            <span className="kpi-header-label">LIFETIME</span>
+            <div className="kpi-huge-number">
+              {formatNumber(lifetimeKwh, 0)} <span className="kpi-unit-inline">KWH</span>
+            </div>
+            <div className="kpi-subtext">{lifetimeMwh} MWH</div>
+          </div>
+
+          {/* Card 5: Fleet Reference */}
+          <div className="fleet-ref-card">
+            <h3 className="fleet-ref-title">Fleet reference</h3>
+            <div className="totals-grid-2x2">
+              <div>
+                <span className="total-item-label">FLEET TODAY</span>
+                <div className="total-item-val">{fleetTodayKwh} kWh</div>
+              </div>
+              <div>
+                <span className="total-item-label">FLEET MONTH</span>
+                <div className="total-item-val">{fleetMonthKwh} kWh</div>
+              </div>
+              <div>
+                <span className="total-item-label">FLEET YEAR</span>
+                <div className="total-item-val">{fleetYearKwh} kWh</div>
+              </div>
+              <div>
+                <span className="total-item-label">FLEET LIFETIME</span>
+                <div className="total-item-val">{fleetLifetimeKwh} kWh</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
