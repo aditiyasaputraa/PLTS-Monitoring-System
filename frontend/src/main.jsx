@@ -327,7 +327,6 @@ export default function App() {
     return (
       <LoginPage
         onSignIn={auth.signIn}
-        onSignInDemo={auth.signInDemo}
         initialError={auth.error}
       />
     );
@@ -341,7 +340,7 @@ export default function App() {
   );
 }
 
-function LoginPage({ onSignIn, onSignInDemo, initialError }) {
+function LoginPage({ onSignIn, initialError }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(initialError || null);
@@ -365,13 +364,6 @@ function LoginPage({ onSignIn, onSignInDemo, initialError }) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const handleDemo = () => {
-    setError(null);
-    if (onSignInDemo) {
-      onSignInDemo();
     }
   };
 
@@ -467,25 +459,6 @@ function LoginPage({ onSignIn, onSignInDemo, initialError }) {
             <button type="submit" className="login-submit-btn" disabled={submitting}>
               {submitting ? "Memproses..." : "Masuk ke Dashboard"}
             </button>
-
-            <div className="login-divider">
-              <span>ATAU</span>
-            </div>
-
-            <button
-              type="button"
-              className="demo-login-btn"
-              onClick={handleDemo}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-              </svg>
-              <span>Masuk Cepat sebagai Operator Demo</span>
-            </button>
-
-            <p className="login-hint">
-              Tekan tombol <strong>Masuk Cepat</strong> untuk langsung meninjau data live tanpa perlu input kata sandi.
-            </p>
           </form>
         </div>
       </div>
