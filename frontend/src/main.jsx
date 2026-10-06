@@ -349,11 +349,11 @@ function LoginPage({ onSignIn, initialError }) {
   const submit = async (event) => {
     event.preventDefault();
     if (!email.trim()) {
-      setError("Silakan masukkan email atau username Anda.");
+      setError("Silakan masukkan email.");
       return;
     }
     if (!password.trim()) {
-      setError("Silakan masukkan password Anda.");
+      setError("Silakan masukkan password.");
       return;
     }
     setSubmitting(true);
@@ -369,95 +369,61 @@ function LoginPage({ onSignIn, initialError }) {
 
   return (
     <div className="login-page">
-      <div className="login-shell">
-        <div className="login-identity">
-          <div className="login-brand-header">
-            <div className="login-logo-circle">
-              <SolarPlantIcon style={{ width: "36px", height: "36px", color: "#10b981" }} />
-            </div>
-            <div className="login-brand-text">
-              <h2>PLTS MONITOR</h2>
-              <span>Sudin Nakertrans & ES Jakarta Pusat</span>
-            </div>
+      <div className="login-card">
+        {/* Left Column */}
+        <div className="login-card-left">
+          <h2 className="login-card-title">PLTS MONITOR</h2>
+          <div className="login-logo-wrap">
+            <img src="/jakarta-logo.png" alt="DKI Jakarta" className="login-jakarta-logo" />
           </div>
-
-          <div className="login-features">
-            <div className="login-feature-item">
-              <div className="login-feature-icon">⚡</div>
-              <div>
-                <strong>Monitoring Real-time</strong>
-                <p>Pantau status kelistrikan dan performa pembangkit PLTS secara akurat.</p>
-              </div>
-            </div>
-            <div className="login-feature-item">
-              <div className="login-feature-icon">📊</div>
-              <div>
-                <strong>Multi-Platform Vendor</strong>
-                <p>Integrasi portal Kehua Cloud dan Huawei FusionSolar dalam satu dashboard.</p>
-              </div>
-            </div>
-            <div className="login-feature-item">
-              <div className="login-feature-icon">🌿</div>
-              <div>
-                <strong>Laporan & Emisi Karbon</strong>
-                <p>Kalkulasi penghematan biaya dan pengurangan emisi CO₂ otomatis.</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="login-campus-brand">
-            <img src="/pnj-logo.svg" alt="PNJ" />
-            <div>
-              <span className="campus-title">Politeknik Negeri Jakarta</span>
-              <span className="campus-sub">Kolaborasi Riset & Pemantauan Energi Terbarukan</span>
-            </div>
+          <div className="login-agency-label">
+            <p>SUKU DINAS</p>
+            <p>TENAGA KERJA, TRANSMIGRASI,</p>
+            <p>& ENERGI</p>
+            <p>JAKARTA UTARA</p>
           </div>
         </div>
 
-        <div className="login-form-panel">
-          <div className="login-form-header">
-            <h1>Selamat Datang</h1>
-            <p>Silakan masuk dengan akun terdaftar untuk mengakses dashboard.</p>
-          </div>
+        {/* Right Column */}
+        <div className="login-card-right">
+          <h1 className="login-form-title">Sign in to PLTS Monitor</h1>
+          <p className="login-form-subtitle">Put your email and password below.</p>
 
           <form className="login-form" onSubmit={submit}>
-            <label>
-              <span>Email / Username</span>
+            <div className="login-input-group">
+              <label htmlFor="login-email">Email</label>
               <input
+                id="login-email"
                 type="text"
                 autoComplete="username"
-                placeholder="operator@jakarta.go.id"
+                placeholder="Masukkan email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 required
               />
-            </label>
+            </div>
 
-            <label>
-              <span>Password</span>
+            <div className="login-input-group">
+              <label htmlFor="login-password">Password</label>
               <input
+                id="login-password"
                 type="password"
                 autoComplete="current-password"
-                placeholder="••••••••"
+                placeholder="Masukkan password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 required
               />
-            </label>
+            </div>
 
             {error && (
               <div className="login-error">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" y1="8" x2="12" y2="12" />
-                  <line x1="12" y1="16" x2="12.01" y2="16" />
-                </svg>
                 <span>{error}</span>
               </div>
             )}
 
             <button type="submit" className="login-submit-btn" disabled={submitting}>
-              {submitting ? "Memproses..." : "Masuk ke Dashboard"}
+              {submitting ? "Memproses..." : "Sign In"}
             </button>
           </form>
         </div>
