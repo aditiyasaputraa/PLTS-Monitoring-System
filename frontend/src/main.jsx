@@ -673,7 +673,7 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt }) {
         </div>
 
         {/* Right: Selected Site Mini Map Card */}
-        <div className="dashboard-card">
+        <div className="dashboard-card selected-site-map-card">
           <div className="mini-map-preview">
             <span className="mini-map-badge">NORTH JAKARTA</span>
             <MiniStationMap location={selected} />
@@ -1230,24 +1230,47 @@ function MiniStationMap({ location }) {
         container: containerRef.current,
         style: OPENFREEMAP_STYLE,
         center: [lng, lat],
-        zoom: 14.5,
-        interactive: false,
+        zoom: 15,
+        interactive: true,
         attributionControl: false,
       });
+
+      // Add Zoom In / Zoom Out navigation buttons (+/-)
+      map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+
+      // Enable scroll wheel zoom and drag pan
+      map.scrollZoom.enable();
+      map.dragPan.enable();
+      map.doubleClickZoom.enable();
 
       const el = document.createElement("div");
       el.className = "station-map-marker online selected";
       new maplibregl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
 
       mapRef.current = map;
+
+      const resizeTimer = setTimeout(() => {
+        map.resize();
+      }, 150);
+
       return () => {
+        clearTimeout(resizeTimer);
         map.remove();
         mapRef.current = null;
       };
     } catch (_) {}
   }, [lat, lng]);
 
-  return <div ref={containerRef} style={{ width: "100%", height: "100%" }} />;
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver(() => {
+      mapRef.current?.resize();
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  return <div ref={containerRef} style={{ width: "100%", height: "100%", minHeight: "240px" }} />;
 }
 
 function FullFleetMap({ locations, selectedId, onSelect }) {
