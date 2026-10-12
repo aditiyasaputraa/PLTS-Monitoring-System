@@ -98,10 +98,21 @@ test("maps Huawei revenue periods to daily, monthly, and yearly vendor series", 
   assert.deepEqual(getRevenueSeries(huawei, "lifetime").values, [18000, 4300]);
 });
 
-test("reports Kehua revenue history unavailable and preserves its vendor currency", () => {
-  const series = getRevenueSeries(kehua, "year");
+test("calculates Kehua revenue series automatically at Rp 900/kWh", () => {
+  const seriesYear = getRevenueSeries(kehua, "year");
+  assert.equal(seriesYear.available, true);
+  assert.equal(seriesYear.unit, "IDR");
+  // 1.2 MWh * 900,000 = 1,080,000, 1.18 MWh * 900,000 = 1,062,000, 1.77 MWh * 900,000 = 1,593,000
+  assert.deepEqual(seriesYear.values, [1080000, 1062000, 1593000]);
+  assert.deepEqual(seriesYear.labels, ["1", "2", "3"]);
+  assert.match(seriesYear.caption, /Rp 900\/kWh/);
 
-  assert.equal(series.available, false);
-  assert.equal(series.unit, "¥");
-  assert.match(series.reason, /does not provide/i);
+  const seriesMonth = getRevenueSeries(kehua, "month");
+  assert.equal(seriesMonth.available, true);
+  assert.equal(seriesMonth.unit, "IDR");
+  // 58.1 kWh * 900 = 52,290, 63 kWh * 900 = 56,700, 68.8 kWh * 900 = 61,920
+  assert.deepEqual(seriesMonth.values, [52290, 56700, 61920]);
+  assert.deepEqual(seriesMonth.labels, ["1", "2", "3"]);
+  assert.match(seriesMonth.caption, /Rp 900\/kWh/);
 });
+

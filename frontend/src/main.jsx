@@ -449,6 +449,26 @@ function Dashboard({ session, onSignOut }) {
     return sites.flatMap((site) => (site.stations || []).map((station) => {
       const id = String(station.station_id || station.station_numeric_id || station.id);
       const name = station.station_name || station.name || `Station ${id}`;
+      const isKehua = (site.platform || "").toLowerCase() === "kehua";
+
+      const dailyKwh = Number(station.today_energy_kwh ?? station.daily_energy_kwh ?? 0);
+      const monthlyKwh = Number(station.monthly_energy_kwh ?? 0);
+      const yearlyKwh = Number(station.yearly_energy_kwh ?? 0);
+      const cumulativeKwh = Number(station.cumulative_energy_kwh ?? 0);
+
+      const dailyIncome = isKehua
+        ? (Number(station.daily_income) || Math.round(dailyKwh * 900))
+        : station.daily_income;
+      const monthlyIncome = isKehua
+        ? (Number(station.monthly_income) || Math.round(monthlyKwh * 900))
+        : station.monthly_income;
+      const yearlyIncome = isKehua
+        ? (Number(station.yearly_income) || Math.round(yearlyKwh * 900))
+        : station.yearly_income;
+      const cumulativeIncome = isKehua
+        ? (Number(station.cumulative_income ?? station.total_income) || Math.round(cumulativeKwh * 900))
+        : (station.cumulative_income ?? station.total_income);
+
       return {
         ...station,
         id,
@@ -456,6 +476,11 @@ function Dashboard({ session, onSignOut }) {
         source: site.platform,
         site,
         uid: `${site.platform}-${id}`,
+        daily_income: dailyIncome,
+        monthly_income: monthlyIncome,
+        yearly_income: yearlyIncome,
+        cumulative_income: cumulativeIncome,
+        income_currency: station.income_currency || "IDR",
       };
     }));
   }, [sites]);
@@ -957,15 +982,7 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt }) {
                 <LeafIcon style={{ width: "12px", height: "12px", color: "#10b981" }} />
               </div>
               <div className="total-stat-num">
-                {selected?.source === "kehua" ? (
-                  <span title="Tidak tersedia di vendor Kehua" style={{ fontSize: "13px", color: "#8a998f", fontWeight: 700 }}>
-                    - <small style={{ fontSize: "10px", color: "#b45309", fontWeight: 600, display: "block" }}>Tidak tersedia di vendor Kehua</small>
-                  </span>
-                ) : (
-                  <>
-                    {formatNumber(selected?.cumulative_income ?? 0, 0)} <small>IDR</small>
-                  </>
-                )}
+                {formatNumber(selected?.cumulative_income ?? (Number(selected?.cumulative_energy_kwh || 0) * 900), 0)} <small>IDR</small>
               </div>
             </div>
           </div>
@@ -1926,7 +1943,7 @@ function EnergyView({ location, fleet, locations }) {
 function RevenueProductionChart({ series, period, isKehua }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
 
-  if (isKehua || series?.available === false) {
+  if (series?.available === false) {
     return (
       <div style={{
         display: "flex",
@@ -1957,10 +1974,10 @@ function RevenueProductionChart({ series, period, isKehua }) {
           ⚠️
         </div>
         <h4 style={{ margin: "0 0 6px", fontSize: "15px", color: "#16231a", fontWeight: 700 }}>
-          Tidak Tersedia di Vendor Kehua
+          {series?.title || (isKehua ? "Data Histori Belum Tersedia" : "Tidak Tersedia")}
         </h4>
         <p style={{ margin: 0, fontSize: "13px", color: "#6e8074", maxWidth: "440px", lineHeight: 1.5 }}>
-          {series?.reason || "Data kurva grafik pendapatan tidak tersedia dari vendor Kehua karena tarif dasar listrik (feed-in tariff) belum dikonfigurasi di portal Kehua."}
+          {series?.reason || "Data kurva grafik pendapatan tidak tersedia untuk periode ini."}
         </p>
       </div>
     );
@@ -2156,10 +2173,10 @@ function RevenueView({ location, fleet, locations }) {
   const platformName = activeStation.source || "huawei";
   const isKehua = (activeStation.source || "").toLowerCase() === "kehua";
 
-  const todayRev = isKehua ? 0 : Number(activeStation.daily_income || 0);
-  const monthRev = isKehua ? 0 : Number(activeStation.monthly_income || 0);
-  const yearRev = isKehua ? 0 : Number(activeStation.yearly_income || 0);
-  const lifetimeRev = isKehua ? 0 : Number(activeStation.cumulative_income ?? activeStation.total_income ?? 0);
+  const todayRev = Number(activeStation.daily_income) || Math.round(Number(activeStation.daily_energy_kwh || activeStation.today_energy_kwh || 0) * 900);
+  const monthRev = Number(activeStation.monthly_income) || Math.round(Number(activeStation.monthly_energy_kwh || 0) * 900);
+  const yearRev = Number(activeStation.yearly_income) || Math.round(Number(activeStation.yearly_energy_kwh || 0) * 900);
+  const lifetimeRev = Number(activeStation.cumulative_income ?? activeStation.total_income) || Math.round(Number(activeStation.cumulative_energy_kwh || 0) * 900);
 
   const fleetMonthRev = Number(fleet.monthlyIncome || 893619);
   const fleetYearRev = Number(fleet.yearlyIncome || 75428228);
@@ -2168,39 +2185,34 @@ function RevenueView({ location, fleet, locations }) {
   const series = useMemo(() => getRevenueSeries(activeStation, period), [activeStation, period]);
 
   const curveSubtitle = useMemo(() => {
-    if (isKehua) return `${stationName} · Tidak tersedia di vendor Kehua`;
-    if (period === "year") return `${stationName} · Revenue recorded in each month`;
-    if (period === "month") return `${stationName} · Revenue through the latest reported day`;
-    return `${stationName} · Available lifetime revenue history`;
+    if (period === "year") return `${stationName} · Revenue recorded in each month${isKehua ? " (Rp 900/kWh)" : ""}`;
+    if (period === "month") return `${stationName} · Revenue through the latest reported day${isKehua ? " (Rp 900/kWh)" : ""}`;
+    return `${stationName} · Available lifetime revenue history${isKehua ? " (Rp 900/kWh)" : ""}`;
   }, [stationName, period, isKehua]);
 
   const curveTitle = useMemo(() => {
-    if (isKehua) return "Revenue tidak tersedia";
     if (period === "year") return "Monthly revenue this year";
     if (period === "month") return "Daily revenue this month";
     return "Revenue by year";
-  }, [period, isKehua]);
+  }, [period]);
 
   const recordCount = useMemo(() => {
-    if (isKehua) return "-";
-    if (period === "year") return "12 / 12";
+    if (period === "year") return `${series?.values?.length || 12} / 12`;
     if (period === "month") return `${series?.values?.length || 31} / 31`;
     return `${series?.values?.length || 2} / ${series?.values?.length || 2}`;
-  }, [period, series, isKehua]);
+  }, [period, series]);
 
   const highestVal = useMemo(() => {
-    if (isKehua) return 0;
     const vals = (series?.values || []).map((v) => Number(v) || 0);
     return vals.length > 0 ? Math.max(...vals) : 0;
-  }, [series, isKehua]);
+  }, [series]);
 
   const latestVal = useMemo(() => {
-    if (isKehua) return 0;
     const vals = (series?.values || []).map((v) => Number(v) || 0);
     if (!vals.length) return 0;
     const nonZero = [...vals].reverse().find((v) => v > 0);
     return nonZero !== undefined ? nonZero : 0;
-  }, [series, isKehua]);
+  }, [series]);
 
   const formatMoneyCompact = (num) => {
     if (!num || num === 0) return "0 IDR";
@@ -2222,72 +2234,48 @@ function RevenueView({ location, fleet, locations }) {
         <div className="rev-kpi-card">
           <div className="rev-kpi-top">
             <span className="rev-kpi-label">TODAY</span>
+            {isKehua && <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>Rp 900/kWh</span>}
             <span className="rev-kpi-dash" />
           </div>
-          {isKehua ? (
-            <div className="rev-kpi-val" style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-              <span style={{ color: "#8a998f" }}>-</span>
-              <span style={{ fontSize: "11px", color: "#b45309", fontWeight: 600 }}>Tidak tersedia di vendor Kehua</span>
-            </div>
-          ) : (
-            <div className="rev-kpi-val">
-              Rp {formatIdrNumber(todayRev)} <span className="rev-kpi-curr">IDR</span>
-            </div>
-          )}
+          <div className="rev-kpi-val">
+            Rp {formatIdrNumber(todayRev)} <span className="rev-kpi-curr">IDR</span>
+          </div>
         </div>
 
         {/* THIS MONTH */}
         <div className="rev-kpi-card">
           <div className="rev-kpi-top">
             <span className="rev-kpi-label">THIS MONTH</span>
+            {isKehua && <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>Rp 900/kWh</span>}
             <span className="rev-kpi-dash" />
           </div>
-          {isKehua ? (
-            <div className="rev-kpi-val" style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-              <span style={{ color: "#8a998f" }}>-</span>
-              <span style={{ fontSize: "11px", color: "#b45309", fontWeight: 600 }}>Tidak tersedia di vendor Kehua</span>
-            </div>
-          ) : (
-            <div className="rev-kpi-val">
-              Rp {formatIdrNumber(monthRev)} <span className="rev-kpi-curr">IDR</span>
-            </div>
-          )}
+          <div className="rev-kpi-val">
+            Rp {formatIdrNumber(monthRev)} <span className="rev-kpi-curr">IDR</span>
+          </div>
         </div>
 
         {/* THIS YEAR */}
         <div className="rev-kpi-card">
           <div className="rev-kpi-top">
             <span className="rev-kpi-label">THIS YEAR</span>
+            {isKehua && <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>Rp 900/kWh</span>}
             <span className="rev-kpi-dash" />
           </div>
-          {isKehua ? (
-            <div className="rev-kpi-val" style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-              <span style={{ color: "#8a998f" }}>-</span>
-              <span style={{ fontSize: "11px", color: "#b45309", fontWeight: 600 }}>Tidak tersedia di vendor Kehua</span>
-            </div>
-          ) : (
-            <div className="rev-kpi-val">
-              Rp {formatIdrNumber(yearRev)} <span className="rev-kpi-curr">IDR</span>
-            </div>
-          )}
+          <div className="rev-kpi-val">
+            Rp {formatIdrNumber(yearRev)} <span className="rev-kpi-curr">IDR</span>
+          </div>
         </div>
 
         {/* LIFETIME */}
         <div className="rev-kpi-card rev-kpi-lifetime">
           <div className="rev-kpi-top">
             <span className="rev-kpi-label">LIFETIME</span>
+            {isKehua && <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>Rp 900/kWh</span>}
             <span className="rev-kpi-dash" />
           </div>
-          {isKehua ? (
-            <div className="rev-kpi-val" style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-              <span style={{ color: "#8a998f" }}>-</span>
-              <span style={{ fontSize: "11px", color: "#b45309", fontWeight: 600 }}>Tidak tersedia di vendor Kehua</span>
-            </div>
-          ) : (
-            <div className="rev-kpi-val">
-              Rp {formatIdrNumber(lifetimeRev)} <span className="rev-kpi-curr">IDR</span>
-            </div>
-          )}
+          <div className="rev-kpi-val">
+            Rp {formatIdrNumber(lifetimeRev)} <span className="rev-kpi-curr">IDR</span>
+          </div>
         </div>
       </div>
 
@@ -2342,11 +2330,11 @@ function RevenueView({ location, fleet, locations }) {
               </div>
               <div className="curve-stat-box">
                 <span className="curve-stat-label">HIGHEST</span>
-                <span className="curve-stat-value">{isKehua ? "-" : formatMoneyCompact(highestVal)}</span>
+                <span className="curve-stat-value">{formatMoneyCompact(highestVal)}</span>
               </div>
               <div className="curve-stat-box">
                 <span className="curve-stat-label">LATEST</span>
-                <span className="curve-stat-value">{isKehua ? "-" : formatMoneyCompact(latestVal)}</span>
+                <span className="curve-stat-value">{formatMoneyCompact(latestVal)}</span>
               </div>
             </div>
           </div>
@@ -2360,50 +2348,29 @@ function RevenueView({ location, fleet, locations }) {
               <h3 className="rev-card-title">Selected site revenue</h3>
               <span className="rev-dash-indicator" />
             </div>
-            {isKehua ? (
-              <div style={{ padding: "6px 0" }}>
-                <div style={{ display: "inline-block", background: "#fef3c7", border: "1px solid #fde68a", color: "#b45309", padding: "5px 10px", borderRadius: "8px", fontSize: "11px", fontWeight: 700, marginBottom: "14px" }}>
-                  ⚠️ Tidak tersedia di vendor Kehua
-                </div>
-                <div className="totals-grid-2x2">
-                  <div>
-                    <span className="total-item-label">CURRENCY</span>
-                    <div className="total-item-val" style={{ color: "#8a998f" }}>-</div>
-                  </div>
-                  <div>
-                    <span className="total-item-label">TODAY</span>
-                    <div className="total-item-val" style={{ color: "#8a998f" }}>-</div>
-                  </div>
-                  <div>
-                    <span className="total-item-label">THIS YEAR</span>
-                    <div className="total-item-val" style={{ color: "#8a998f" }}>-</div>
-                  </div>
-                  <div>
-                    <span className="total-item-label">LIFETIME</span>
-                    <div className="total-item-val" style={{ color: "#8a998f" }}>-</div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="totals-grid-2x2">
-                <div>
-                  <span className="total-item-label">CURRENCY</span>
-                  <div className="total-item-val">IDR</div>
-                </div>
-                <div>
-                  <span className="total-item-label">TODAY</span>
-                  <div className="total-item-val">Rp {formatIdrNumber(todayRev)}</div>
-                </div>
-                <div>
-                  <span className="total-item-label">THIS YEAR</span>
-                  <div className="total-item-val">Rp {formatIdrNumber(yearRev)}</div>
-                </div>
-                <div>
-                  <span className="total-item-label">LIFETIME</span>
-                  <div className="total-item-val">Rp {formatIdrNumber(lifetimeRev)}</div>
-                </div>
+            {isKehua && (
+              <div style={{ display: "inline-block", background: "#ecfdf5", border: "1px solid #a7f3d0", color: "#047857", padding: "4px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 700, marginBottom: "12px" }}>
+                ⚡ Dihitung otomatis: Rp 900/kWh
               </div>
             )}
+            <div className="totals-grid-2x2">
+              <div>
+                <span className="total-item-label">CURRENCY</span>
+                <div className="total-item-val">IDR</div>
+              </div>
+              <div>
+                <span className="total-item-label">TODAY</span>
+                <div className="total-item-val">Rp {formatIdrNumber(todayRev)}</div>
+              </div>
+              <div>
+                <span className="total-item-label">THIS YEAR</span>
+                <div className="total-item-val">Rp {formatIdrNumber(yearRev)}</div>
+              </div>
+              <div>
+                <span className="total-item-label">LIFETIME</span>
+                <div className="total-item-val">Rp {formatIdrNumber(lifetimeRev)}</div>
+              </div>
+            </div>
           </div>
 
           {/* Card 2: Fleet Revenue Reference */}
@@ -2444,11 +2411,11 @@ function buildFleet(sites, locations) {
   const capacity = locations.reduce((sum, l) => sum + (Number(l.capacity_kwp || l.installed_capacity) || 0), 0) || 126.8;
   const current = locations.reduce((sum, l) => sum + (Number(l.inverter_power_kw || l.current_power_kw) || 0), 0);
   const daily = locations.reduce((sum, l) => sum + (Number(l.today_energy_kwh || l.daily_energy_kwh) || 0), 0) || 7.9;
-  const monthly = overview.reduce((sum, o) => sum + (Number(o.monthly_energy_kwh) || 0), 0) || 1153;
-  const yearly = overview.reduce((sum, o) => sum + (Number(o.yearly_energy_kwh) || 0), 0) || 73786;
-  const totalIncome = overview.reduce((sum, o) => sum + (Number(o.cumulative_income) || 0), 0) || 84520705;
-  const monthlyIncome = overview.reduce((sum, o) => sum + (Number(o.monthly_income) || 0), 0) || 893619;
-  const yearlyIncome = overview.reduce((sum, o) => sum + (Number(o.yearly_income) || 0), 0) || 75428228;
+  const monthly = locations.reduce((sum, l) => sum + (Number(l.monthly_energy_kwh) || 0), 0) || overview.reduce((sum, o) => sum + (Number(o.monthly_energy_kwh) || 0), 0) || 1153;
+  const yearly = locations.reduce((sum, l) => sum + (Number(l.yearly_energy_kwh) || 0), 0) || overview.reduce((sum, o) => sum + (Number(o.yearly_energy_kwh) || 0), 0) || 73786;
+  const totalIncome = locations.reduce((sum, l) => sum + (Number(l.cumulative_income) || 0), 0) || overview.reduce((sum, o) => sum + (Number(o.cumulative_income) || 0), 0) || 84520705;
+  const monthlyIncome = locations.reduce((sum, l) => sum + (Number(l.monthly_income) || 0), 0) || overview.reduce((sum, o) => sum + (Number(o.monthly_income) || 0), 0) || 893619;
+  const yearlyIncome = locations.reduce((sum, l) => sum + (Number(l.yearly_income) || 0), 0) || overview.reduce((sum, o) => sum + (Number(o.yearly_income) || 0), 0) || 75428228;
 
   return {
     stations: locations.length || 6,

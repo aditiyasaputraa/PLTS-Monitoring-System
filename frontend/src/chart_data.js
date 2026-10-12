@@ -173,7 +173,7 @@ export function getEnergySeries(location, period) {
 }
 
 export function getRevenueSeries(location, period) {
-  const unit = location?.income_currency || (location?.source === "huawei" ? "IDR" : "Currency");
+  const unit = location?.income_currency || "IDR";
   const config = {
     month: {
       chart: trimTrailingMissing(location?.revenue_charts?.daily),
@@ -192,12 +192,38 @@ export function getRevenueSeries(location, period) {
     },
   }[period];
 
-  if (location?.source === "kehua" || location?.source !== "huawei") {
+  if (location?.source === "kehua") {
+    const energySeries = getEnergySeries(location, period);
+    if (energySeries && energySeries.available !== false && Array.isArray(energySeries.values)) {
+      const isMwh = (energySeries.unit || "").toUpperCase() === "MWH";
+      const multiplier = isMwh ? (900 * 1000) : 900;
+      const revValues = energySeries.values.map((v) =>
+        v !== null && v !== undefined ? Math.round(Number(v) * multiplier) : null
+      );
+      return {
+        labels: energySeries.labels || [],
+        values: revValues,
+        unit: "IDR",
+        kind: "bar",
+        title: config?.title || "Revenue history",
+        caption: (energySeries.caption ? `${energySeries.caption} · ` : "") + "Dihitung otomatis (Rp 900/kWh)",
+        available: true,
+      };
+    }
     return unavailable({
       unit: "IDR",
       kind: "bar",
       title: config?.title || "Revenue history",
-      reason: "Tidak tersedia di vendor Kehua (tarif listrik belum dikonfigurasi di portal Kehua).",
+      reason: "Histori energi Kehua tidak tersedia untuk periode ini.",
+    });
+  }
+
+  if (location?.source !== "huawei") {
+    return unavailable({
+      unit: "IDR",
+      kind: "bar",
+      title: config?.title || "Revenue history",
+      reason: "Revenue history is unavailable for this platform.",
     });
   }
 

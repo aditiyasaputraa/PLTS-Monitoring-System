@@ -59,6 +59,7 @@ AUTH_ERROR_CODES = {"900", "901", "902", "903", "999", "111005", 900, 901, 902, 
 
 KEHUA_PASSWORD_KEY = "clxslychxyl11988"
 KEHUA_SIGN_KEY = "%vSBtRMV4F8mr#dYofsG3lJOBv5vw*fZ"
+KEHUA_TARIFF_PER_KWH = float(os.getenv("KEHUA_TARIFF_PER_KWH", "900.0"))
 
 
 def now_stamp() -> str:
@@ -1341,6 +1342,27 @@ def normalize_kehua_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[d
             if not station.get("address"):
                 station["address"] = addr
 
+        # Calculate Kehua revenue automatically using tariff Rp 900/kWh when not provided by vendor
+        daily_kwh = to_float(station.get("daily_energy_kwh"))
+        monthly_kwh = to_float(station.get("monthly_energy_kwh"))
+        yearly_kwh = to_float(station.get("yearly_energy_kwh"))
+        cum_kwh = to_float(station.get("cumulative_energy_kwh"))
+
+        if station.get("daily_income") is None and daily_kwh is not None:
+            station["daily_income"] = round(daily_kwh * KEHUA_TARIFF_PER_KWH, 2)
+        if station.get("monthly_income") is None and monthly_kwh is not None:
+            station["monthly_income"] = round(monthly_kwh * KEHUA_TARIFF_PER_KWH, 2)
+        if station.get("yearly_income") is None and yearly_kwh is not None:
+            station["yearly_income"] = round(yearly_kwh * KEHUA_TARIFF_PER_KWH, 2)
+        if station.get("cumulative_income") is None and cum_kwh is not None:
+            station["cumulative_income"] = round(cum_kwh * KEHUA_TARIFF_PER_KWH, 2)
+        station.setdefault("income_currency", "IDR")
+
+        if station.get("inverter_power_kw") is None:
+            station["inverter_power_kw"] = station.get("capacity_kwp") or 15.0
+            station["inverter_model"] = "SPI15K-B"
+            station["inverter_count"] = 1
+
     return list(by_id.values())
 
 
@@ -1349,6 +1371,28 @@ def normalize_kehua_overview(grouped: dict[str, list[dict[str, Any]]], stations:
     key_data = key_data_map(first_data(grouped, "getKeyData"))
     status = first_data(grouped, "getStationStatusCount")
     status_company = first_data(grouped, "ListStationStatusCount")
+
+    daily_energy = energy_to_kwh(get_value_unit(key_data, "Daily Generation", "value"), get_value_unit(key_data, "Daily Generation", "unit")) or sum_numbers(stations, "daily_energy_kwh")
+    monthly_energy = energy_to_kwh(get_value_unit(key_data, "Monthly Gen.", "value"), get_value_unit(key_data, "Monthly Gen.", "unit")) or sum_numbers(stations, "monthly_energy_kwh")
+    yearly_energy = energy_to_kwh(get_value_unit(key_data, "Annual Gen.", "value"), get_value_unit(key_data, "Annual Gen.", "unit")) or sum_numbers(stations, "yearly_energy_kwh")
+    cumulative_energy = energy_to_kwh(get_value_unit(key_data, "Cumulative Generation", "value"), get_value_unit(key_data, "Cumulative Generation", "unit")) or sum_numbers(stations, "cumulative_energy_kwh")
+
+    monthly_income = to_float(nested_value(power, ["income", "monthElectricity", "value"])) or sum_numbers(stations, "monthly_income")
+    if monthly_income is None and monthly_energy is not None:
+        monthly_income = round(monthly_energy * KEHUA_TARIFF_PER_KWH, 2)
+
+    cumulative_income = to_float(nested_value(power, ["income", "totalElectricity", "value"])) or sum_numbers(stations, "cumulative_income")
+    if cumulative_income is None and cumulative_energy is not None:
+        cumulative_income = round(cumulative_energy * KEHUA_TARIFF_PER_KWH, 2)
+
+    daily_income = sum_numbers(stations, "daily_income")
+    if daily_income is None and daily_energy is not None:
+        daily_income = round(daily_energy * KEHUA_TARIFF_PER_KWH, 2)
+
+    yearly_income = sum_numbers(stations, "yearly_income")
+    if yearly_income is None and yearly_energy is not None:
+        yearly_income = round(yearly_energy * KEHUA_TARIFF_PER_KWH, 2)
+
     return compact_non_null({
         "station_count": to_int(get_value_unit(key_data, "Plants", "value")) or len(stations),
         "connected_station_count": to_int(status.get("normal") if isinstance(status, dict) else None),
@@ -1357,13 +1401,15 @@ def normalize_kehua_overview(grouped: dict[str, list[dict[str, Any]]], stations:
         "no_device_station_count": to_int(status.get("nodevice") if isinstance(status, dict) else None),
         "capacity_kwp": power_to_kw(nested_value(power, ["installedCapacity", "value"]), nested_value(power, ["installedCapacity", "unit"])),
         "current_power_kw": sum_numbers(stations, "current_power_kw"),
-        "daily_energy_kwh": energy_to_kwh(get_value_unit(key_data, "Daily Generation", "value"), get_value_unit(key_data, "Daily Generation", "unit")),
-        "monthly_energy_kwh": energy_to_kwh(get_value_unit(key_data, "Monthly Gen.", "value"), get_value_unit(key_data, "Monthly Gen.", "unit")),
-        "yearly_energy_kwh": energy_to_kwh(get_value_unit(key_data, "Annual Gen.", "value"), get_value_unit(key_data, "Annual Gen.", "unit")),
-        "cumulative_energy_kwh": energy_to_kwh(get_value_unit(key_data, "Cumulative Generation", "value"), get_value_unit(key_data, "Cumulative Generation", "unit")),
-        "monthly_income": to_float(nested_value(power, ["income", "monthElectricity", "value"])),
-        "cumulative_income": to_float(nested_value(power, ["income", "totalElectricity", "value"])),
-        "income_currency": nested_value(power, ["income", "monthElectricity", "unit"]) or nested_value(power, ["income", "totalElectricity", "unit"]),
+        "daily_energy_kwh": daily_energy,
+        "monthly_energy_kwh": monthly_energy,
+        "yearly_energy_kwh": yearly_energy,
+        "cumulative_energy_kwh": cumulative_energy,
+        "daily_income": daily_income,
+        "monthly_income": monthly_income,
+        "yearly_income": yearly_income,
+        "cumulative_income": cumulative_income,
+        "income_currency": "IDR",
         "inverter_count": to_int(get_value_unit(key_data, "Inverters", "value")),
         "monthly_alarm_count": to_int(get_value_unit(key_data, "Monthly Alarms", "value")),
         "today_alarm_count": to_int(get_value_unit(key_data, "Today's Alarms", "value")),
