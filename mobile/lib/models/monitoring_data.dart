@@ -1,4 +1,6 @@
-﻿class StationModel {
+class StationModel {
+  static const double kehuaTariffPerKwh = 900.0;
+
   final String id;
   final String name;
   final String platform;
@@ -9,6 +11,9 @@
   final double monthlyEnergyKwh;
   final double yearlyEnergyKwh;
   final double cumulativeEnergyKwh;
+  final double dailyIncome;
+  final double monthlyIncome;
+  final double yearlyIncome;
   final double cumulativeIncome;
   final double? latitude;
   final double? longitude;
@@ -28,6 +33,9 @@
     required this.monthlyEnergyKwh,
     required this.yearlyEnergyKwh,
     required this.cumulativeEnergyKwh,
+    this.dailyIncome = 0.0,
+    this.monthlyIncome = 0.0,
+    this.yearlyIncome = 0.0,
     required this.cumulativeIncome,
     this.latitude,
     this.longitude,
@@ -42,11 +50,47 @@
       status.toLowerCase() == 'online' ||
       status.toLowerCase() == 'grid-connected';
 
+  bool get isKehua =>
+      platform.toLowerCase().contains('kehua') ||
+      name.toLowerCase().contains('kehua');
+
   factory StationModel.fromJson(Map<String, dynamic> json, String platformName) {
     double parseDouble(dynamic val) {
       if (val == null) return 0.0;
       if (val is num) return val.toDouble();
       return double.tryParse(val.toString()) ?? 0.0;
+    }
+
+    final String platform = (json['platform'] ?? json['platform_name'] ?? platformName).toString();
+    final String name = (json['name'] ?? json['station_name'] ?? 'PLTS Station').toString();
+    final bool isKehuaStation = platform.toLowerCase().contains('kehua') ||
+        (json['vendor'] ?? '').toString().toLowerCase().contains('kehua') ||
+        name.toLowerCase().contains('kehua');
+
+    final double dailyKwh = parseDouble(json['daily_energy_kwh']);
+    final double monthlyKwh = parseDouble(json['monthly_energy_kwh']);
+    final double yearlyKwh = parseDouble(json['yearly_energy_kwh']);
+    final double cumKwh = parseDouble(json['cumulative_energy_kwh']);
+
+    double dailyIncome = parseDouble(json['daily_income']);
+    double monthlyIncome = parseDouble(json['monthly_income']);
+    double yearlyIncome = parseDouble(json['yearly_income']);
+    double cumulativeIncome = parseDouble(json['cumulative_income'] ?? json['total_income'] ?? json['income']);
+
+    // Perhitungan otomatis pendapatan vendor Kehua: Rp 900 / kWh
+    if (isKehuaStation) {
+      if (dailyIncome <= 0 && dailyKwh > 0) {
+        dailyIncome = (dailyKwh * kehuaTariffPerKwh).roundToDouble();
+      }
+      if (monthlyIncome <= 0 && monthlyKwh > 0) {
+        monthlyIncome = (monthlyKwh * kehuaTariffPerKwh).roundToDouble();
+      }
+      if (yearlyIncome <= 0 && yearlyKwh > 0) {
+        yearlyIncome = (yearlyKwh * kehuaTariffPerKwh).roundToDouble();
+      }
+      if (cumulativeIncome <= 0 && cumKwh > 0) {
+        cumulativeIncome = (cumKwh * kehuaTariffPerKwh).roundToDouble();
+      }
     }
 
     // Extract power curve from Huawei or Kehua
@@ -116,16 +160,19 @@
 
     return StationModel(
       id: (json['station_id'] ?? json['id'] ?? '').toString(),
-      name: (json['name'] ?? json['station_name'] ?? 'PLTS Station').toString(),
-      platform: platformName,
+      name: name,
+      platform: platform,
       status: (json['status'] ?? 'unknown').toString(),
       capacityKwp: parseDouble(json['capacity_kwp']),
       currentPowerKw: parseDouble(json['current_power_kw']),
-      dailyEnergyKwh: parseDouble(json['daily_energy_kwh']),
-      monthlyEnergyKwh: parseDouble(json['monthly_energy_kwh']),
-      yearlyEnergyKwh: parseDouble(json['yearly_energy_kwh']),
-      cumulativeEnergyKwh: parseDouble(json['cumulative_energy_kwh']),
-      cumulativeIncome: parseDouble(json['cumulative_income']),
+      dailyEnergyKwh: dailyKwh,
+      monthlyEnergyKwh: monthlyKwh,
+      yearlyEnergyKwh: yearlyKwh,
+      cumulativeEnergyKwh: cumKwh,
+      dailyIncome: dailyIncome,
+      monthlyIncome: monthlyIncome,
+      yearlyIncome: yearlyIncome,
+      cumulativeIncome: cumulativeIncome,
       latitude: json['latitude'] != null ? parseDouble(json['latitude']) : null,
       longitude: json['longitude'] != null ? parseDouble(json['longitude']) : null,
       address: (json['address'] ?? json['location'] ?? '').toString(),
@@ -142,6 +189,8 @@ class FleetSummary {
   final double totalCurrentPowerKw;
   final double totalDailyEnergyKwh;
   final double totalMonthlyEnergyKwh;
+  final double totalDailyIncome;
+  final double totalMonthlyIncome;
   final double totalCumulativeIncome;
   final int onlineStations;
   final int offlineStations;
@@ -153,6 +202,8 @@ class FleetSummary {
     required this.totalCurrentPowerKw,
     required this.totalDailyEnergyKwh,
     required this.totalMonthlyEnergyKwh,
+    this.totalDailyIncome = 0.0,
+    this.totalMonthlyIncome = 0.0,
     required this.totalCumulativeIncome,
     required this.onlineStations,
     required this.offlineStations,
@@ -164,6 +215,8 @@ class FleetSummary {
     double current = 0;
     double daily = 0;
     double monthly = 0;
+    double dailyInc = 0;
+    double monthlyInc = 0;
     double income = 0;
     int online = 0;
     int offline = 0;
@@ -173,6 +226,8 @@ class FleetSummary {
       current += s.currentPowerKw;
       daily += s.dailyEnergyKwh;
       monthly += s.monthlyEnergyKwh;
+      dailyInc += s.dailyIncome;
+      monthlyInc += s.monthlyIncome;
       income += s.cumulativeIncome;
       if (s.isOnline) {
         online++;
@@ -187,6 +242,8 @@ class FleetSummary {
       totalCurrentPowerKw: current,
       totalDailyEnergyKwh: daily,
       totalMonthlyEnergyKwh: monthly,
+      totalDailyIncome: dailyInc,
+      totalMonthlyIncome: monthlyInc,
       totalCumulativeIncome: income,
       onlineStations: online,
       offlineStations: offline,

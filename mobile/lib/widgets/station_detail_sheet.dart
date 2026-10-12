@@ -69,6 +69,24 @@ class StationDetailSheet extends StatelessWidget {
                                     ),
                                   ),
                                 ),
+                                if (station.isKehua) ...[
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text(
+                                      "Rp 900/kWh",
+                                      style: TextStyle(
+                                        color: Color(0xFF34D399),
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                                 const SizedBox(width: 8),
                                 Text(
                                   "ID: ${station.id}",
@@ -98,7 +116,7 @@ class StationDetailSheet extends StatelessWidget {
                   // Address box
                   if (station.address.isNotEmpty)
                     Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
                         color: const Color(0xFF1E293B),
                         borderRadius: BorderRadius.circular(12),
@@ -285,14 +303,35 @@ class StationDetailSheet extends StatelessWidget {
               "Total Nilai Penghematan",
               _formatRupiah(station.cumulativeIncome),
               const Color(0xFF34D399),
+              subtitle: station.isKehua ? "Tarif otomatis: Rp 900/kWh" : null,
             ),
           ],
         ),
+        if (station.dailyIncome > 0 || station.monthlyIncome > 0) ...[
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _buildStatItem(
+                "Hemat Hari Ini",
+                _formatRupiah(station.dailyIncome),
+                const Color(0xFF10B981),
+                subtitle: station.isKehua ? "Rp 900/kWh" : null,
+              ),
+              const SizedBox(width: 12),
+              _buildStatItem(
+                "Hemat Bulan Ini",
+                _formatRupiah(station.monthlyIncome),
+                const Color(0xFF34D399),
+                subtitle: station.isKehua ? "Rp 900/kWh" : null,
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }
 
-  Widget _buildStatItem(String label, String value, Color color) {
+  Widget _buildStatItem(String label, String value, Color color, {String? subtitle}) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -319,6 +358,19 @@ class StationDetailSheet extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
+            if (subtitle != null) ...[
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  color: Color(0xFF34D399),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ],
         ),
       ),
