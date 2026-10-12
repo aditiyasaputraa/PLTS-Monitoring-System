@@ -952,7 +952,7 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt }) {
                 <FlashIcon style={{ width: "12px", height: "12px", color: "#10b981" }} />
               </div>
               <div className="total-stat-num">
-                {formatNumber(selected?.inverter_power_kw ?? selected?.current_power_kw ?? 2.8, 1)} <small>kW</small>
+                {formatNumber(selected?.current_power_kw ?? selected?.output_power_kw ?? selected?.inverter_power_kw ?? 0, 1)} <small>kW</small>
               </div>
             </div>
 
@@ -1103,7 +1103,7 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt }) {
             </div>
             <div className="spec-row">
               <span className="spec-label">Power</span>
-              <span className="spec-val">{formatNumber(selected?.inverter_power_kw ?? selected?.current_power_kw ?? 2.8, 1)} kW</span>
+              <span className="spec-val">{formatNumber(selected?.current_power_kw ?? selected?.output_power_kw ?? selected?.inverter_power_kw ?? 0, 1)} kW</span>
             </div>
             <div className="spec-row">
               <span className="spec-label">Status</span>
@@ -2409,7 +2409,7 @@ function RevenueView({ location, fleet, locations }) {
 function buildFleet(sites, locations) {
   const overview = sites.map((s) => s.overview || {});
   const capacity = locations.reduce((sum, l) => sum + (Number(l.capacity_kwp || l.installed_capacity) || 0), 0) || 126.8;
-  const current = locations.reduce((sum, l) => sum + (Number(l.inverter_power_kw || l.current_power_kw) || 0), 0);
+  const current = locations.reduce((sum, l) => sum + (Number(l.current_power_kw ?? l.output_power_kw ?? l.inverter_power_kw) || 0), 0);
   const daily = locations.reduce((sum, l) => sum + (Number(l.today_energy_kwh || l.daily_energy_kwh) || 0), 0) || 7.9;
   const monthly = locations.reduce((sum, l) => sum + (Number(l.monthly_energy_kwh) || 0), 0) || overview.reduce((sum, o) => sum + (Number(o.monthly_energy_kwh) || 0), 0) || 1153;
   const yearly = locations.reduce((sum, l) => sum + (Number(l.yearly_energy_kwh) || 0), 0) || overview.reduce((sum, o) => sum + (Number(o.yearly_energy_kwh) || 0), 0) || 73786;

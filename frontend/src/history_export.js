@@ -420,7 +420,7 @@ async function exportDirectFromSupabase({ startDate, endDate, resolution, platfo
           station_id: stId,
           station_name: st.name || st.station_name || `Station ${stId}`,
           status: st.status || "normal",
-          current_power_kw: st.inverter_power_kw ?? st.current_power_kw ?? 0,
+          current_power_kw: st.current_power_kw ?? st.output_power_kw ?? st.inverter_power_kw ?? 0,
           today_energy_kwh: st.today_energy_kwh ?? st.daily_energy_kwh ?? 0,
           monthly_energy_kwh: st.monthly_energy_kwh ?? st.month_energy_kwh ?? 0,
           total_energy_kwh: st.total_energy_kwh ?? st.cumulative_energy_kwh ?? 0,

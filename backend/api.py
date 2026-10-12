@@ -557,5 +557,20 @@ def sync_vendor(
     )
 
 
+@app.post("/api/notifications/test")
+def test_notification() -> JSONResponse:
+    from notifications import send_push_notification
+    ok = send_push_notification(
+        title="Uji Notifikasi PLTS",
+        message="Tes push notifikasi OneSignal berhasil terhubung ke perangkat Anda!",
+    )
+    return JSONResponse(
+        content={
+            "success": ok,
+            "message": "Notification dispatched to OneSignal" if ok else "Failed to dispatch",
+        }
+    )
+
+
 # Register history CSV export routes after the core app and auth dependencies exist.
 import history_export_api  # noqa: E402,F401
