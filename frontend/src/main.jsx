@@ -2637,7 +2637,9 @@ function EmissionProductionChart({ series, period }) {
           gap: "8px",
           zIndex: 10,
         }}>
-          <span style={{ color: "#a3b8aa" }}>Periode {effectiveLabels[hoveredIndex]}</span>
+          <span style={{ color: "#a3b8aa" }}>
+            {period === "year" ? `Bulan ${effectiveLabels[hoveredIndex]}` : (period === "month" ? `Tgl ${effectiveLabels[hoveredIndex]}` : `Tahun ${effectiveLabels[hoveredIndex]}`)}
+          </span>
           <span style={{ color: "#34d399" }}>
             {Number(effectiveValues[hoveredIndex]) >= 1000
               ? `${(Number(effectiveValues[hoveredIndex]) / 1000).toFixed(2)} Ton CO₂ (${new Intl.NumberFormat("id-ID").format(Math.round(Number(effectiveValues[hoveredIndex])))} kg)`
