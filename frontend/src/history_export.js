@@ -423,6 +423,7 @@ async function exportDirectFromSupabase({ startDate, endDate, resolution, platfo
           current_power_kw: st.current_power_kw ?? st.output_power_kw ?? st.inverter_power_kw ?? 0,
           today_energy_kwh: st.today_energy_kwh ?? st.daily_energy_kwh ?? 0,
           monthly_energy_kwh: st.monthly_energy_kwh ?? st.month_energy_kwh ?? 0,
+          yearly_energy_kwh: st.yearly_energy_kwh ?? st.year_energy_kwh ?? 0,
           total_energy_kwh: st.total_energy_kwh ?? st.cumulative_energy_kwh ?? 0,
           capacity_kwp: st.capacity_kwp ?? st.installed_capacity ?? 0,
           address: st.address || "",
@@ -444,6 +445,8 @@ async function exportDirectFromSupabase({ startDate, endDate, resolution, platfo
         "Daily Emission Reduced (kg CO2)",
         "Monthly Energy (kWh)",
         "Monthly Emission Reduced (kg CO2)",
+        "Yearly Energy (kWh)",
+        "Yearly Emission Reduced (kg CO2)",
         "Total Energy (kWh)",
         "Total Emission Reduced (kg CO2)",
         "Address",
@@ -454,6 +457,7 @@ async function exportDirectFromSupabase({ startDate, endDate, resolution, platfo
       stations.forEach((s) => {
         const todayEnergy = Number(s.today_energy_kwh || 0);
         const monthEnergy = Number(s.monthly_energy_kwh || 0);
+        const yearEnergy = Number(s.yearly_energy_kwh || 0);
         const totalEnergy = Number(s.total_energy_kwh || 0);
         const EMISSION_FACTOR = 0.85;
 
@@ -468,6 +472,8 @@ async function exportDirectFromSupabase({ startDate, endDate, resolution, platfo
           (todayEnergy * EMISSION_FACTOR).toFixed(2),
           monthEnergy.toFixed(2),
           (monthEnergy * EMISSION_FACTOR).toFixed(2),
+          yearEnergy.toFixed(2),
+          (yearEnergy * EMISSION_FACTOR).toFixed(2),
           totalEnergy.toFixed(2),
           (totalEnergy * EMISSION_FACTOR).toFixed(2),
           `"${(s.address || "").replace(/"/g, '""')}"`,
