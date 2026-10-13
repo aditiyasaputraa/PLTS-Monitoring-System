@@ -120,6 +120,22 @@ export function getEnergySeries(location, period) {
       });
     }
 
+    if (period === "lifetime" && !location?.energy_charts?.yearly && location?.revenue_charts?.yearly) {
+      const revChart = location.revenue_charts.yearly;
+      const kwhValues = (revChart.values || []).map((v) =>
+        v !== null && v !== undefined ? Math.round(Number(v) / 900) : null
+      );
+      return {
+        labels: revChart.labels || [],
+        values: kwhValues,
+        unit: "kWh",
+        kind: "bar",
+        title,
+        caption: "Available lifetime energy history",
+        available: true,
+      };
+    }
+
     const chart = period === "month"
       ? location?.energy_charts?.daily
       : (period === "lifetime" ? location?.energy_charts?.yearly : location?.energy_charts?.monthly);
@@ -150,14 +166,16 @@ export function getEnergySeries(location, period) {
       });
     }
 
-    const dimension = period === "month" ? "month_daily" : "year_monthly";
+    const dimension = period === "month"
+      ? "month_daily"
+      : (period === "lifetime" ? "all_yearly" : "year_monthly");
     const nested = latestNestedSeries(charts.company_power_trends?.[dimension]);
     if (nested.data) {
       return chartSeries(nested.data, {
-        unit: charts.company_power_trends?.[dimension]?.unit || (period === "year" ? "MWh" : "kWh"),
+        unit: charts.company_power_trends?.[dimension]?.unit || (period === "month" ? "kWh" : "MWh"),
         kind: "bar",
         title,
-        caption: nested.key || (period === "month" ? "Daily generation" : "Monthly generation"),
+        caption: nested.key || (period === "month" ? "Daily generation" : (period === "lifetime" ? "Yearly generation" : "Monthly generation")),
         reason: "Kehua energy history is unavailable.",
       });
     }

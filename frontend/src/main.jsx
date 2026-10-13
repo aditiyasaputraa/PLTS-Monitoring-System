@@ -2465,7 +2465,15 @@ function EmissionProductionChart({ series, period }) {
   const effectiveValues = values.length > 0 ? values : Array.from({ length: effectiveLabels.length }, () => 0);
 
   const rawMax = Math.max(...effectiveValues.map((v) => Number(v) || 0), 10);
-  const yMax = rawMax;
+  const isTonScale = rawMax >= 1000;
+  const scaleDivisor = isTonScale ? 1000 : 1;
+
+  // Scaled max for yTicks
+  const scaledMax = rawMax / scaleDivisor;
+  const yMax = isTonScale
+    ? Math.ceil(scaledMax * 1.15 * 10) / 10
+    : (rawMax <= 10 ? 10 : Math.ceil(rawMax * 1.15));
+
   const yTicks = [
     0,
     Math.round(yMax * 0.25 * 10) / 10,
@@ -2476,7 +2484,7 @@ function EmissionProductionChart({ series, period }) {
 
   const svgWidth = 720;
   const svgHeight = 290;
-  const paddingLeft = 48;
+  const paddingLeft = isTonScale ? 64 : 48;
   const paddingRight = 14;
   const paddingTop = 14;
   const paddingBottom = 26;
@@ -2509,8 +2517,8 @@ function EmissionProductionChart({ series, period }) {
 
   const formatTick = (val) => {
     if (val === 0) return "0";
-    if (val >= 1000) return `${(val / 1000).toFixed(1)}T`;
-    return `${Math.round(val)}`;
+    if (isTonScale) return `${val.toFixed(1)} Ton`;
+    return `${Math.round(val)} kg`;
   };
 
   return (
@@ -2551,7 +2559,8 @@ function EmissionProductionChart({ series, period }) {
         {/* Bars */}
         {effectiveValues.map((val, i) => {
           const num = Number(val) || 0;
-          const barHeight = Math.max((num / (yTicks[yTicks.length - 1] || 1)) * plotHeight, 0);
+          const scaledNum = num / scaleDivisor;
+          const barHeight = Math.max((scaledNum / (yTicks[yTicks.length - 1] || 1)) * plotHeight, 0);
           const x = paddingLeft + i * step + (step - barWidth) / 2;
           const y = paddingTop + plotHeight - barHeight;
           const isHovered = hoveredIndex === i;
@@ -2631,7 +2640,7 @@ function EmissionProductionChart({ series, period }) {
           <span style={{ color: "#a3b8aa" }}>Periode {effectiveLabels[hoveredIndex]}</span>
           <span style={{ color: "#34d399" }}>
             {Number(effectiveValues[hoveredIndex]) >= 1000
-              ? `${(Number(effectiveValues[hoveredIndex]) / 1000).toFixed(2)} Ton CO₂`
+              ? `${(Number(effectiveValues[hoveredIndex]) / 1000).toFixed(2)} Ton CO₂ (${new Intl.NumberFormat("id-ID").format(Math.round(Number(effectiveValues[hoveredIndex])))} kg)`
               : `${Number(effectiveValues[hoveredIndex]).toFixed(1)} kg CO₂`}
           </span>
         </div>
@@ -2817,7 +2826,9 @@ function EmissionView({ location, fleet, locations }) {
                     Lifetime
                   </button>
                 </div>
-                <span className="unit-pill-badge">kg CO₂</span>
+                <span className="unit-pill-badge">
+                  {highestVal >= 1000 ? "Ton CO₂" : "kg CO₂"}
+                </span>
               </div>
             </div>
 
