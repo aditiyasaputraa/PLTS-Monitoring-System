@@ -116,22 +116,22 @@ test("calculates Kehua revenue series automatically at Rp 900/kWh", () => {
   assert.match(seriesMonth.caption, /Rp 900\/kWh/);
 });
 
-test("calculates Kehua emission series automatically at 0.794 kg CO2/kWh", () => {
+test("calculates Kehua emission series automatically at 0.85 kg CO2/kWh", () => {
   const seriesYear = getEmissionSeries(kehua, "year");
   assert.equal(seriesYear.available, true);
   assert.equal(seriesYear.unit, "kg CO₂");
-  // 1.2 MWh * 794 = 952.8, 1.18 MWh * 794 = 936.9, 1.77 MWh * 794 = 1405.4
-  assert.deepEqual(seriesYear.values, [952.8, 936.9, 1405.4]);
+  // 1.2 MWh * 850 = 1020, 1.18 MWh * 850 = 1003, 1.77 MWh * 850 = 1504.5
+  assert.deepEqual(seriesYear.values, [1020, 1003, 1504.5]);
   assert.deepEqual(seriesYear.labels, ["1", "2", "3"]);
-  assert.match(seriesYear.caption, /0.794 kg CO₂\/kWh/);
+  assert.match(seriesYear.caption, /0.85 kg CO₂\/kWh/);
 
   const seriesMonth = getEmissionSeries(kehua, "month");
   assert.equal(seriesMonth.available, true);
   assert.equal(seriesMonth.unit, "kg CO₂");
-  // 58.1 kWh * 0.794 = 46.1, 63 kWh * 0.794 = 50.0, 68.8 kWh * 0.794 = 54.6
-  assert.deepEqual(seriesMonth.values, [46.1, 50.0, 54.6]);
+  // 58.1 kWh * 0.85 = 49.4, 63 kWh * 0.85 = 53.6, 68.8 kWh * 0.85 = 58.5
+  assert.deepEqual(seriesMonth.values, [49.4, 53.6, 58.5]);
   assert.deepEqual(seriesMonth.labels, ["1", "2", "3"]);
-  assert.match(seriesMonth.caption, /0.794 kg CO₂\/kWh/);
+  assert.match(seriesMonth.caption, /0.85 kg CO₂\/kWh/);
 });
 
 

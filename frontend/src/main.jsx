@@ -2647,7 +2647,7 @@ function EmissionView({ location, fleet, locations }) {
   const stationName = activeStation.name || "GOR Sekda Saefullah";
   const platformName = activeStation.source || "huawei";
 
-  const EMISSION_FACTOR = 0.794; // kg CO2 / kWh (Standar Gatrik ESDM)
+  const EMISSION_FACTOR = 0.85; // kg CO2 / kWh
 
   const todayKwh = Number(activeStation.daily_energy_kwh || activeStation.today_energy_kwh || 0);
   const monthKwh = Number(activeStation.monthly_energy_kwh || 0);
@@ -2677,8 +2677,8 @@ function EmissionView({ location, fleet, locations }) {
   const series = useMemo(() => getEmissionSeries(activeStation, period), [activeStation, period]);
 
   const curveSubtitle = useMemo(() => {
-    if (period === "year") return `${stationName} · Reduksi emisi CO₂ bulanan tahun ini (0.794 kg CO₂/kWh)`;
-    if (period === "month") return `${stationName} · Reduksi emisi CO₂ harian bulan ini (0.794 kg CO₂/kWh)`;
+    if (period === "year") return `${stationName} · Reduksi emisi CO₂ bulanan tahun ini (0.85 kg CO₂/kWh)`;
+    if (period === "month") return `${stationName} · Reduksi emisi CO₂ harian bulan ini (0.85 kg CO₂/kWh)`;
     return `${stationName} · Histori akumulasi reduksi emisi CO₂ per tahun`;
   }, [stationName, period]);
 
@@ -2738,7 +2738,7 @@ function EmissionView({ location, fleet, locations }) {
         <div className="rev-kpi-card">
           <div className="rev-kpi-top">
             <span className="rev-kpi-label">TODAY</span>
-            <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>0.794 kg/kWh</span>
+            <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>0.85 kg/kWh</span>
             <span className="rev-kpi-dash" />
           </div>
           <div className="rev-kpi-val">
@@ -2750,7 +2750,7 @@ function EmissionView({ location, fleet, locations }) {
         <div className="rev-kpi-card">
           <div className="rev-kpi-top">
             <span className="rev-kpi-label">THIS MONTH</span>
-            <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>0.794 kg/kWh</span>
+            <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>0.85 kg/kWh</span>
             <span className="rev-kpi-dash" />
           </div>
           <div className="rev-kpi-val">
@@ -2762,7 +2762,7 @@ function EmissionView({ location, fleet, locations }) {
         <div className="rev-kpi-card">
           <div className="rev-kpi-top">
             <span className="rev-kpi-label">THIS YEAR</span>
-            <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>0.794 kg/kWh</span>
+            <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>0.85 kg/kWh</span>
             <span className="rev-kpi-dash" />
           </div>
           <div className="rev-kpi-val">
@@ -2774,7 +2774,7 @@ function EmissionView({ location, fleet, locations }) {
         <div className="rev-kpi-card rev-kpi-lifetime">
           <div className="rev-kpi-top">
             <span className="rev-kpi-label">LIFETIME</span>
-            <span style={{ fontSize: "10px", color: "#047857", fontWeight: 700 }}>0.794 kg/kWh</span>
+            <span style={{ fontSize: "10px", color: "#047857", fontWeight: 700 }}>0.85 kg/kWh</span>
             <span className="rev-kpi-dash" />
           </div>
           <div className="rev-kpi-val">
@@ -2853,12 +2853,12 @@ function EmissionView({ location, fleet, locations }) {
               <span className="rev-dash-indicator" />
             </div>
             <div style={{ display: "inline-block", background: "#ecfdf5", border: "1px solid #a7f3d0", color: "#047857", padding: "4px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 700, marginBottom: "12px" }}>
-              🌿 Dihitung otomatis: 0.794 kg CO₂/kWh (Standar ESDM)
+              🌿 Dihitung otomatis: 0.85 kg CO₂/kWh
             </div>
             <div className="totals-grid-2x2">
               <div>
                 <span className="total-item-label">FACTOR</span>
-                <div className="total-item-val" style={{ fontSize: "14px" }}>0.794 kg/kWh</div>
+                <div className="total-item-val" style={{ fontSize: "14px" }}>0.85 kg/kWh</div>
               </div>
               <div>
                 <span className="total-item-label">TODAY</span>

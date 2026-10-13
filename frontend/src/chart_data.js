@@ -264,8 +264,8 @@ export function getEmissionSeries(location, period) {
   const energySeries = getEnergySeries(location, period);
   if (energySeries && energySeries.available !== false && Array.isArray(energySeries.values)) {
     const isMwh = (energySeries.unit || "").toUpperCase() === "MWH";
-    // 0.794 kg CO2 / kWh (Standar Gatrik ESDM), jika MWh dikalikan 1000
-    const factor = isMwh ? (0.794 * 1000) : 0.794;
+    // 0.85 kg CO2 / kWh, jika MWh dikalikan 1000
+    const factor = isMwh ? (0.85 * 1000) : 0.85;
     const emValues = energySeries.values.map((v) =>
       v !== null && v !== undefined ? Math.round(Number(v) * factor * 10) / 10 : null
     );
@@ -275,7 +275,7 @@ export function getEmissionSeries(location, period) {
       unit: "kg CO₂",
       kind: "bar",
       title: config?.title || "Emission reduction history",
-      caption: (energySeries.caption ? `${energySeries.caption} · ` : "") + "Dihitung otomatis (0.794 kg CO₂/kWh)",
+      caption: (energySeries.caption ? `${energySeries.caption} · ` : "") + "Dihitung otomatis (0.85 kg CO₂/kWh)",
       available: true,
     };
   }
@@ -290,13 +290,13 @@ export function getEmissionSeries(location, period) {
     });
     if (raw && raw.available !== false && Array.isArray(raw.values)) {
       const emValues = raw.values.map((v) =>
-        v !== null && v !== undefined ? Math.round(Number(v) * 0.794 * 10) / 10 : null
+        v !== null && v !== undefined ? Math.round(Number(v) * 0.85 * 10) / 10 : null
       );
       return {
         ...raw,
         values: emValues,
         unit: "kg CO₂",
-        caption: (raw.caption ? `${raw.caption} · ` : "") + "Dihitung otomatis (0.794 kg CO₂/kWh)",
+        caption: (raw.caption ? `${raw.caption} · ` : "") + "Dihitung otomatis (0.85 kg CO₂/kWh)",
       };
     }
   }
