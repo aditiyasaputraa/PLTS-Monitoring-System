@@ -433,19 +433,43 @@ async function exportDirectFromSupabase({ startDate, endDate, resolution, platfo
     });
 
     if (stations.length > 0) {
-      const headers = ["Platform", "Station ID", "Station Name", "Status", "Current Power (kW)", "Daily Energy (kWh)", "Monthly Energy (kWh)", "Total Energy (kWh)", "Capacity (kWp)", "Address", "Latitude", "Longitude"];
+      const headers = [
+        "Platform",
+        "Station ID",
+        "Station Name",
+        "Status",
+        "Capacity (kWp)",
+        "Current Power (kW)",
+        "Daily Energy (kWh)",
+        "Daily Emission Reduced (kg CO2)",
+        "Monthly Energy (kWh)",
+        "Monthly Emission Reduced (kg CO2)",
+        "Total Energy (kWh)",
+        "Total Emission Reduced (kg CO2)",
+        "Address",
+        "Latitude",
+        "Longitude",
+      ];
       const csvLines = [headers.join(",")];
       stations.forEach((s) => {
+        const todayEnergy = Number(s.today_energy_kwh || 0);
+        const monthEnergy = Number(s.monthly_energy_kwh || 0);
+        const totalEnergy = Number(s.total_energy_kwh || 0);
+        const EMISSION_FACTOR = 0.85;
+
         const row = [
           `"${s.platform}"`,
           `"${s.station_id}"`,
           `"${(s.station_name || "").replace(/"/g, '""')}"`,
           `"${s.status}"`,
-          Number(s.current_power_kw || 0).toFixed(2),
-          Number(s.today_energy_kwh || 0).toFixed(2),
-          Number(s.monthly_energy_kwh || 0).toFixed(2),
-          Number(s.total_energy_kwh || 0).toFixed(2),
           Number(s.capacity_kwp || 0).toFixed(1),
+          Number(s.current_power_kw || 0).toFixed(2),
+          todayEnergy.toFixed(2),
+          (todayEnergy * EMISSION_FACTOR).toFixed(2),
+          monthEnergy.toFixed(2),
+          (monthEnergy * EMISSION_FACTOR).toFixed(2),
+          totalEnergy.toFixed(2),
+          (totalEnergy * EMISSION_FACTOR).toFixed(2),
           `"${(s.address || "").replace(/"/g, '""')}"`,
           s.latitude,
           s.longitude,

@@ -82,6 +82,31 @@ def _timestamp_parts(
     return converted.date().isoformat(), converted.time().replace(microsecond=0).isoformat()
 
 
+def _station_capacity_map(client, config) -> dict[str, float]:
+    """Map station_id to capacity_kwp using latest monitoring_current payload."""
+    try:
+        response = client.table(config.current_table).select("payload").limit(1).execute()
+        rows = response.data or []
+        if not rows:
+            return {}
+        payload = rows[0].get("payload") or {}
+        by_site = payload.get("by_site") or {}
+        capacities: dict[str, float] = {}
+        for site in by_site.values():
+            for st in site.get("stations") or []:
+                raw_id = st.get("station_id") if st.get("station_id") is not None else (st.get("station_numeric_id") if st.get("station_numeric_id") is not None else st.get("id"))
+                st_id = str(raw_id or "")
+                cap = st.get("capacity_kwp") if st.get("capacity_kwp") is not None else st.get("installed_capacity")
+                if st_id and cap is not None:
+                    try:
+                        capacities[st_id] = float(cap)
+                    except (ValueError, TypeError):
+                        pass
+        return capacities
+    except Exception:
+        return {}
+
+
 def _daily_rows(
     *,
     start: date,
@@ -110,11 +135,26 @@ def _daily_rows(
 
     with STORE._lock:
         rows = _fetch_pages(build_query)
+        cap_map = _station_capacity_map(client, config)
 
     for row in rows:
         scraped_date, scraped_time = _timestamp_parts(row.get("source_scraped_at"))
         row["source_scraped_date_wib"] = scraped_date
         row["source_scraped_time_wib"] = scraped_time
+
+        # Capacity (kWp)
+        st_id = str(row.get("station_id") or "")
+        row["capacity_kwp"] = cap_map.get(st_id)
+
+        # Emission (kg CO2) = energy_kwh * 0.85
+        energy = row.get("energy_kwh")
+        if energy is not None:
+            try:
+                row["emission_reduced_kg"] = round(float(energy) * 0.85, 2)
+            except (ValueError, TypeError):
+                row["emission_reduced_kg"] = None
+        else:
+            row["emission_reduced_kg"] = None
     return rows
 
 
@@ -160,6 +200,7 @@ def _hourly_rows(
 
     with STORE._lock:
         rows = _fetch_pages(build_query)
+        cap_map = _station_capacity_map(client, config)
 
     for row in rows:
         hour_date_wib, hour_time_wib = _timestamp_parts(row.get("bucket_hour"))
@@ -169,6 +210,29 @@ def _hourly_rows(
         row["bucket_hour_time_wib"] = hour_time_wib
         row["source_scraped_date_wib"] = reading_date_wib
         row["source_scraped_time_wib"] = reading_time_wib
+
+        # Capacity (kWp)
+        st_id = str(row.get("station_id") or "")
+        row["capacity_kwp"] = cap_map.get(st_id)
+
+        # Emission (kg CO2) for daily and cumulative energy
+        daily_e = row.get("daily_energy_kwh")
+        if daily_e is not None:
+            try:
+                row["daily_emission_reduced_kg"] = round(float(daily_e) * 0.85, 2)
+            except (ValueError, TypeError):
+                row["daily_emission_reduced_kg"] = None
+        else:
+            row["daily_emission_reduced_kg"] = None
+
+        cum_e = row.get("cumulative_energy_kwh")
+        if cum_e is not None:
+            try:
+                row["cumulative_emission_reduced_kg"] = round(float(cum_e) * 0.85, 2)
+            except (ValueError, TypeError):
+                row["cumulative_emission_reduced_kg"] = None
+        else:
+            row["cumulative_emission_reduced_kg"] = None
     return rows
 
 
@@ -306,7 +370,9 @@ def export_history(
                 ("platform", "Platform"),
                 ("station_id", "Station ID"),
                 ("station_name", "Station Name"),
+                ("capacity_kwp", "Capacity (kWp)"),
                 ("energy_kwh", "Energy (kWh)"),
+                ("emission_reduced_kg", "Emission Reduced (kg CO2)"),
                 ("revenue_amount", "Revenue"),
                 ("currency", "Currency"),
                 ("source_scraped_date_wib", "Source Scraped Date (WIB)"),
@@ -321,11 +387,14 @@ def export_history(
                 ("station_id", "Station ID"),
                 ("station_name", "Station Name"),
                 ("status", "Status"),
+                ("capacity_kwp", "Capacity (kWp)"),
                 ("current_power_kw", "Current Power (kW)"),
                 ("daily_energy_kwh", "Daily Energy (kWh)"),
+                ("daily_emission_reduced_kg", "Daily Emission Reduced (kg CO2)"),
                 ("monthly_energy_kwh", "Monthly Energy (kWh)"),
                 ("yearly_energy_kwh", "Yearly Energy (kWh)"),
                 ("cumulative_energy_kwh", "Cumulative Energy (kWh)"),
+                ("cumulative_emission_reduced_kg", "Cumulative Emission Reduced (kg CO2)"),
                 ("daily_income", "Daily Revenue"),
                 ("monthly_income", "Monthly Revenue"),
                 ("yearly_income", "Yearly Revenue"),
