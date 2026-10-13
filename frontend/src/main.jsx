@@ -2363,11 +2363,6 @@ function RevenueView({ location, fleet, locations }) {
               <h3 className="rev-card-title">Selected site revenue</h3>
               <span className="rev-dash-indicator" />
             </div>
-            {isKehua && (
-              <div style={{ display: "inline-block", background: "#ecfdf5", border: "1px solid #a7f3d0", color: "#047857", padding: "4px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 700, marginBottom: "12px" }}>
-                ⚡ Dihitung otomatis: Rp 900/kWh
-              </div>
-            )}
             <div className="totals-grid-2x2">
               <div>
                 <span className="total-item-label">CURRENCY</span>
@@ -2674,10 +2669,6 @@ function EmissionView({ location, fleet, locations }) {
   const yearEmissionKg = yearKwh * EMISSION_FACTOR;
   const lifetimeEmissionKg = lifetimeKwh * EMISSION_FACTOR;
 
-  // Impact equivalence
-  const siteTrees = Math.round(lifetimeEmissionKg / 20); // 1 pohon dewasa ~20 kg CO2/thn
-  const siteCoalKg = Math.round(lifetimeKwh * 0.38);     // ~0.38 kg batubara standar/kWh
-
   // Fleet totals
   const fleetMonthlyKwh = Number(fleet.monthly || 1153);
   const fleetYearlyKwh = Number(fleet.yearly || 73786);
@@ -2686,8 +2677,6 @@ function EmissionView({ location, fleet, locations }) {
   const fleetMonthEmissionKg = fleetMonthlyKwh * EMISSION_FACTOR;
   const fleetYearEmissionKg = fleetYearlyKwh * EMISSION_FACTOR;
   const fleetTotalEmissionKg = fleetCumulativeKwh * EMISSION_FACTOR;
-  const fleetTrees = Math.round(fleetTotalEmissionKg / 20);
-  const fleetCoalKg = Math.round(fleetCumulativeKwh * 0.38);
 
   const series = useMemo(() => getEmissionSeries(activeStation, period), [activeStation, period]);
 
@@ -2869,9 +2858,6 @@ function EmissionView({ location, fleet, locations }) {
               <h3 className="rev-card-title">Selected site emission impact</h3>
               <span className="rev-dash-indicator" />
             </div>
-            <div style={{ display: "inline-block", background: "#ecfdf5", border: "1px solid #a7f3d0", color: "#047857", padding: "4px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 700, marginBottom: "12px" }}>
-              🌿 Dihitung otomatis: 0.85 kg CO₂/kWh
-            </div>
             <div className="totals-grid-2x2">
               <div>
                 <span className="total-item-label">FACTOR</span>
@@ -2888,20 +2874,6 @@ function EmissionView({ location, fleet, locations }) {
               <div>
                 <span className="total-item-label">LIFETIME</span>
                 <div className="total-item-val">{formatEmissionCompact(lifetimeEmissionKg)}</div>
-              </div>
-            </div>
-            <div style={{ marginTop: "16px", paddingTop: "14px", borderTop: "1px dashed #c7e5ce", display: "flex", flexDirection: "column", gap: "8px" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "12px", color: "#16231a" }}>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                  <span>🌳</span> Setara Pohon Ditanam:
-                </span>
-                <strong style={{ color: "#047857" }}>~{formatNumberIndo(siteTrees)} Pohon</strong>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "12px", color: "#16231a" }}>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                  <span>⚡</span> Hemat Batubara Standar:
-                </span>
-                <strong style={{ color: "#047857" }}>~{formatNumberIndo(siteCoalKg)} kg</strong>
               </div>
             </div>
           </div>
@@ -2928,20 +2900,6 @@ function EmissionView({ location, fleet, locations }) {
               <div>
                 <span className="total-item-label">SELECTED PLATFORM</span>
                 <div className="total-item-val">{platformName}</div>
-              </div>
-            </div>
-            <div style={{ marginTop: "16px", paddingTop: "14px", borderTop: "1px dashed #e2e8df", display: "flex", flexDirection: "column", gap: "8px" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "12px", color: "#16231a" }}>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                  <span>🌳</span> Total Armada Setara:
-                </span>
-                <strong style={{ color: "#047857" }}>~{formatNumberIndo(fleetTrees)} Pohon</strong>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "12px", color: "#16231a" }}>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                  <span>⚡</span> Total Hemat Batubara:
-                </span>
-                <strong style={{ color: "#047857" }}>~{formatNumberIndo(fleetCoalKg)} kg</strong>
               </div>
             </div>
           </div>
