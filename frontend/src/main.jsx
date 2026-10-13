@@ -1732,7 +1732,9 @@ function EnergyProductionChart({ series, period }) {
           gap: "8px",
           zIndex: 10,
         }}>
-          <span style={{ color: "#a3b8aa" }}>{effectiveLabels[hoveredIndex]}</span>
+          <span style={{ color: "#a3b8aa" }}>
+            {period === "year" ? `Bulan ${effectiveLabels[hoveredIndex]}` : (period === "month" ? `Tgl ${effectiveLabels[hoveredIndex]}` : `Jam ${effectiveLabels[hoveredIndex]}`)}
+          </span>
           <span style={{ color: "#34d399" }}>
             {Number(effectiveValues[hoveredIndex] || 0).toFixed(2)} {series?.unit || "kWh"}
           </span>
@@ -1833,7 +1835,7 @@ function EnergyView({ location, fleet, locations }) {
                   Year
                 </button>
               </div>
-              <span className="unit-pill-badge">KWH</span>
+              <span className="unit-pill-badge">{series?.unit || "kWh"}</span>
             </div>
           </div>
 
@@ -2166,7 +2168,9 @@ function RevenueProductionChart({ series, period, isKehua }) {
           gap: "8px",
           zIndex: 10,
         }}>
-          <span style={{ color: "#a3b8aa" }}>Periode {effectiveLabels[hoveredIndex]}</span>
+          <span style={{ color: "#a3b8aa" }}>
+            {period === "year" ? `Bulan ${effectiveLabels[hoveredIndex]}` : (period === "month" ? `Tgl ${effectiveLabels[hoveredIndex]}` : `Tahun ${effectiveLabels[hoveredIndex]}`)}
+          </span>
           <span style={{ color: "#34d399" }}>
             Rp {new Intl.NumberFormat("id-ID").format(Math.round(effectiveValues[hoveredIndex] || 0))} IDR
           </span>
