@@ -2242,164 +2242,170 @@ function RevenueView({ location, fleet, locations }) {
   };
 
   return (
-    <div className="energy-view-container">
-      {/* ROW 1: REVENUE CURVE CARD (LEFT) + 4 KPI CARDS (RIGHT) */}
-      <div className="energy-row-main">
-        {/* Left: Revenue Curve Card */}
-        <div className="energy-curve-card">
-          <div className="curve-card-header">
-            <div>
-              <h2 className="curve-title">{curveTitle}</h2>
-              <p className="curve-subtitle">{curveSubtitle}</p>
-            </div>
-            <div className="curve-controls">
-              <div className="period-toggle-pill">
-                <button
-                  type="button"
-                  className={period === "month" ? "active" : ""}
-                  onClick={() => setPeriod("month")}
-                >
-                  Month
-                </button>
-                <button
-                  type="button"
-                  className={period === "year" ? "active" : ""}
-                  onClick={() => setPeriod("year")}
-                >
-                  Year
-                </button>
-                <button
-                  type="button"
-                  className={period === "lifetime" ? "active" : ""}
-                  onClick={() => setPeriod("lifetime")}
-                >
-                  Lifetime
-                </button>
-              </div>
-              <span className="unit-pill-badge">IDR</span>
-            </div>
+    <div className="revenue-view-container">
+      {/* TOP ROW: 4 HORIZONTAL KPI CARDS */}
+      <div className="revenue-kpi-grid">
+        {/* TODAY */}
+        <div className="rev-kpi-card">
+          <div className="rev-kpi-top">
+            <span className="rev-kpi-label">TODAY</span>
+            {isKehua && <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>Rp 900/kWh</span>}
+            <span className="rev-kpi-dash" />
           </div>
-
-          {/* Inner Chart Box */}
-          <div className="energy-chart-stage">
-            <RevenueProductionChart series={series} period={period} isKehua={isKehua} />
-          </div>
-
-          {/* 3 Stats underneath chart */}
-          <div className="curve-stats-row">
-            <div className="curve-stat-box">
-              <span className="curve-stat-label">RECORDS</span>
-              <span className="curve-stat-value">{recordCount}</span>
-            </div>
-            <div className="curve-stat-box">
-              <span className="curve-stat-label">HIGHEST</span>
-              <span className="curve-stat-value">{formatMoneyCompact(highestVal)}</span>
-            </div>
-            <div className="curve-stat-box">
-              <span className="curve-stat-label">LATEST</span>
-              <span className="curve-stat-value">{formatMoneyCompact(latestVal)}</span>
-            </div>
+          <div className="rev-kpi-val">
+            Rp {formatIdrNumber(todayRev)} <span className="rev-kpi-curr">IDR</span>
           </div>
         </div>
 
-        {/* Right: 4 KPI Cards (Stack) */}
-        <div className="energy-kpi-stack">
-          {/* Card 1: TODAY */}
-          <div className="kpi-card-white">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span className="kpi-header-label">TODAY</span>
-              {isKehua && <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>Rp 900/kWh</span>}
-            </div>
-            <div className="kpi-huge-number" style={{ fontSize: "22px" }}>
-              Rp {formatIdrNumber(todayRev)} <span className="kpi-unit-inline">IDR</span>
-            </div>
+        {/* THIS MONTH */}
+        <div className="rev-kpi-card">
+          <div className="rev-kpi-top">
+            <span className="rev-kpi-label">THIS MONTH</span>
+            {isKehua && <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>Rp 900/kWh</span>}
+            <span className="rev-kpi-dash" />
           </div>
-
-          {/* Card 2: THIS MONTH */}
-          <div className="kpi-card-white">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span className="kpi-header-label">THIS MONTH</span>
-              {isKehua && <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>Rp 900/kWh</span>}
-            </div>
-            <div className="kpi-huge-number" style={{ fontSize: "22px" }}>
-              Rp {formatIdrNumber(monthRev)} <span className="kpi-unit-inline">IDR</span>
-            </div>
+          <div className="rev-kpi-val">
+            Rp {formatIdrNumber(monthRev)} <span className="rev-kpi-curr">IDR</span>
           </div>
+        </div>
 
-          {/* Card 3: THIS YEAR */}
-          <div className="kpi-card-white">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span className="kpi-header-label">THIS YEAR</span>
-              {isKehua && <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>Rp 900/kWh</span>}
-            </div>
-            <div className="kpi-huge-number" style={{ fontSize: "22px" }}>
-              Rp {formatIdrNumber(yearRev)} <span className="kpi-unit-inline">IDR</span>
-            </div>
+        {/* THIS YEAR */}
+        <div className="rev-kpi-card">
+          <div className="rev-kpi-top">
+            <span className="rev-kpi-label">THIS YEAR</span>
+            {isKehua && <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>Rp 900/kWh</span>}
+            <span className="rev-kpi-dash" />
           </div>
+          <div className="rev-kpi-val">
+            Rp {formatIdrNumber(yearRev)} <span className="rev-kpi-curr">IDR</span>
+          </div>
+        </div>
 
-          {/* Card 4: LIFETIME */}
-          <div className="kpi-card-lifetime">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span className="kpi-header-label">LIFETIME</span>
-              {isKehua && <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>Rp 900/kWh</span>}
-            </div>
-            <div className="kpi-huge-number" style={{ fontSize: "22px" }}>
-              Rp {formatIdrNumber(lifetimeRev)} <span className="kpi-unit-inline">IDR</span>
-            </div>
+        {/* LIFETIME */}
+        <div className="rev-kpi-card rev-kpi-lifetime">
+          <div className="rev-kpi-top">
+            <span className="rev-kpi-label">LIFETIME</span>
+            {isKehua && <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>Rp 900/kWh</span>}
+            <span className="rev-kpi-dash" />
+          </div>
+          <div className="rev-kpi-val">
+            Rp {formatIdrNumber(lifetimeRev)} <span className="rev-kpi-curr">IDR</span>
           </div>
         </div>
       </div>
 
-      {/* ROW 2: SELECTED SITE REVENUE (LEFT) + FLEET REVENUE REFERENCE (RIGHT) */}
-      <div className="energy-row-bottom">
-        {/* Left: Selected Site Revenue */}
-        <div className="rev-selected-card">
-          <div className="rev-card-header">
-            <h3 className="rev-card-title">Selected site revenue</h3>
-            <span className="rev-dash-indicator" />
-          </div>
-          <div className="totals-grid-2x2">
-            <div>
-              <span className="total-item-label">CURRENCY</span>
-              <div className="total-item-val">IDR</div>
+      {/* MAIN ROW: 2 COLUMNS (CHART ON LEFT, 2 DETAIL CARDS ON RIGHT) */}
+      <div className="energy-grid-layout">
+        {/* LEFT COLUMN: Revenue Curve Card */}
+        <div className="energy-left-col">
+          <div className="energy-curve-card">
+            <div className="curve-card-header">
+              <div>
+                <h2 className="curve-title">{curveTitle}</h2>
+                <p className="curve-subtitle">{curveSubtitle}</p>
+              </div>
+              <div className="curve-controls">
+                <div className="period-toggle-pill">
+                  <button
+                    type="button"
+                    className={period === "month" ? "active" : ""}
+                    onClick={() => setPeriod("month")}
+                  >
+                    Month
+                  </button>
+                  <button
+                    type="button"
+                    className={period === "year" ? "active" : ""}
+                    onClick={() => setPeriod("year")}
+                  >
+                    Year
+                  </button>
+                  <button
+                    type="button"
+                    className={period === "lifetime" ? "active" : ""}
+                    onClick={() => setPeriod("lifetime")}
+                  >
+                    Lifetime
+                  </button>
+                </div>
+                <span className="unit-pill-badge">IDR</span>
+              </div>
             </div>
-            <div>
-              <span className="total-item-label">TODAY</span>
-              <div className="total-item-val">Rp {formatIdrNumber(todayRev)}</div>
+
+            {/* Inner Chart Box */}
+            <div className="energy-chart-stage">
+              <RevenueProductionChart series={series} period={period} isKehua={isKehua} />
             </div>
-            <div>
-              <span className="total-item-label">THIS YEAR</span>
-              <div className="total-item-val">Rp {formatIdrNumber(yearRev)}</div>
-            </div>
-            <div>
-              <span className="total-item-label">LIFETIME</span>
-              <div className="total-item-val">Rp {formatIdrNumber(lifetimeRev)}</div>
+
+            {/* 3 Stats underneath chart */}
+            <div className="curve-stats-row">
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">RECORDS</span>
+                <span className="curve-stat-value">{recordCount}</span>
+              </div>
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">HIGHEST</span>
+                <span className="curve-stat-value">{formatMoneyCompact(highestVal)}</span>
+              </div>
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">LATEST</span>
+                <span className="curve-stat-value">{formatMoneyCompact(latestVal)}</span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Right: Fleet Revenue Reference */}
-        <div className="rev-fleet-card">
-          <div className="rev-card-header">
-            <h3 className="rev-card-title">Fleet revenue reference</h3>
-            <span className="rev-dash-indicator" />
+        {/* RIGHT COLUMN: Selected site revenue + Fleet revenue reference */}
+        <div className="energy-right-col">
+          {/* Card 1: Selected Site Revenue */}
+          <div className="rev-selected-card">
+            <div className="rev-card-header">
+              <h3 className="rev-card-title">Selected site revenue</h3>
+              <span className="rev-dash-indicator" />
+            </div>
+            <div className="totals-grid-2x2">
+              <div>
+                <span className="total-item-label">CURRENCY</span>
+                <div className="total-item-val">IDR</div>
+              </div>
+              <div>
+                <span className="total-item-label">TODAY</span>
+                <div className="total-item-val">Rp {formatIdrNumber(todayRev)}</div>
+              </div>
+              <div>
+                <span className="total-item-label">THIS YEAR</span>
+                <div className="total-item-val">Rp {formatIdrNumber(yearRev)}</div>
+              </div>
+              <div>
+                <span className="total-item-label">LIFETIME</span>
+                <div className="total-item-val">Rp {formatIdrNumber(lifetimeRev)}</div>
+              </div>
+            </div>
           </div>
-          <div className="totals-grid-2x2">
-            <div>
-              <span className="total-item-label">FLEET MONTH</span>
-              <div className="total-item-val">Rp {formatIdrNumber(fleetMonthRev)}</div>
+
+          {/* Card 2: Fleet Revenue Reference */}
+          <div className="rev-fleet-card">
+            <div className="rev-card-header">
+              <h3 className="rev-card-title">Fleet revenue reference</h3>
+              <span className="rev-dash-indicator" />
             </div>
-            <div>
-              <span className="total-item-label">FLEET YEAR</span>
-              <div className="total-item-val">Rp {formatIdrNumber(fleetYearRev)}</div>
-            </div>
-            <div>
-              <span className="total-item-label">FLEET TOTAL</span>
-              <div className="total-item-val">Rp {formatIdrNumber(fleetTotalRev)}</div>
-            </div>
-            <div>
-              <span className="total-item-label">SELECTED PLATFORM</span>
-              <div className="total-item-val">{platformName}</div>
+            <div className="totals-grid-2x2">
+              <div>
+                <span className="total-item-label">FLEET MONTH</span>
+                <div className="total-item-val">Rp {formatIdrNumber(fleetMonthRev)}</div>
+              </div>
+              <div>
+                <span className="total-item-label">FLEET YEAR</span>
+                <div className="total-item-val">Rp {formatIdrNumber(fleetYearRev)}</div>
+              </div>
+              <div>
+                <span className="total-item-label">FLEET TOTAL</span>
+                <div className="total-item-val">Rp {formatIdrNumber(fleetTotalRev)}</div>
+              </div>
+              <div>
+                <span className="total-item-label">SELECTED PLATFORM</span>
+                <div className="total-item-val">{platformName}</div>
+              </div>
             </div>
           </div>
         </div>
@@ -2729,166 +2735,172 @@ function EmissionView({ location, fleet, locations }) {
   };
 
   return (
-    <div className="energy-view-container">
-      {/* ROW 1: EMISSION CURVE CARD (LEFT) + 4 KPI CARDS (RIGHT) */}
-      <div className="energy-row-main">
-        {/* Left: Emission Curve Card */}
-        <div className="energy-curve-card">
-          <div className="curve-card-header">
-            <div>
-              <h2 className="curve-title">{curveTitle}</h2>
-              <p className="curve-subtitle">{curveSubtitle}</p>
-            </div>
-            <div className="curve-controls">
-              <div className="period-toggle-pill">
-                <button
-                  type="button"
-                  className={period === "month" ? "active" : ""}
-                  onClick={() => setPeriod("month")}
-                >
-                  Month
-                </button>
-                <button
-                  type="button"
-                  className={period === "year" ? "active" : ""}
-                  onClick={() => setPeriod("year")}
-                >
-                  Year
-                </button>
-                <button
-                  type="button"
-                  className={period === "lifetime" ? "active" : ""}
-                  onClick={() => setPeriod("lifetime")}
-                >
-                  Lifetime
-                </button>
-              </div>
-              <span className="unit-pill-badge">
-                {highestVal >= 1000 ? "Ton CO₂" : "kg CO₂"}
-              </span>
-            </div>
+    <div className="revenue-view-container">
+      {/* TOP ROW: 4 HORIZONTAL KPI CARDS */}
+      <div className="revenue-kpi-grid">
+        {/* TODAY */}
+        <div className="rev-kpi-card">
+          <div className="rev-kpi-top">
+            <span className="rev-kpi-label">TODAY</span>
+            <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>0.85 kg/kWh</span>
+            <span className="rev-kpi-dash" />
           </div>
-
-          {/* Inner Chart Box */}
-          <div className="energy-chart-stage">
-            <EmissionProductionChart series={series} period={period} />
-          </div>
-
-          {/* 3 Stats underneath chart */}
-          <div className="curve-stats-row">
-            <div className="curve-stat-box">
-              <span className="curve-stat-label">RECORDS</span>
-              <span className="curve-stat-value">{recordCount}</span>
-            </div>
-            <div className="curve-stat-box">
-              <span className="curve-stat-label">HIGHEST</span>
-              <span className="curve-stat-value">{formatEmissionCompact(highestVal)}</span>
-            </div>
-            <div className="curve-stat-box">
-              <span className="curve-stat-label">LATEST</span>
-              <span className="curve-stat-value">{formatEmissionCompact(latestVal)}</span>
-            </div>
+          <div className="rev-kpi-val">
+            {formatEmissionCard(todayEmissionKg).val} <span className="rev-kpi-curr">{formatEmissionCard(todayEmissionKg).unit}</span>
           </div>
         </div>
 
-        {/* Right: 4 KPI Cards (Stack) */}
-        <div className="energy-kpi-stack">
-          {/* Card 1: TODAY */}
-          <div className="kpi-card-white">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span className="kpi-header-label">TODAY</span>
-              <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>0.85 kg/kWh</span>
-            </div>
-            <div className="kpi-huge-number" style={{ fontSize: "24px" }}>
-              {formatEmissionCard(todayEmissionKg).val} <span className="kpi-unit-inline">{formatEmissionCard(todayEmissionKg).unit}</span>
-            </div>
+        {/* THIS MONTH */}
+        <div className="rev-kpi-card">
+          <div className="rev-kpi-top">
+            <span className="rev-kpi-label">THIS MONTH</span>
+            <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>0.85 kg/kWh</span>
+            <span className="rev-kpi-dash" />
           </div>
-
-          {/* Card 2: THIS MONTH */}
-          <div className="kpi-card-white">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span className="kpi-header-label">THIS MONTH</span>
-              <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>0.85 kg/kWh</span>
-            </div>
-            <div className="kpi-huge-number" style={{ fontSize: "24px" }}>
-              {formatEmissionCard(monthEmissionKg).val} <span className="kpi-unit-inline">{formatEmissionCard(monthEmissionKg).unit}</span>
-            </div>
+          <div className="rev-kpi-val">
+            {formatEmissionCard(monthEmissionKg).val} <span className="rev-kpi-curr">{formatEmissionCard(monthEmissionKg).unit}</span>
           </div>
+        </div>
 
-          {/* Card 3: THIS YEAR */}
-          <div className="kpi-card-white">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span className="kpi-header-label">THIS YEAR</span>
-              <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>0.85 kg/kWh</span>
-            </div>
-            <div className="kpi-huge-number" style={{ fontSize: "24px" }}>
-              {formatEmissionCard(yearEmissionKg).val} <span className="kpi-unit-inline">{formatEmissionCard(yearEmissionKg).unit}</span>
-            </div>
+        {/* THIS YEAR */}
+        <div className="rev-kpi-card">
+          <div className="rev-kpi-top">
+            <span className="rev-kpi-label">THIS YEAR</span>
+            <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>0.85 kg/kWh</span>
+            <span className="rev-kpi-dash" />
           </div>
+          <div className="rev-kpi-val">
+            {formatEmissionCard(yearEmissionKg).val} <span className="rev-kpi-curr">{formatEmissionCard(yearEmissionKg).unit}</span>
+          </div>
+        </div>
 
-          {/* Card 4: LIFETIME */}
-          <div className="kpi-card-lifetime">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span className="kpi-header-label">LIFETIME</span>
-              <span style={{ fontSize: "10px", color: "#047857", fontWeight: 700 }}>0.85 kg/kWh</span>
-            </div>
-            <div className="kpi-huge-number" style={{ fontSize: "24px" }}>
-              {formatEmissionCard(lifetimeEmissionKg).val} <span className="kpi-unit-inline">{formatEmissionCard(lifetimeEmissionKg).unit}</span>
-            </div>
+        {/* LIFETIME */}
+        <div className="rev-kpi-card rev-kpi-lifetime">
+          <div className="rev-kpi-top">
+            <span className="rev-kpi-label">LIFETIME</span>
+            <span style={{ fontSize: "10px", color: "#047857", fontWeight: 700 }}>0.85 kg/kWh</span>
+            <span className="rev-kpi-dash" />
+          </div>
+          <div className="rev-kpi-val">
+            {formatEmissionCard(lifetimeEmissionKg).val} <span className="rev-kpi-curr">{formatEmissionCard(lifetimeEmissionKg).unit}</span>
           </div>
         </div>
       </div>
 
-      {/* ROW 2: SELECTED SITE EMISSION IMPACT (LEFT) + FLEET EMISSION REFERENCE (RIGHT) */}
-      <div className="energy-row-bottom">
-        {/* Left: Selected Site Emission Impact */}
-        <div className="rev-selected-card">
-          <div className="rev-card-header">
-            <h3 className="rev-card-title">Selected site emission impact</h3>
-            <span className="rev-dash-indicator" />
-          </div>
-          <div className="totals-grid-2x2">
-            <div>
-              <span className="total-item-label">FACTOR</span>
-              <div className="total-item-val" style={{ fontSize: "14px" }}>0.85 kg/kWh</div>
+      {/* MAIN ROW: 2 COLUMNS (CHART ON LEFT, 2 DETAIL CARDS ON RIGHT) */}
+      <div className="energy-grid-layout">
+        {/* LEFT COLUMN: Emission Curve Card */}
+        <div className="energy-left-col">
+          <div className="energy-curve-card">
+            <div className="curve-card-header">
+              <div>
+                <h2 className="curve-title">{curveTitle}</h2>
+                <p className="curve-subtitle">{curveSubtitle}</p>
+              </div>
+              <div className="curve-controls">
+                <div className="period-toggle-pill">
+                  <button
+                    type="button"
+                    className={period === "month" ? "active" : ""}
+                    onClick={() => setPeriod("month")}
+                  >
+                    Month
+                  </button>
+                  <button
+                    type="button"
+                    className={period === "year" ? "active" : ""}
+                    onClick={() => setPeriod("year")}
+                  >
+                    Year
+                  </button>
+                  <button
+                    type="button"
+                    className={period === "lifetime" ? "active" : ""}
+                    onClick={() => setPeriod("lifetime")}
+                  >
+                    Lifetime
+                  </button>
+                </div>
+                <span className="unit-pill-badge">
+                  {highestVal >= 1000 ? "Ton CO₂" : "kg CO₂"}
+                </span>
+              </div>
             </div>
-            <div>
-              <span className="total-item-label">TODAY</span>
-              <div className="total-item-val">{formatEmissionCompact(todayEmissionKg)}</div>
+
+            {/* Inner Chart Box */}
+            <div className="energy-chart-stage">
+              <EmissionProductionChart series={series} period={period} />
             </div>
-            <div>
-              <span className="total-item-label">THIS YEAR</span>
-              <div className="total-item-val">{formatEmissionCompact(yearEmissionKg)}</div>
-            </div>
-            <div>
-              <span className="total-item-label">LIFETIME</span>
-              <div className="total-item-val">{formatEmissionCompact(lifetimeEmissionKg)}</div>
+
+            {/* 3 Stats underneath chart */}
+            <div className="curve-stats-row">
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">RECORDS</span>
+                <span className="curve-stat-value">{recordCount}</span>
+              </div>
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">HIGHEST</span>
+                <span className="curve-stat-value">{formatEmissionCompact(highestVal)}</span>
+              </div>
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">LATEST</span>
+                <span className="curve-stat-value">{formatEmissionCompact(latestVal)}</span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Right: Fleet Emission Reference */}
-        <div className="rev-fleet-card">
-          <div className="rev-card-header">
-            <h3 className="rev-card-title">Fleet emission reference</h3>
-            <span className="rev-dash-indicator" />
+        {/* RIGHT COLUMN: Selected site emission + Fleet emission reference */}
+        <div className="energy-right-col">
+          {/* Card 1: Selected Site Emission */}
+          <div className="rev-selected-card">
+            <div className="rev-card-header">
+              <h3 className="rev-card-title">Selected site emission impact</h3>
+              <span className="rev-dash-indicator" />
+            </div>
+            <div className="totals-grid-2x2">
+              <div>
+                <span className="total-item-label">FACTOR</span>
+                <div className="total-item-val" style={{ fontSize: "14px" }}>0.85 kg/kWh</div>
+              </div>
+              <div>
+                <span className="total-item-label">TODAY</span>
+                <div className="total-item-val">{formatEmissionCompact(todayEmissionKg)}</div>
+              </div>
+              <div>
+                <span className="total-item-label">THIS YEAR</span>
+                <div className="total-item-val">{formatEmissionCompact(yearEmissionKg)}</div>
+              </div>
+              <div>
+                <span className="total-item-label">LIFETIME</span>
+                <div className="total-item-val">{formatEmissionCompact(lifetimeEmissionKg)}</div>
+              </div>
+            </div>
           </div>
-          <div className="totals-grid-2x2">
-            <div>
-              <span className="total-item-label">FLEET MONTH</span>
-              <div className="total-item-val">{formatEmissionCompact(fleetMonthEmissionKg)}</div>
+
+          {/* Card 2: Fleet Emission Reference */}
+          <div className="rev-fleet-card">
+            <div className="rev-card-header">
+              <h3 className="rev-card-title">Fleet emission reference</h3>
+              <span className="rev-dash-indicator" />
             </div>
-            <div>
-              <span className="total-item-label">FLEET YEAR</span>
-              <div className="total-item-val">{formatEmissionCompact(fleetYearEmissionKg)}</div>
-            </div>
-            <div>
-              <span className="total-item-label">FLEET TOTAL</span>
-              <div className="total-item-val">{formatEmissionCompact(fleetTotalEmissionKg)}</div>
-            </div>
-            <div>
-              <span className="total-item-label">SELECTED PLATFORM</span>
-              <div className="total-item-val">{platformName}</div>
+            <div className="totals-grid-2x2">
+              <div>
+                <span className="total-item-label">FLEET MONTH</span>
+                <div className="total-item-val">{formatEmissionCompact(fleetMonthEmissionKg)}</div>
+              </div>
+              <div>
+                <span className="total-item-label">FLEET YEAR</span>
+                <div className="total-item-val">{formatEmissionCompact(fleetYearEmissionKg)}</div>
+              </div>
+              <div>
+                <span className="total-item-label">FLEET TOTAL</span>
+                <div className="total-item-val">{formatEmissionCompact(fleetTotalEmissionKg)}</div>
+              </div>
+              <div>
+                <span className="total-item-label">SELECTED PLATFORM</span>
+                <div className="total-item-val">{platformName}</div>
+              </div>
             </div>
           </div>
         </div>

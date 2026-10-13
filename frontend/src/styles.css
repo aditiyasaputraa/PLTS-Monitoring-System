@@ -1020,7 +1020,7 @@ button {
 .energy-grid-layout {
   display: grid;
   grid-template-columns: 1.55fr 1fr;
-  gap: 20px;
+  gap: 16px;
   align-items: stretch;
 }
 
@@ -1033,19 +1033,20 @@ button {
 .energy-left-col {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  height: 100%;
 }
 
 .energy-curve-card {
   background: #ffffff;
   border: 1px solid #e2e8df;
   border-radius: 16px;
-  padding: 24px;
+  padding: 22px 24px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   height: 100%;
+  flex: 1;
   box-sizing: border-box;
 }
 
@@ -1184,7 +1185,7 @@ button {
 .totals-grid-2x2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 22px 24px;
+  gap: 16px 20px;
 }
 
 .total-item-label {
@@ -1207,6 +1208,7 @@ button {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  height: 100%;
 }
 
 .kpi-card-white {
@@ -1304,7 +1306,7 @@ button {
 .revenue-view-container {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 
 .revenue-kpi-grid {
@@ -1329,7 +1331,7 @@ button {
   background: #ffffff;
   border: 1px solid #e2e8df;
   border-radius: 16px;
-  padding: 20px 24px;
+  padding: 18px 22px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
   display: flex;
   flex-direction: column;
@@ -1344,7 +1346,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 .rev-kpi-label {
@@ -1372,7 +1374,7 @@ button {
 }
 
 .rev-kpi-val {
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 800;
   color: #16231a;
   line-height: 1.1;
@@ -1400,9 +1402,10 @@ button {
   background: #eaf5ec;
   border: 1px solid #c7e5ce;
   border-radius: 16px;
-  padding: 24px;
+  padding: 20px 22px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
   height: 100%;
+  flex: 1;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -1413,9 +1416,10 @@ button {
   background: #ffffff;
   border: 1px solid #e2e8df;
   border-radius: 16px;
-  padding: 24px;
+  padding: 20px 22px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
   height: 100%;
+  flex: 1;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -1426,7 +1430,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20px;
+  margin-bottom: 14px;
 }
 
 .rev-card-title {
