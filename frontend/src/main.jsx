@@ -2,11 +2,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createRoot } from "react-dom/client";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { getEnergySeries, getRevenueSeries } from "./chart_data.js";
+import { getEnergySeries, getRevenueSeries, getEmissionSeries } from "./chart_data.js";
 import { MOCK_MONITORING_DATA } from "./mock_data.js";
 import "./styles.css";
 
-const TABS = ["Overview", "Energy", "Revenue"];
+const TABS = ["Overview", "Energy", "Revenue", "Emission"];
 const OPENFREEMAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
 const AUTH_STORAGE_KEY = "plts-monitoring.supabase-session";
 const UI_STATE_STORAGE_KEY = "plts-monitoring.ui-state";
@@ -739,6 +739,13 @@ function Dashboard({ session, onSignOut }) {
           </section>
         )}
 
+        {activeTab === "Emission" && (
+          <section className="energy-page-header">
+            <span className="energy-page-eyebrow">ENVIRONMENTAL IMPACT & CO₂ REDUCTION FOR THE SELECTED LOCATION</span>
+            <h1 className="energy-page-title">Emission</h1>
+          </section>
+        )}
+
         {/* Tab Content */}
         {activeTab === "Overview" && (
           <OverviewView
@@ -756,6 +763,10 @@ function Dashboard({ session, onSignOut }) {
 
         {activeTab === "Revenue" && (
           <RevenueView location={selected} fleet={fleet} locations={locations} />
+        )}
+
+        {activeTab === "Emission" && (
+          <EmissionView location={selected} fleet={fleet} locations={locations} />
         )}
       </main>
 
@@ -2404,6 +2415,525 @@ function RevenueView({ location, fleet, locations }) {
   );
 }
 
+function EmissionProductionChart({ series, period }) {
+  const [hoveredIndex, setHoveredIndex] = useState(null);
+
+  if (series?.available === false) {
+    return (
+      <div style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "100%",
+        minHeight: "260px",
+        background: "#fafbfa",
+        borderRadius: "14px",
+        border: "1px dashed #cbd5cb",
+        padding: "28px 20px",
+        textAlign: "center",
+        boxSizing: "border-box",
+      }}>
+        <div style={{
+          width: "44px",
+          height: "44px",
+          borderRadius: "50%",
+          background: "#ecfdf5",
+          color: "#059669",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          marginBottom: "12px",
+          fontSize: "20px",
+        }}>
+          🌿
+        </div>
+        <h4 style={{ margin: "0 0 6px", fontSize: "15px", color: "#16231a", fontWeight: 700 }}>
+          {series?.title || "Data Histori Emisi Belum Tersedia"}
+        </h4>
+        <p style={{ margin: 0, fontSize: "13px", color: "#6e8074", maxWidth: "440px", lineHeight: 1.5 }}>
+          {series?.reason || "Data kurva grafik reduksi emisi CO₂ belum tersedia untuk periode ini."}
+        </p>
+      </div>
+    );
+  }
+
+  const labels = series?.labels || [];
+  const values = series?.values || [];
+
+  const effectiveLabels = labels.length > 0 ? labels : ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
+  const effectiveValues = values.length > 0 ? values : Array.from({ length: effectiveLabels.length }, () => 0);
+
+  const rawMax = Math.max(...effectiveValues.map((v) => Number(v) || 0), 10);
+  const yMax = rawMax;
+  const yTicks = [
+    0,
+    Math.round(yMax * 0.25 * 10) / 10,
+    Math.round(yMax * 0.5 * 10) / 10,
+    Math.round(yMax * 0.75 * 10) / 10,
+    Math.round(yMax * 10) / 10,
+  ];
+
+  const svgWidth = 720;
+  const svgHeight = 290;
+  const paddingLeft = 48;
+  const paddingRight = 14;
+  const paddingTop = 14;
+  const paddingBottom = 26;
+  const plotWidth = svgWidth - paddingLeft - paddingRight;
+  const plotHeight = svgHeight - paddingTop - paddingBottom;
+
+  const barCount = effectiveLabels.length;
+  const step = plotWidth / barCount;
+  const barWidth = Math.max(5, Math.min(step * 0.72, 28));
+
+  let latestNonZeroIndex = -1;
+  for (let idx = effectiveValues.length - 1; idx >= 0; idx--) {
+    if (Number(effectiveValues[idx]) > 0) {
+      latestNonZeroIndex = idx;
+      break;
+    }
+  }
+
+  const isLabelVisible = (index) => {
+    if (period === "year") {
+      const val = parseInt(effectiveLabels[index], 10);
+      return [1, 3, 6, 8, 10, 12].includes(val);
+    }
+    if (period === "month") {
+      const day = parseInt(effectiveLabels[index], 10);
+      return [1, 5, 10, 15, 20, 25, 30].includes(day);
+    }
+    return true;
+  };
+
+  const formatTick = (val) => {
+    if (val === 0) return "0";
+    if (val >= 1000) return `${(val / 1000).toFixed(1)}T`;
+    return `${Math.round(val)}`;
+  };
+
+  return (
+    <div style={{ position: "relative", width: "100%", height: "100%", flex: 1, display: "flex", alignItems: "stretch" }}>
+      <svg
+        viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+        style={{ width: "100%", height: "100%", display: "block", overflow: "visible" }}
+      >
+        {/* Horizontal Grid lines and Y labels */}
+        {yTicks.map((tick, i) => {
+          const ratio = (tick - yTicks[0]) / (yTicks[yTicks.length - 1] - yTicks[0] || 1);
+          const y = paddingTop + plotHeight - ratio * plotHeight;
+          return (
+            <g key={i}>
+              <line
+                x1={paddingLeft}
+                y1={y}
+                x2={svgWidth - paddingRight}
+                y2={y}
+                stroke="rgba(0, 0, 0, 0.06)"
+                strokeDasharray={tick === 0 ? "none" : "3 3"}
+              />
+              <text
+                x={paddingLeft - 8}
+                y={y + 3.5}
+                textAnchor="end"
+                fontSize="10"
+                fontWeight="500"
+                fill="#7e9185"
+                fontFamily="Inter, system-ui, sans-serif"
+              >
+                {formatTick(tick)}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Bars */}
+        {effectiveValues.map((val, i) => {
+          const num = Number(val) || 0;
+          const barHeight = Math.max((num / (yTicks[yTicks.length - 1] || 1)) * plotHeight, 0);
+          const x = paddingLeft + i * step + (step - barWidth) / 2;
+          const y = paddingTop + plotHeight - barHeight;
+          const isHovered = hoveredIndex === i;
+          const isCurrentActive = i === latestNonZeroIndex;
+
+          return (
+            <g
+              key={i}
+              onMouseEnter={() => setHoveredIndex(i)}
+              onMouseLeave={() => setHoveredIndex(null)}
+              style={{ cursor: "pointer" }}
+            >
+              <rect
+                x={paddingLeft + i * step}
+                y={paddingTop}
+                width={step}
+                height={plotHeight}
+                fill="transparent"
+              />
+              {barHeight > 0 && (
+                <rect
+                  x={x}
+                  y={y}
+                  width={barWidth}
+                  height={barHeight}
+                  rx="3"
+                  ry="3"
+                  fill={isHovered ? "#047857" : (isCurrentActive ? "#059669" : "#a7f3d0")}
+                  opacity={isHovered ? 1 : 0.95}
+                  style={{ transition: "all 0.2s ease" }}
+                />
+              )}
+            </g>
+          );
+        })}
+
+        {/* X-axis labels */}
+        {effectiveLabels.map((lbl, i) => {
+          if (!isLabelVisible(i)) return null;
+          const x = paddingLeft + i * step + step / 2;
+          const y = paddingTop + plotHeight + 16;
+          return (
+            <text
+              key={i}
+              x={x}
+              y={y}
+              textAnchor="middle"
+              fontSize="10"
+              fontWeight="500"
+              fill="#7e9185"
+              fontFamily="Inter, system-ui, sans-serif"
+            >
+              {lbl}
+            </text>
+          );
+        })}
+      </svg>
+
+      {hoveredIndex !== null && (
+        <div style={{
+          position: "absolute",
+          top: "6px",
+          left: "50%",
+          transform: "translateX(-50%)",
+          background: "#111a14",
+          color: "#ffffff",
+          padding: "4px 12px",
+          borderRadius: "8px",
+          fontSize: "11px",
+          fontWeight: 600,
+          pointerEvents: "none",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+          display: "flex",
+          gap: "8px",
+          zIndex: 10,
+        }}>
+          <span style={{ color: "#a3b8aa" }}>Periode {effectiveLabels[hoveredIndex]}</span>
+          <span style={{ color: "#34d399" }}>
+            {Number(effectiveValues[hoveredIndex]) >= 1000
+              ? `${(Number(effectiveValues[hoveredIndex]) / 1000).toFixed(2)} Ton CO₂`
+              : `${Number(effectiveValues[hoveredIndex]).toFixed(1)} kg CO₂`}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EmissionView({ location, fleet, locations }) {
+  const [period, setPeriod] = useState("year");
+
+  const activeStation = location || locations.find((l) => l.source === "huawei") || locations?.[0] || {};
+  const stationName = activeStation.name || "GOR Sekda Saefullah";
+  const platformName = activeStation.source || "huawei";
+
+  const EMISSION_FACTOR = 0.794; // kg CO2 / kWh (Standar Gatrik ESDM)
+
+  const todayKwh = Number(activeStation.daily_energy_kwh || activeStation.today_energy_kwh || 0);
+  const monthKwh = Number(activeStation.monthly_energy_kwh || 0);
+  const yearKwh = Number(activeStation.yearly_energy_kwh || 0);
+  const lifetimeKwh = Number(activeStation.cumulative_energy_kwh || 0);
+
+  const todayEmissionKg = todayKwh * EMISSION_FACTOR;
+  const monthEmissionKg = monthKwh * EMISSION_FACTOR;
+  const yearEmissionKg = yearKwh * EMISSION_FACTOR;
+  const lifetimeEmissionKg = lifetimeKwh * EMISSION_FACTOR;
+
+  // Impact equivalence
+  const siteTrees = Math.round(lifetimeEmissionKg / 20); // 1 pohon dewasa ~20 kg CO2/thn
+  const siteCoalKg = Math.round(lifetimeKwh * 0.38);     // ~0.38 kg batubara standar/kWh
+
+  // Fleet totals
+  const fleetMonthlyKwh = Number(fleet.monthly || 1153);
+  const fleetYearlyKwh = Number(fleet.yearly || 73786);
+  const fleetCumulativeKwh = Number(fleet.cumulative || 106000);
+
+  const fleetMonthEmissionKg = fleetMonthlyKwh * EMISSION_FACTOR;
+  const fleetYearEmissionKg = fleetYearlyKwh * EMISSION_FACTOR;
+  const fleetTotalEmissionKg = fleetCumulativeKwh * EMISSION_FACTOR;
+  const fleetTrees = Math.round(fleetTotalEmissionKg / 20);
+  const fleetCoalKg = Math.round(fleetCumulativeKwh * 0.38);
+
+  const series = useMemo(() => getEmissionSeries(activeStation, period), [activeStation, period]);
+
+  const curveSubtitle = useMemo(() => {
+    if (period === "year") return `${stationName} · Reduksi emisi CO₂ bulanan tahun ini (0.794 kg CO₂/kWh)`;
+    if (period === "month") return `${stationName} · Reduksi emisi CO₂ harian bulan ini (0.794 kg CO₂/kWh)`;
+    return `${stationName} · Histori akumulasi reduksi emisi CO₂ per tahun`;
+  }, [stationName, period]);
+
+  const curveTitle = useMemo(() => {
+    if (period === "year") return "Monthly emission reduction this year";
+    if (period === "month") return "Daily emission reduction this month";
+    return "Emission reduction by year";
+  }, [period]);
+
+  const recordCount = useMemo(() => {
+    if (period === "year") return `${series?.values?.length || 12} / 12`;
+    if (period === "month") return `${series?.values?.length || 31} / 31`;
+    return `${series?.values?.length || 2} / ${series?.values?.length || 2}`;
+  }, [period, series]);
+
+  const highestVal = useMemo(() => {
+    const vals = (series?.values || []).map((v) => Number(v) || 0);
+    return vals.length > 0 ? Math.max(...vals) : 0;
+  }, [series]);
+
+  const latestVal = useMemo(() => {
+    const vals = (series?.values || []).map((v) => Number(v) || 0);
+    if (!vals.length) return 0;
+    const nonZero = [...vals].reverse().find((v) => v > 0);
+    return nonZero !== undefined ? nonZero : 0;
+  }, [series]);
+
+  const formatEmissionCard = (kg) => {
+    const num = Number(kg) || 0;
+    if (num >= 1000) {
+      return {
+        val: (num / 1000).toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        unit: "Ton CO₂",
+      };
+    }
+    return {
+      val: num.toLocaleString("id-ID", { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+      unit: "kg CO₂",
+    };
+  };
+
+  const formatEmissionCompact = (kg) => {
+    const num = Number(kg) || 0;
+    if (num >= 1000) return `${(num / 1000).toFixed(2)} Ton CO₂`;
+    return `${num.toFixed(1)} kg CO₂`;
+  };
+
+  const formatNumberIndo = (num) => {
+    return new Intl.NumberFormat("id-ID").format(Math.round(Number(num) || 0));
+  };
+
+  return (
+    <div className="revenue-view-container">
+      {/* TOP ROW: 4 HORIZONTAL KPI CARDS */}
+      <div className="revenue-kpi-grid">
+        {/* TODAY */}
+        <div className="rev-kpi-card">
+          <div className="rev-kpi-top">
+            <span className="rev-kpi-label">TODAY</span>
+            <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>0.794 kg/kWh</span>
+            <span className="rev-kpi-dash" />
+          </div>
+          <div className="rev-kpi-val">
+            {formatEmissionCard(todayEmissionKg).val} <span className="rev-kpi-curr">{formatEmissionCard(todayEmissionKg).unit}</span>
+          </div>
+        </div>
+
+        {/* THIS MONTH */}
+        <div className="rev-kpi-card">
+          <div className="rev-kpi-top">
+            <span className="rev-kpi-label">THIS MONTH</span>
+            <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>0.794 kg/kWh</span>
+            <span className="rev-kpi-dash" />
+          </div>
+          <div className="rev-kpi-val">
+            {formatEmissionCard(monthEmissionKg).val} <span className="rev-kpi-curr">{formatEmissionCard(monthEmissionKg).unit}</span>
+          </div>
+        </div>
+
+        {/* THIS YEAR */}
+        <div className="rev-kpi-card">
+          <div className="rev-kpi-top">
+            <span className="rev-kpi-label">THIS YEAR</span>
+            <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>0.794 kg/kWh</span>
+            <span className="rev-kpi-dash" />
+          </div>
+          <div className="rev-kpi-val">
+            {formatEmissionCard(yearEmissionKg).val} <span className="rev-kpi-curr">{formatEmissionCard(yearEmissionKg).unit}</span>
+          </div>
+        </div>
+
+        {/* LIFETIME */}
+        <div className="rev-kpi-card rev-kpi-lifetime">
+          <div className="rev-kpi-top">
+            <span className="rev-kpi-label">LIFETIME</span>
+            <span style={{ fontSize: "10px", color: "#047857", fontWeight: 700 }}>0.794 kg/kWh</span>
+            <span className="rev-kpi-dash" />
+          </div>
+          <div className="rev-kpi-val">
+            {formatEmissionCard(lifetimeEmissionKg).val} <span className="rev-kpi-curr">{formatEmissionCard(lifetimeEmissionKg).unit}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* MAIN ROW: 2 COLUMNS (CHART ON LEFT, 2 DETAIL CARDS ON RIGHT) */}
+      <div className="energy-grid-layout">
+        {/* LEFT COLUMN: Emission Curve Card */}
+        <div className="energy-left-col">
+          <div className="energy-curve-card">
+            <div className="curve-card-header">
+              <div>
+                <h2 className="curve-title">{curveTitle}</h2>
+                <p className="curve-subtitle">{curveSubtitle}</p>
+              </div>
+              <div className="curve-controls">
+                <div className="period-toggle-pill">
+                  <button
+                    type="button"
+                    className={period === "month" ? "active" : ""}
+                    onClick={() => setPeriod("month")}
+                  >
+                    Month
+                  </button>
+                  <button
+                    type="button"
+                    className={period === "year" ? "active" : ""}
+                    onClick={() => setPeriod("year")}
+                  >
+                    Year
+                  </button>
+                  <button
+                    type="button"
+                    className={period === "lifetime" ? "active" : ""}
+                    onClick={() => setPeriod("lifetime")}
+                  >
+                    Lifetime
+                  </button>
+                </div>
+                <span className="unit-pill-badge">kg CO₂</span>
+              </div>
+            </div>
+
+            {/* Inner Chart Box */}
+            <div className="energy-chart-stage">
+              <EmissionProductionChart series={series} period={period} />
+            </div>
+
+            {/* 3 Stats underneath chart */}
+            <div className="curve-stats-row">
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">RECORDS</span>
+                <span className="curve-stat-value">{recordCount}</span>
+              </div>
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">HIGHEST</span>
+                <span className="curve-stat-value">{formatEmissionCompact(highestVal)}</span>
+              </div>
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">LATEST</span>
+                <span className="curve-stat-value">{formatEmissionCompact(latestVal)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN: Selected site emission + Fleet emission reference */}
+        <div className="energy-right-col">
+          {/* Card 1: Selected Site Emission */}
+          <div className="rev-selected-card">
+            <div className="rev-card-header">
+              <h3 className="rev-card-title">Selected site emission impact</h3>
+              <span className="rev-dash-indicator" />
+            </div>
+            <div style={{ display: "inline-block", background: "#ecfdf5", border: "1px solid #a7f3d0", color: "#047857", padding: "4px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 700, marginBottom: "12px" }}>
+              🌿 Dihitung otomatis: 0.794 kg CO₂/kWh (Standar ESDM)
+            </div>
+            <div className="totals-grid-2x2">
+              <div>
+                <span className="total-item-label">FACTOR</span>
+                <div className="total-item-val" style={{ fontSize: "14px" }}>0.794 kg/kWh</div>
+              </div>
+              <div>
+                <span className="total-item-label">TODAY</span>
+                <div className="total-item-val">{formatEmissionCompact(todayEmissionKg)}</div>
+              </div>
+              <div>
+                <span className="total-item-label">THIS YEAR</span>
+                <div className="total-item-val">{formatEmissionCompact(yearEmissionKg)}</div>
+              </div>
+              <div>
+                <span className="total-item-label">LIFETIME</span>
+                <div className="total-item-val">{formatEmissionCompact(lifetimeEmissionKg)}</div>
+              </div>
+            </div>
+            <div style={{ marginTop: "16px", paddingTop: "14px", borderTop: "1px dashed #c7e5ce", display: "flex", flexDirection: "column", gap: "8px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "12px", color: "#16231a" }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                  <span>🌳</span> Setara Pohon Ditanam:
+                </span>
+                <strong style={{ color: "#047857" }}>~{formatNumberIndo(siteTrees)} Pohon</strong>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "12px", color: "#16231a" }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                  <span>⚡</span> Hemat Batubara Standar:
+                </span>
+                <strong style={{ color: "#047857" }}>~{formatNumberIndo(siteCoalKg)} kg</strong>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: Fleet Emission Reference */}
+          <div className="rev-fleet-card">
+            <div className="rev-card-header">
+              <h3 className="rev-card-title">Fleet emission reference</h3>
+              <span className="rev-dash-indicator" />
+            </div>
+            <div className="totals-grid-2x2">
+              <div>
+                <span className="total-item-label">FLEET MONTH</span>
+                <div className="total-item-val">{formatEmissionCompact(fleetMonthEmissionKg)}</div>
+              </div>
+              <div>
+                <span className="total-item-label">FLEET YEAR</span>
+                <div className="total-item-val">{formatEmissionCompact(fleetYearEmissionKg)}</div>
+              </div>
+              <div>
+                <span className="total-item-label">FLEET TOTAL</span>
+                <div className="total-item-val">{formatEmissionCompact(fleetTotalEmissionKg)}</div>
+              </div>
+              <div>
+                <span className="total-item-label">SELECTED PLATFORM</span>
+                <div className="total-item-val">{platformName}</div>
+              </div>
+            </div>
+            <div style={{ marginTop: "16px", paddingTop: "14px", borderTop: "1px dashed #e2e8df", display: "flex", flexDirection: "column", gap: "8px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "12px", color: "#16231a" }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                  <span>🌳</span> Total Armada Setara:
+                </span>
+                <strong style={{ color: "#047857" }}>~{formatNumberIndo(fleetTrees)} Pohon</strong>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "12px", color: "#16231a" }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                  <span>⚡</span> Total Hemat Batubara:
+                </span>
+                <strong style={{ color: "#047857" }}>~{formatNumberIndo(fleetCoalKg)} kg</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ==================== DATA BUILDERS & HELPERS ==================== */
 
 function buildFleet(sites, locations) {
@@ -2413,6 +2943,7 @@ function buildFleet(sites, locations) {
   const daily = locations.reduce((sum, l) => sum + (Number(l.today_energy_kwh || l.daily_energy_kwh) || 0), 0) || 7.9;
   const monthly = locations.reduce((sum, l) => sum + (Number(l.monthly_energy_kwh) || 0), 0) || overview.reduce((sum, o) => sum + (Number(o.monthly_energy_kwh) || 0), 0) || 1153;
   const yearly = locations.reduce((sum, l) => sum + (Number(l.yearly_energy_kwh) || 0), 0) || overview.reduce((sum, o) => sum + (Number(o.yearly_energy_kwh) || 0), 0) || 73786;
+  const cumulative = locations.reduce((sum, l) => sum + (Number(l.cumulative_energy_kwh) || 0), 0) || overview.reduce((sum, o) => sum + (Number(o.cumulative_energy_kwh) || 0), 0) || 106000;
   const totalIncome = locations.reduce((sum, l) => sum + (Number(l.cumulative_income) || 0), 0) || overview.reduce((sum, o) => sum + (Number(o.cumulative_income) || 0), 0) || 84520705;
   const monthlyIncome = locations.reduce((sum, l) => sum + (Number(l.monthly_income) || 0), 0) || overview.reduce((sum, o) => sum + (Number(o.monthly_income) || 0), 0) || 893619;
   const yearlyIncome = locations.reduce((sum, l) => sum + (Number(l.yearly_income) || 0), 0) || overview.reduce((sum, o) => sum + (Number(o.yearly_income) || 0), 0) || 75428228;
@@ -2426,6 +2957,7 @@ function buildFleet(sites, locations) {
     daily,
     monthly,
     yearly,
+    cumulative,
     totalIncome,
     monthlyIncome,
     yearlyIncome,
