@@ -1559,6 +1559,46 @@ function FullFleetMap({ locations, selectedId, onSelect }) {
 function EnergyProductionChart({ series, period }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
 
+  if (series?.available === false) {
+    return (
+      <div style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "100%",
+        minHeight: "260px",
+        background: "#fafbfa",
+        borderRadius: "14px",
+        border: "1px dashed #cbd5cb",
+        padding: "28px 20px",
+        textAlign: "center",
+        boxSizing: "border-box",
+      }}>
+        <div style={{
+          width: "44px",
+          height: "44px",
+          borderRadius: "50%",
+          background: "#ecfdf5",
+          color: "#1b804e",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          marginBottom: "12px",
+          fontSize: "20px",
+        }}>
+          ⚡
+        </div>
+        <h4 style={{ margin: "0 0 6px", fontSize: "15px", color: "#16231a", fontWeight: 700 }}>
+          {series?.title || "Data Histori Energi Belum Tersedia"}
+        </h4>
+        <p style={{ margin: 0, fontSize: "13px", color: "#6e8074", maxWidth: "440px", lineHeight: 1.5 }}>
+          {series?.reason || "Data kurva grafik energi belum tersedia untuk periode ini."}
+        </p>
+      </div>
+    );
+  }
+
   const labels = series?.labels || [];
   const values = series?.values || [];
 
@@ -1733,7 +1773,7 @@ function EnergyProductionChart({ series, period }) {
           zIndex: 10,
         }}>
           <span style={{ color: "#a3b8aa" }}>
-            {period === "year" ? `Bulan ${effectiveLabels[hoveredIndex]}` : (period === "month" ? `Tgl ${effectiveLabels[hoveredIndex]}` : `Jam ${effectiveLabels[hoveredIndex]}`)}
+            {period === "lifetime" ? `Tahun ${effectiveLabels[hoveredIndex]}` : (period === "year" ? `Bulan ${effectiveLabels[hoveredIndex]}` : (period === "month" ? `Tgl ${effectiveLabels[hoveredIndex]}` : `Jam ${effectiveLabels[hoveredIndex]}`))}
           </span>
           <span style={{ color: "#34d399" }}>
             {Number(effectiveValues[hoveredIndex] || 0).toFixed(2)} {series?.unit || "kWh"}
@@ -1773,19 +1813,22 @@ function EnergyView({ location, fleet, locations }) {
   const curveSubtitle = useMemo(() => {
     if (period === "today") return `${stationName} · Hourly generation reported by ${platformName}`;
     if (period === "month") return `${stationName} · Daily generation reported by ${platformName}`;
-    return `${stationName} · Monthly generation reported by ${platformName}`;
+    if (period === "year") return `${stationName} · Monthly generation reported by ${platformName}`;
+    return `${stationName} · Yearly generation reported by ${platformName}`;
   }, [stationName, platformName, period]);
 
   const curveTitle = useMemo(() => {
     if (period === "today") return "Today's production curve";
     if (period === "month") return "Monthly production curve";
-    return "Yearly production curve";
+    if (period === "year") return "Yearly production curve";
+    return "Lifetime production curve";
   }, [period]);
 
   const recordCount = useMemo(() => {
     if (period === "today") return "24 / 24";
     if (period === "month") return `${series?.values?.length || 31} / 31`;
-    return "12 / 12";
+    if (period === "year") return "12 / 12";
+    return `${series?.values?.length || 0} / ${series?.values?.length || 0}`;
   }, [period, series]);
 
   const highestVal = useMemo(() => {
@@ -1834,6 +1877,13 @@ function EnergyView({ location, fleet, locations }) {
                 >
                   Year
                 </button>
+                <button
+                  type="button"
+                  className={period === "lifetime" ? "active" : ""}
+                  onClick={() => setPeriod("lifetime")}
+                >
+                  Lifetime
+                </button>
               </div>
               <span className="unit-pill-badge">{series?.unit || "kWh"}</span>
             </div>
@@ -1852,11 +1902,11 @@ function EnergyView({ location, fleet, locations }) {
             </div>
             <div className="curve-stat-box">
               <span className="curve-stat-label">HIGHEST</span>
-              <span className="curve-stat-value">{formatNumber(highestVal, 1)} kWh</span>
+              <span className="curve-stat-value">{formatNumber(highestVal, 1)} {series?.unit || "kWh"}</span>
             </div>
             <div className="curve-stat-box">
               <span className="curve-stat-label">LATEST</span>
-              <span className="curve-stat-value">{formatNumber(latestVal, 1)} kWh</span>
+              <span className="curve-stat-value">{formatNumber(latestVal, 1)} {series?.unit || "kWh"}</span>
             </div>
           </div>
         </div>

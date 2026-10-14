@@ -38,6 +38,12 @@ const kehua = {
             "2026": { x: ["1", "2", "3"], y: { y_data: [1.2, 1.18, 1.77] } },
           },
         },
+        all_yearly: {
+          unit: "MWh",
+          series: {
+            "all": { x: ["2024", "2025", "2026"], y: { y_data: [12.4, 18.6, 6.2] } },
+          },
+        },
       },
     },
   },
@@ -66,18 +72,22 @@ test("uses Huawei energy-balance history and removes only future placeholders", 
     energy_charts: {
       daily: { labels: ["01", "02", "03", "04"], values: [64.67, 62.14, 60.4, null] },
       monthly: { labels: ["01", "02", "03", "04"], values: [2084.12, 1990.17, 2814.79, null] },
+      yearly: { labels: ["2024", "2025", "2026"], values: [18450.2, 22100.5, 9530.1] },
     },
   };
 
   assert.deepEqual(getEnergySeries(location, "month").values, [64.67, 62.14, 60.4]);
   assert.deepEqual(getEnergySeries(location, "year").values, [2084.12, 1990.17, 2814.79]);
+  assert.deepEqual(getEnergySeries(location, "lifetime").values, [18450.2, 22100.5, 9530.1]);
 });
 
-test("selects Kehua daily, monthly, and yearly energy series", () => {
+test("selects Kehua daily, monthly, yearly, and lifetime energy series", () => {
   assert.deepEqual(getEnergySeries(kehua, "today").values, [0, 0.4]);
   assert.deepEqual(getEnergySeries(kehua, "month").values, [58.1, 63, 68.8]);
   assert.deepEqual(getEnergySeries(kehua, "year").values, [1.2, 1.18, 1.77]);
   assert.equal(getEnergySeries(kehua, "year").unit, "MWh");
+  assert.deepEqual(getEnergySeries(kehua, "lifetime").values, [12.4, 18.6, 6.2]);
+  assert.equal(getEnergySeries(kehua, "lifetime").unit, "MWh");
 });
 
 test("prefers the selected Kehua station's account-specific charts", () => {

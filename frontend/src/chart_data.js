@@ -74,6 +74,7 @@ export function getEnergySeries(location, period) {
     today: "Today's production curve",
     month: "Daily energy this month",
     year: "Monthly energy this year",
+    lifetime: "Lifetime energy history",
   };
   const title = titleByPeriod[period] || "Energy history";
 
@@ -125,15 +126,15 @@ export function getEnergySeries(location, period) {
       const kwhValues = (revChart.values || []).map((v) =>
         v !== null && v !== undefined ? Math.round(Number(v) / 900) : null
       );
-      return {
-        labels: revChart.labels || [],
+      return makeSeries({
+        labels: revChart.labels,
         values: kwhValues,
         unit: "kWh",
         kind: "bar",
         title,
         caption: "Available lifetime energy history",
-        available: true,
-      };
+        reason: "Lifetime energy history is not provided for this Huawei station yet.",
+      });
     }
 
     const chart = period === "month"
@@ -178,6 +179,10 @@ export function getEnergySeries(location, period) {
         caption: nested.key || (period === "month" ? "Daily generation" : (period === "lifetime" ? "Yearly generation" : "Monthly generation")),
         reason: "Kehua energy history is unavailable.",
       });
+    }
+
+    if (period === "lifetime") {
+      return unavailable({ unit: "MWh", title, reason: "Lifetime Kehua energy history is unavailable." });
     }
 
     return period === "month"
