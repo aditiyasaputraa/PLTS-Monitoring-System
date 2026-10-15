@@ -1001,6 +1001,31 @@ def sma_extra_plant_calls(site: dict[str, Any], navigation_call: dict[str, Any])
                 "dateTimeEnd": year_start_meter_end,
             }),
         })
+        calls.append({
+            "id": f"sma_plant_historical_years_{component_id}",
+            "site": "sma",
+            "name": f"sma_plant_historical_years_{component_id}",
+            "method": "POST",
+            "url": f"{api_base}/measurements/search",
+            "headers": {
+                "Accept": "application/json, text/plain, */*",
+                "Content-Type": "application/json",
+                "Origin": "https://ennexos.sunnyportal.com",
+                "Referer": "https://ennexos.sunnyportal.com/",
+            },
+            "payload_raw": json.dumps({
+                "queryItems": [{
+                    "componentId": component_id,
+                    "channelId": "Measurement.Metering.TotWhOut.Pv",
+                    "resolution": "OneYear",
+                    "aggregate": "Dif",
+                    "multiAggregate": "Sum",
+                    "timezone": "Asia/Jakarta",
+                }],
+                "dateTimeBegin": "2019-12-31T17:00:00Z",
+                "dateTimeEnd": f"{jakarta_now.year - 1:04d}-12-31T17:00:00Z",
+            }),
+        })
     return calls
 
 
@@ -1966,6 +1991,37 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
         else:
             yearly_energy_kwh = monthly_kwh
 
+        # Historical years energy history across all operating years (for Lifetime yearly chart)
+        hist_years_call = grouped.get(f"sma_plant_historical_years_{component_id}") or []
+        hist_years_body = response_data(hist_years_call[0]) if hist_years_call else []
+        yearly_by_year: dict[str, float] = {}
+        if isinstance(hist_years_body, list):
+            for channel in hist_years_body:
+                if isinstance(channel, dict) and "values" in channel:
+                    for v in channel.get("values", []):
+                        if isinstance(v, dict) and v.get("value") is not None:
+                            val = to_float(v["value"])
+                            time_str = str(v.get("time") or "")
+                            try:
+                                t_utc = datetime.fromisoformat(time_str.replace("Z", "+00:00"))
+                                t_jkt = t_utc.astimezone(timezone(timedelta(hours=7)))
+                                y_str = str((t_jkt - timedelta(minutes=1)).year)
+                                yearly_by_year[y_str] = round((val or 0.0) / 1000.0, 2)
+                            except Exception:
+                                pass
+
+        curr_year_str = str(jakarta_now.year)
+        yearly_by_year[curr_year_str] = yearly_energy_kwh
+
+        if yearly_by_year:
+            min_year = min(int(y) for y in yearly_by_year.keys())
+            max_year = int(curr_year_str)
+            yearly_chart_labels = [str(y) for y in range(min_year, max_year + 1)]
+            yearly_chart_values = [yearly_by_year.get(str(y), 0.0) for y in range(min_year, max_year + 1)]
+        else:
+            yearly_chart_labels = [curr_year_str]
+            yearly_chart_values = [yearly_energy_kwh]
+
         daily_income = round(daily_kwh * SMA_TARIFF_PER_KWH, 2)
         monthly_income = round(monthly_kwh * SMA_TARIFF_PER_KWH, 2)
         yearly_income = round(yearly_energy_kwh * SMA_TARIFF_PER_KWH, 2)
@@ -2043,12 +2099,12 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
                     "values": year_monthly_values,
                 },
                 "yearly": {
-                    "labels": [year_label],
-                    "values": [yearly_energy_kwh],
+                    "labels": yearly_chart_labels,
+                    "values": yearly_chart_values,
                 },
                 "lifetime": {
-                    "labels": ["Total"],
-                    "values": [cumulative_energy_kwh],
+                    "labels": yearly_chart_labels,
+                    "values": yearly_chart_values,
                 },
             },
             "revenue_charts": {
@@ -2069,12 +2125,12 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
                     "values": [round(val * SMA_TARIFF_PER_KWH, 2) for val in year_monthly_values],
                 },
                 "yearly": {
-                    "labels": [year_label],
-                    "values": [yearly_income],
+                    "labels": yearly_chart_labels,
+                    "values": [round(val * SMA_TARIFF_PER_KWH, 2) for val in yearly_chart_values],
                 },
                 "lifetime": {
-                    "labels": ["Total"],
-                    "values": [cumulative_income],
+                    "labels": yearly_chart_labels,
+                    "values": [round(val * SMA_TARIFF_PER_KWH, 2) for val in yearly_chart_values],
                 },
             },
         }
