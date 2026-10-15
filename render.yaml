@@ -24,6 +24,8 @@ services:
         value: "true"
       - key: ENABLE_KEHUA
         value: "true"
+      - key: ENABLE_SMA
+        value: "true"
       - key: SUPABASE_CURRENT_TABLE
         value: monitoring_current
       - key: SUPABASE_HISTORY_TABLE
@@ -52,7 +54,13 @@ services:
         sync: false
       - key: KEHUA_ACCOUNTS_JSON
         sync: false
+      - key: SMA_USERNAME
+        sync: false
+      - key: SMA_PASSWORD
+        sync: false
       - key: HUAWEI_COOKIES_JSON
         sync: false
       - key: KEHUA_COOKIES_JSON
+        sync: false
+      - key: SMA_COOKIES_JSON
         sync: false
