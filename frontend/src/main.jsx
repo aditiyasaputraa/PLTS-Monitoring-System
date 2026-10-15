@@ -1338,17 +1338,32 @@ function MonthlyProductionChart({ currentMonthKwh }) {
   );
 }
 
-function formatStationLabel(name) {
+function formatStationLabel(name, isCrowded = false) {
   if (!name) return "";
-  const n = String(name).trim();
-  if (n.includes("Rawa Badak")) return "SDN Rawa Badak Sela...";
-  if (n.includes("SMAN 75")) return "SMAN 75 Jakarta Uta...";
-  if (n.includes("GOR Sekda")) return "GOR Sekda Saefullah";
-  if (n.includes("SDN 09")) return "SDN 09 JAKUT";
-  if (n.includes("SMPN 282")) return "SMPN 282 JAKUT";
+  let n = String(name).trim();
+  // Strip redundant administrative prefixes and suffixes
+  n = n.replace(/^JAKTIM\s+/i, "");
+  n = n.replace(/\s+JAKUT$/i, "");
+  n = n.replace(/\s+Jakarta\s+Utara.*$/i, "");
+  n = n.replace(/\s+Saefullah$/i, "");
+  n = n.replace(/Selatan\s+03$/i, "03");
+
+  if (n.includes("Rawa Badak")) return "SDN Rawa Badak";
+  if (n.includes("SMAN 75")) return "SMAN 75";
+  if (n.includes("GOR Sekda")) return "GOR Sekda";
+  if (n.includes("SDN 09")) return "SDN 09";
+  if (n.includes("SMPN 282")) return "SMPN 282";
   if (n.includes("Sukapura")) return "SDN Sukapura 02";
-  if (n.length > 20) {
-    return `${n.slice(0, 18)}...`;
+  if (n.includes("SMPN 51")) return "SMPN 51";
+  if (n.includes("SMPN 213")) return "SMPN 213";
+  if (n.includes("SMPN 255")) return "SMPN 255";
+  if (n.includes("SMAN 105")) return "SMAN 105";
+
+  if (isCrowded && n.length > 13) {
+    return `${n.slice(0, 11)}...`;
+  }
+  if (n.length > 18) {
+    return `${n.slice(0, 16)}...`;
   }
   return n;
 }
@@ -1376,17 +1391,18 @@ function TodayEnergyBySiteChart({ locations, selectedId, onSelect }) {
   else yMax = Math.ceil(rawMax / 10) * 10;
 
   const yTicks = [yMax, yMax * 0.75, yMax * 0.5, yMax * 0.25, 0];
+  const isCrowded = sitesData.length > 6;
   const plotTop = 15;
-  const plotBottom = 160;
+  const plotBottom = isCrowded ? 142 : 155;
   const plotHeight = plotBottom - plotTop;
   const plotLeft = 35;
   const plotRight = 715;
   const slotWidth = (plotRight - plotLeft) / Math.max(sitesData.length, 1);
-  const barWidth = 44;
+  const barWidth = Math.min(38, Math.max(14, slotWidth * 0.52));
 
   return (
     <div className="today-energy-chart-wrap">
-      <svg viewBox="0 0 740 190" style={{ width: "100%", height: "100%", overflow: "visible" }}>
+      <svg viewBox={isCrowded ? "0 0 740 215" : "0 0 740 190"} style={{ width: "100%", height: "100%", overflow: "visible" }}>
         {/* Y Grid lines and tick labels */}
         {yTicks.map((tickVal) => {
           const y = plotBottom - (tickVal / yMax) * plotHeight;
@@ -1400,13 +1416,14 @@ function TodayEnergyBySiteChart({ locations, selectedId, onSelect }) {
           );
         })}
 
-        {/* Bars for 6 sites */}
+        {/* Bars for sites */}
         {sitesData.map((site, idx) => {
           const slotCenter = plotLeft + idx * slotWidth + slotWidth / 2;
           const barX = slotCenter - barWidth / 2;
           const barHeight = Math.max((site.val / yMax) * plotHeight, 2.5);
           const barY = plotBottom - barHeight;
           const isSelected = site.uid === selectedId;
+          const labelText = formatStationLabel(site.name, isCrowded);
 
           return (
             <g
@@ -1426,16 +1443,30 @@ function TodayEnergyBySiteChart({ locations, selectedId, onSelect }) {
                 opacity={isSelected ? 1 : 0.95}
                 style={{ transition: "all 0.2s ease" }}
               />
-              <text
-                x={slotCenter}
-                y="176"
-                fill="#586b5e"
-                fontSize="7.2"
-                fontWeight={isSelected ? "700" : "500"}
-                textAnchor="middle"
-              >
-                {formatStationLabel(site.name)}
-              </text>
+              {isCrowded ? (
+                <text
+                  x={slotCenter}
+                  y={plotBottom + 12}
+                  fill={isSelected ? "#1b804e" : "#586b5e"}
+                  fontSize="7.5"
+                  fontWeight={isSelected ? "700" : "500"}
+                  textAnchor="end"
+                  transform={`rotate(-35, ${slotCenter}, ${plotBottom + 12})`}
+                >
+                  {labelText}
+                </text>
+              ) : (
+                <text
+                  x={slotCenter}
+                  y={plotBottom + 16}
+                  fill={isSelected ? "#1b804e" : "#586b5e"}
+                  fontSize="8"
+                  fontWeight={isSelected ? "700" : "500"}
+                  textAnchor="middle"
+                >
+                  {labelText}
+                </text>
+              )}
             </g>
           );
         })}
