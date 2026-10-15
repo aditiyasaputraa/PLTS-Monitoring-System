@@ -907,23 +907,11 @@ def sma_extra_plant_calls(site: dict[str, Any], navigation_call: dict[str, Any])
                     "resolution": "OneDay",
                     "aggregate": "Dif",
                     "multiAggregate": "Sum",
+                    "timezone": "Asia/Jakarta",
                 }],
                 "dateTimeBegin": date_begin,
                 "dateTimeEnd": date_end,
             }),
-        })
-        calls.append({
-            "id": f"sma_plant_weather_{component_id}",
-            "site": "sma",
-            "name": f"sma_plant_weather_{component_id}",
-            "method": "GET",
-            "url": f"{api_base}/components/{component_id}/forecast/weather",
-            "headers": {
-                "Accept": "application/json, text/plain, */*",
-                "Origin": "https://ennexos.sunnyportal.com",
-                "Referer": "https://ennexos.sunnyportal.com/",
-            },
-            "payload_raw": "",
         })
     return calls
 
@@ -1791,7 +1779,11 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
         power_call = grouped.get(f"sma_plant_power_{component_id}") or grouped.get("gauge_power") or []
         power_body = response_data(power_call[0]) if power_call else {}
         power_val = to_float(power_body.get("value")) if isinstance(power_body, dict) else None
-        current_power_kw = power_val if power_val is not None else 0.0
+        max_val = to_float(power_body.get("max")) if isinstance(power_body, dict) else None
+        # SMA gauge power is in Watts (W), convert to kW
+        current_power_kw = round(power_val / 1000.0, 3) if power_val is not None else 0.0
+        capacity_from_max = round(max_val / 1000.0, 2) if max_val else None
+        capacity_kwp = capacity_kwp or capacity_from_max or 15.0
 
         energy_call = grouped.get(f"sma_plant_daily_energy_{component_id}") or grouped.get("daily_energy") or []
         energy_body = response_data(energy_call[0]) if energy_call else []
@@ -1812,9 +1804,11 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
                                 energy_labels.append(label)
                                 energy_values.append(kwh)
 
+        monthly_kwh = round(sum(energy_values), 2) if energy_values else daily_kwh
         daily_income = round(daily_kwh * SMA_TARIFF_PER_KWH, 2)
-        total_kwh = daily_kwh
-        total_income = round(total_kwh * SMA_TARIFF_PER_KWH, 2)
+        monthly_income = round(monthly_kwh * SMA_TARIFF_PER_KWH, 2)
+        total_kwh = monthly_kwh
+        total_income = monthly_income
 
         weather_call = grouped.get(f"sma_plant_weather_{component_id}") or grouped.get("weather") or []
         weather_body = response_data(weather_call[0]) if weather_call else {}
@@ -1829,15 +1823,16 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
             "name": plant_name,
             "platform": "sma",
             "source": "sma",
-            "capacity_kwp": capacity_kwp or 10.0,
+            "status": "normal" if current_power_kw > 0 else "offline",
+            "capacity_kwp": capacity_kwp,
             "current_power_kw": current_power_kw,
             "daily_energy_kwh": daily_kwh,
-            "monthly_energy_kwh": daily_kwh,
-            "yearly_energy_kwh": daily_kwh,
+            "monthly_energy_kwh": monthly_kwh,
+            "yearly_energy_kwh": monthly_kwh,
             "cumulative_energy_kwh": total_kwh,
             "daily_income": daily_income,
-            "monthly_income": daily_income,
-            "yearly_income": daily_income,
+            "monthly_income": monthly_income,
+            "yearly_income": monthly_income,
             "cumulative_income": total_income,
             "income_currency": "IDR",
             "grid_status": "online" if current_power_kw > 0 else "offline",
@@ -1849,11 +1844,11 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
                 },
                 "monthly": {
                     "labels": [month_label],
-                    "values": [daily_kwh],
+                    "values": [monthly_kwh],
                 },
                 "yearly": {
                     "labels": [year_label],
-                    "values": [daily_kwh],
+                    "values": [monthly_kwh],
                 },
             },
             "revenue_charts": {
@@ -1863,11 +1858,11 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
                 },
                 "monthly": {
                     "labels": [month_label],
-                    "values": [daily_income],
+                    "values": [monthly_income],
                 },
                 "yearly": {
                     "labels": [year_label],
-                    "values": [daily_income],
+                    "values": [monthly_income],
                 },
             },
         }
@@ -1886,8 +1881,10 @@ def normalize_sma_overview(grouped: dict[str, list[dict[str, Any]]], stations: l
     total_capacity = sum(to_float(s.get("capacity_kwp")) or 0.0 for s in stations)
     total_power = sum(to_float(s.get("current_power_kw")) or 0.0 for s in stations)
     daily_energy = sum(to_float(s.get("daily_energy_kwh")) or 0.0 for s in stations)
+    monthly_energy = sum(to_float(s.get("monthly_energy_kwh")) or 0.0 for s in stations)
     total_energy = sum(to_float(s.get("cumulative_energy_kwh")) or 0.0 for s in stations)
     daily_income = sum(to_float(s.get("daily_income")) or 0.0 for s in stations)
+    monthly_income = sum(to_float(s.get("monthly_income")) or 0.0 for s in stations)
     total_income = sum(to_float(s.get("cumulative_income")) or 0.0 for s in stations)
 
     return compact_non_null({
@@ -1899,12 +1896,12 @@ def normalize_sma_overview(grouped: dict[str, list[dict[str, Any]]], stations: l
         "capacity_kwp": round(total_capacity, 2),
         "current_power_kw": round(total_power, 2),
         "daily_energy_kwh": round(daily_energy, 4),
-        "monthly_energy_kwh": round(daily_energy, 4),
-        "yearly_energy_kwh": round(daily_energy, 4),
+        "monthly_energy_kwh": round(monthly_energy, 4),
+        "yearly_energy_kwh": round(monthly_energy, 4),
         "cumulative_energy_kwh": round(total_energy, 4),
         "daily_income": round(daily_income, 2),
-        "monthly_income": round(daily_income, 2),
-        "yearly_income": round(daily_income, 2),
+        "monthly_income": round(monthly_income, 2),
+        "yearly_income": round(monthly_income, 2),
         "cumulative_income": round(total_income, 2),
         "income_currency": "IDR",
         "inverter_count": station_count,

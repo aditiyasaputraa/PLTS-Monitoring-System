@@ -86,7 +86,7 @@ class SmaAuthAndNormalizationTests(unittest.TestCase):
             "sma_plant_power_plant_101": [{
                 "success": True,
                 "response_body": {
-                    "value": 14.8,
+                    "value": 14800,
                 },
             }],
             "sma_plant_daily_energy_plant_101": [{

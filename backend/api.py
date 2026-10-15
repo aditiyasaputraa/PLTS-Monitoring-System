@@ -131,7 +131,7 @@ def build_scrape_args() -> SimpleNamespace:
             binding += f":{cookie_path}"
         sites.append(binding)
 
-    if env_enabled("ENABLE_SMA", default=False):
+    if env_enabled("ENABLE_SMA", default=True):
         cookie_path = cookie_paths.get("sma")
         binding = f"sma:{ROOT / 'sma_api_blueprint.json'}"
         if cookie_path:
