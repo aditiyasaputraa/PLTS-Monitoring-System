@@ -100,13 +100,16 @@ def write_json_secret(env_name: str, destination: Path) -> bool:
 def materialize_cookies() -> dict[str, Path | None]:
     huawei_path = COOKIE_DIR / "huawei_Cookies.json"
     kehua_path = COOKIE_DIR / "kehua_Cookies.json"
+    sma_path = COOKIE_DIR / "sma_Cookies.json"
 
     huawei_written = write_json_secret("HUAWEI_COOKIES_JSON", huawei_path)
     kehua_written = write_json_secret("KEHUA_COOKIES_JSON", kehua_path)
+    sma_written = write_json_secret("SMA_COOKIES_JSON", sma_path)
 
     return {
         "huawei": huawei_path if huawei_written else None,
         "kehua": kehua_path if kehua_written else None,
+        "sma": sma_path if sma_written else None,
     }
 
 
@@ -124,6 +127,13 @@ def build_scrape_args() -> SimpleNamespace:
     if env_enabled("ENABLE_KEHUA"):
         cookie_path = cookie_paths["kehua"]
         binding = f"kehua:{ROOT / 'kehua_api_blueprint.json'}"
+        if cookie_path:
+            binding += f":{cookie_path}"
+        sites.append(binding)
+
+    if env_enabled("ENABLE_SMA", default=False):
+        cookie_path = cookie_paths.get("sma")
+        binding = f"sma:{ROOT / 'sma_api_blueprint.json'}"
         if cookie_path:
             binding += f":{cookie_path}"
         sites.append(binding)

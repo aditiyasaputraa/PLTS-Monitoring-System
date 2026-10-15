@@ -37,5 +37,20 @@ export const MOCK_MONITORING_DATA = {
       },
       stations: [],
     },
+    sma: {
+      platform: "sma",
+      overview: {
+        capacity_kwp: 0,
+        current_power_kw: 0,
+        daily_energy_kwh: 0,
+        monthly_energy_kwh: 0,
+        yearly_energy_kwh: 0,
+        cumulative_energy_kwh: 0,
+        monthly_income: 0,
+        yearly_income: 0,
+        cumulative_income: 0,
+      },
+      stations: [],
+    },
   },
 };

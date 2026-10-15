@@ -144,4 +144,32 @@ test("calculates Kehua emission series automatically at 0.85 kg CO2/kWh", () => 
   assert.match(seriesMonth.caption, /0.85 kg CO₂\/kWh/);
 });
 
+const sma = {
+  source: "sma",
+  name: "SMA Site",
+  energy_charts: {
+    today: { labels: ["00:00", "01:00"], values: [0, 5.2] },
+    daily: { labels: ["01", "02"], values: [45.5, 52.1] },
+    monthly: { labels: ["Jan", "Feb"], values: [1200, 1350] },
+    yearly: { labels: ["2025", "2026"], values: [12500, 14200] },
+  },
+};
+
+test("selects SMA energy and calculates revenue and emission series", () => {
+  const energyToday = getEnergySeries(sma, "today");
+  assert.equal(energyToday.available, true);
+  assert.deepEqual(energyToday.values, [0, 5.2]);
+
+  const energyMonth = getEnergySeries(sma, "month");
+  assert.deepEqual(energyMonth.values, [45.5, 52.1]);
+
+  const revMonth = getRevenueSeries(sma, "month");
+  assert.equal(revMonth.available, true);
+  assert.deepEqual(revMonth.values, [40950, 46890]);
+
+  const emMonth = getEmissionSeries(sma, "month");
+  assert.equal(emMonth.available, true);
+  assert.deepEqual(emMonth.values, [38.7, 44.3]);
+});
+
 

@@ -449,23 +449,23 @@ function Dashboard({ session, onSignOut }) {
     return sites.flatMap((site) => (site.stations || []).map((station) => {
       const id = String(station.station_id || station.station_numeric_id || station.id);
       const name = station.station_name || station.name || `Station ${id}`;
-      const isKehua = (site.platform || "").toLowerCase() === "kehua";
+      const isAutoTariff = ["kehua", "sma"].includes((site.platform || "").toLowerCase());
 
       const dailyKwh = Number(station.today_energy_kwh ?? station.daily_energy_kwh ?? 0);
       const monthlyKwh = Number(station.monthly_energy_kwh ?? 0);
       const yearlyKwh = Number(station.yearly_energy_kwh ?? 0);
       const cumulativeKwh = Number(station.cumulative_energy_kwh ?? 0);
 
-      const dailyIncome = isKehua
+      const dailyIncome = isAutoTariff
         ? (Number(station.daily_income) || Math.round(dailyKwh * 900))
         : station.daily_income;
-      const monthlyIncome = isKehua
+      const monthlyIncome = isAutoTariff
         ? (Number(station.monthly_income) || Math.round(monthlyKwh * 900))
         : station.monthly_income;
-      const yearlyIncome = isKehua
+      const yearlyIncome = isAutoTariff
         ? (Number(station.yearly_income) || Math.round(yearlyKwh * 900))
         : station.yearly_income;
-      const cumulativeIncome = isKehua
+      const cumulativeIncome = isAutoTariff
         ? (Number(station.cumulative_income ?? station.total_income) || Math.round(cumulativeKwh * 900))
         : (station.cumulative_income ?? station.total_income);
 
@@ -506,7 +506,7 @@ function Dashboard({ session, onSignOut }) {
   const handleSyncNow = useCallback(async () => {
     if (isSyncing) return;
     setIsSyncing(true);
-    setSyncNotice("Menarik data terbaru dari Huawei & Kehua...");
+    setSyncNotice("Menarik data terbaru dari Huawei, Kehua & SMA...");
 
     const base = apiBase();
     if (base) {
@@ -660,6 +660,7 @@ function Dashboard({ session, onSignOut }) {
               <span style={{ opacity: 0.4, margin: "0 2px" }}>•</span>
               <span style={{ color: "#a7f3d0" }}>FUSIONSOLAR</span>
               <span style={{ color: "#a7f3d0" }}>KEHUA</span>
+              <span style={{ color: "#93c5fd" }}>SMA</span>
             </div>
 
             {/* Sync Button */}
@@ -699,7 +700,7 @@ function Dashboard({ session, onSignOut }) {
                   Live
                 </span>
               </div>
-              <p className="operations-subtitle">Integrated monitoring for Huawei FusionSolar and Kehua.</p>
+              <p className="operations-subtitle">Integrated monitoring for Huawei FusionSolar, Kehua, and SMA Sunny Portal.</p>
             </div>
 
             <div className="operations-actions">
@@ -1008,6 +1009,10 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt }) {
               <span className="source-item">
                 <span className="pulse-dot" style={{ width: "5px", height: "5px" }} />
                 Kehua <span className="badge-online-sm">ONLINE</span>
+              </span>
+              <span className="source-item">
+                <span className="pulse-dot" style={{ width: "5px", height: "5px" }} />
+                SMA <span className="badge-online-sm">ONLINE</span>
               </span>
             </div>
             <div style={{ color: "#34d399", fontWeight: 800, fontSize: "10px" }}>
@@ -2236,7 +2241,7 @@ function RevenueView({ location, fleet, locations }) {
   const activeStation = location || locations.find((l) => l.source === "huawei") || locations?.[0] || {};
   const stationName = activeStation.name || "GOR Sekda Saefullah";
   const platformName = activeStation.source || "huawei";
-  const isKehua = (activeStation.source || "").toLowerCase() === "kehua";
+  const isAutoTariff = ["kehua", "sma"].includes((activeStation.source || "").toLowerCase());
 
   const todayRev = Number(activeStation.daily_income) || Math.round(Number(activeStation.daily_energy_kwh || activeStation.today_energy_kwh || 0) * 900);
   const monthRev = Number(activeStation.monthly_income) || Math.round(Number(activeStation.monthly_energy_kwh || 0) * 900);
@@ -2250,10 +2255,10 @@ function RevenueView({ location, fleet, locations }) {
   const series = useMemo(() => getRevenueSeries(activeStation, period), [activeStation, period]);
 
   const curveSubtitle = useMemo(() => {
-    if (period === "year") return `${stationName} · Revenue recorded in each month${isKehua ? " (Rp 900/kWh)" : ""}`;
-    if (period === "month") return `${stationName} · Revenue through the latest reported day${isKehua ? " (Rp 900/kWh)" : ""}`;
-    return `${stationName} · Available lifetime revenue history${isKehua ? " (Rp 900/kWh)" : ""}`;
-  }, [stationName, period, isKehua]);
+    if (period === "year") return `${stationName} · Revenue recorded in each month${isAutoTariff ? " (Rp 900/kWh)" : ""}`;
+    if (period === "month") return `${stationName} · Revenue through the latest reported day${isAutoTariff ? " (Rp 900/kWh)" : ""}`;
+    return `${stationName} · Available lifetime revenue history${isAutoTariff ? " (Rp 900/kWh)" : ""}`;
+  }, [stationName, period, isAutoTariff]);
 
   const curveTitle = useMemo(() => {
     if (period === "year") return "Monthly revenue this year";
@@ -2299,7 +2304,7 @@ function RevenueView({ location, fleet, locations }) {
         <div className="rev-kpi-card">
           <div className="rev-kpi-top">
             <span className="rev-kpi-label">TODAY</span>
-            {isKehua && <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>Rp 900/kWh</span>}
+            {isAutoTariff && <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>Rp 900/kWh</span>}
             <span className="rev-kpi-dash" />
           </div>
           <div className="rev-kpi-val">
@@ -2311,7 +2316,7 @@ function RevenueView({ location, fleet, locations }) {
         <div className="rev-kpi-card">
           <div className="rev-kpi-top">
             <span className="rev-kpi-label">THIS MONTH</span>
-            {isKehua && <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>Rp 900/kWh</span>}
+            {isAutoTariff && <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>Rp 900/kWh</span>}
             <span className="rev-kpi-dash" />
           </div>
           <div className="rev-kpi-val">
@@ -2323,7 +2328,7 @@ function RevenueView({ location, fleet, locations }) {
         <div className="rev-kpi-card">
           <div className="rev-kpi-top">
             <span className="rev-kpi-label">THIS YEAR</span>
-            {isKehua && <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>Rp 900/kWh</span>}
+            {isAutoTariff && <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>Rp 900/kWh</span>}
             <span className="rev-kpi-dash" />
           </div>
           <div className="rev-kpi-val">
@@ -2335,7 +2340,7 @@ function RevenueView({ location, fleet, locations }) {
         <div className="rev-kpi-card rev-kpi-lifetime">
           <div className="rev-kpi-top">
             <span className="rev-kpi-label">LIFETIME</span>
-            {isKehua && <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>Rp 900/kWh</span>}
+            {isAutoTariff && <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>Rp 900/kWh</span>}
             <span className="rev-kpi-dash" />
           </div>
           <div className="rev-kpi-val">
@@ -2384,7 +2389,7 @@ function RevenueView({ location, fleet, locations }) {
 
             {/* Inner Chart Box */}
             <div className="energy-chart-stage">
-              <RevenueProductionChart series={series} period={period} isKehua={isKehua} />
+              <RevenueProductionChart series={series} period={period} isKehua={isAutoTariff} />
             </div>
 
             {/* 3 Stats underneath chart */}

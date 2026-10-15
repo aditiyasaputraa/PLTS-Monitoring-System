@@ -61,7 +61,7 @@ def _station_rows(payload: dict[str, Any]):
 
 def _currency(platform: str, overview: dict[str, Any], station: dict[str, Any]) -> Any:
     value = station.get("income_currency") or overview.get("income_currency")
-    if not value and platform in ("huawei", "kehua"):
+    if not value and platform in ("huawei", "kehua", "sma"):
         return "IDR"
     return value
 

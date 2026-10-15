@@ -74,3 +74,4 @@ mobile/android/.gradle/
 mobile/android/local.properties
 mobile/ios/.symlinks/
 mobile/ios/Pods/
+*.apk

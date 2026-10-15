@@ -47,5 +47,24 @@
       "listAlarmEventLevel",
       "listBsDataDictionary"
     ]
+  },
+  "sma": {
+    "base_url": "https://ennexos.sunnyportal.com",
+    "base_domain": "ennexos.sunnyportal.com",
+    "api_base": "https://uiapi.sunnyportal.com/api/v1",
+    "login_url": "https://ennexos.sunnyportal.com",
+    "dashboard_url": "https://ennexos.sunnyportal.com/dashboard",
+    "cookie_domains": ["ennexos.sunnyportal.com", "sunnyportal.com", "sma.energy"],
+    "auth_type": "sma_ennexos",
+    "auth_base": "https://login.sma.energy/auth/realms/SMA",
+    "client_id": "SPpbeOS",
+    "redirect_uri": "https://ennexos.sunnyportal.com/dashboard/initialize",
+    "monitoring_keywords": [
+      "/navigation",
+      "/plants",
+      "/widgets/gauge/power",
+      "/measurements/search",
+      "/forecast/weather"
+    ]
   }
 }

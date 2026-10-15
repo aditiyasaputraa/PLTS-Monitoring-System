@@ -7,11 +7,13 @@ from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
 import os
+import re
+import secrets
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs, quote, urlencode, urlparse
+from urllib.parse import parse_qs, quote, urlencode, urljoin, urlparse
 
 import socket
 import requests
@@ -60,6 +62,7 @@ AUTH_ERROR_CODES = {"900", "901", "902", "903", "999", "111005", 900, 901, 902, 
 KEHUA_PASSWORD_KEY = "clxslychxyl11988"
 KEHUA_SIGN_KEY = "%vSBtRMV4F8mr#dYofsG3lJOBv5vw*fZ"
 KEHUA_TARIFF_PER_KWH = float(os.getenv("KEHUA_TARIFF_PER_KWH", "900.0"))
+SMA_TARIFF_PER_KWH = float(os.getenv("SMA_TARIFF_PER_KWH", "900.0"))
 
 
 def now_stamp() -> str:
@@ -296,6 +299,142 @@ def refresh_huawei_roarand(session: requests.Session, site: dict[str, Any], time
     return {"success": bool(roarand), "status_code": response.status_code, "roarand_found": bool(roarand), "body": body}
 
 
+def sma_generate_pkce() -> tuple[str, str]:
+    verifier = base64.urlsafe_b64encode(os.urandom(32)).decode("ascii").rstrip("=")
+    digest = hashlib.sha256(verifier.encode("ascii")).digest()
+    challenge = base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
+    return verifier, challenge
+
+
+def sma_parse_form_action(html: str) -> str | None:
+    match = re.search(r'<form[^>]+action=["\']([^"\']+)["\']', html, re.IGNORECASE)
+    return match.group(1).replace("&amp;", "&") if match else None
+
+
+def sma_password_login(
+    session: requests.Session,
+    site: dict[str, Any],
+    username: str,
+    password: str,
+    timeout: int,
+) -> dict[str, Any]:
+    auth_base = site.get("auth_base", "https://login.sma.energy/auth/realms/SMA")
+    auth_url = f"{auth_base}/protocol/openid-connect/auth"
+    token_url = f"{auth_base}/protocol/openid-connect/token"
+    client_id = site.get("client_id", "SPpbeOS")
+    redirect_uri = site.get("redirect_uri", "https://ennexos.sunnyportal.com/dashboard/initialize")
+
+    code_verifier, code_challenge = sma_generate_pkce()
+    state = secrets.token_urlsafe(16)
+    nonce = secrets.token_urlsafe(16)
+
+    params = {
+        "response_type": "code",
+        "client_id": client_id,
+        "redirect_uri": redirect_uri,
+        "scope": "openid profile",
+        "state": state,
+        "code_challenge": code_challenge,
+        "code_challenge_method": "S256",
+        "nonce": nonce,
+    }
+
+    try:
+        r1 = session.get(
+            auth_url,
+            params=params,
+            headers={
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome Safari/537.36",
+            },
+            timeout=timeout,
+        )
+        if not r1.ok:
+            return {"success": False, "status_code": r1.status_code, "reason": "auth_page_error"}
+
+        form_action = sma_parse_form_action(r1.text)
+        if not form_action:
+            return {"success": False, "reason": "login_form_not_found"}
+
+        form_url = urljoin(auth_url, form_action)
+        r2 = session.post(
+            form_url,
+            data={"username": username, "password": password, "credentialId": ""},
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome Safari/537.36",
+            },
+            allow_redirects=False,
+            timeout=timeout,
+        )
+
+        location = r2.headers.get("Location")
+        if not location:
+            return {"success": False, "status_code": r2.status_code, "reason": "invalid_credentials_or_no_redirect"}
+
+        parsed_loc = urlparse(location)
+        query_params = parse_qs(parsed_loc.query)
+        auth_code = query_params.get("code", [None])[0]
+        if not auth_code:
+            return {"success": False, "reason": "missing_auth_code_in_redirect", "location": location}
+
+        r3 = session.post(
+            token_url,
+            data={
+                "grant_type": "authorization_code",
+                "code": auth_code,
+                "redirect_uri": redirect_uri,
+                "code_verifier": code_verifier,
+                "client_id": client_id,
+            },
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Origin": "https://ennexos.sunnyportal.com",
+                "Referer": "https://ennexos.sunnyportal.com/",
+            },
+            timeout=timeout,
+        )
+        if not r3.ok:
+            return {"success": False, "status_code": r3.status_code, "reason": "token_exchange_failed"}
+
+        token_data = r3.json()
+        access_token = token_data.get("access_token")
+        if not access_token:
+            return {"success": False, "reason": "no_access_token_returned"}
+
+        session.headers["Authorization"] = f"Bearer {access_token}"
+        return {
+            "success": True,
+            "status_code": r3.status_code,
+            "token_type": token_data.get("token_type"),
+            "expires_in": token_data.get("expires_in"),
+        }
+    except Exception as exc:
+        return {"success": False, "reason": repr(exc)}
+
+
+def sma_check_auth(session: requests.Session, site: dict[str, Any], timeout: int) -> dict[str, Any]:
+    url = f"{site.get('api_base', 'https://uiapi.sunnyportal.com/api/v1')}/navigation"
+    try:
+        response = session.get(
+            url,
+            headers={
+                "Accept": "application/json, text/plain, */*",
+                "Origin": "https://ennexos.sunnyportal.com",
+                "Referer": "https://ennexos.sunnyportal.com/",
+            },
+            timeout=timeout,
+            allow_redirects=False,
+        )
+        return {
+            "checked": True,
+            "success": response.ok and response.status_code == 200,
+            "status_code": response.status_code,
+        }
+    except Exception as exc:
+        return {"checked": True, "success": False, "error": repr(exc)}
+
+
 def check_auth(session: requests.Session, site: dict[str, Any], timeout: int) -> dict[str, Any]:
     url = site.get("auth_check")
     if not url:
@@ -338,6 +477,18 @@ def prepare_session(
             if username and password:
                 meta["password_login"] = kehua_password_login(session, site, username, password, timeout)
                 meta["auth_check_after_login"] = kehua_check_auth(session, site, timeout)
+            else:
+                meta["password_login"] = {"success": False, "reason": "credentials_not_configured"}
+
+    if site.get("auth_type") == "sma_ennexos":
+        auth = sma_check_auth(session, site, timeout)
+        meta["auth_check_before_login"] = auth
+        if not auth.get("success"):
+            username = credentials.get("username") if credentials else os.getenv("SMA_USERNAME")
+            password = credentials.get("password") if credentials else os.getenv("SMA_PASSWORD")
+            if username and password:
+                meta["password_login"] = sma_password_login(session, site, username, password, timeout)
+                meta["auth_check_after_login"] = sma_check_auth(session, site, timeout)
             else:
                 meta["password_login"] = {"success": False, "reason": "credentials_not_configured"}
 
@@ -689,6 +840,94 @@ def kehua_extra_station_calls(
     return calls
 
 
+def sma_extra_plant_calls(site: dict[str, Any], navigation_call: dict[str, Any]) -> list[dict[str, Any]]:
+    body = response_data(navigation_call) or navigation_call.get("response_body")
+    items = body if isinstance(body, list) else ([body] if isinstance(body, dict) else [])
+    api_base = site.get("api_base") or f"{site.get('base_url', 'https://ennexos.sunnyportal.com')}/api/v1"
+    calls: list[dict[str, Any]] = []
+
+    jakarta_now = datetime.now(timezone(timedelta(hours=7)))
+    prev_day = jakarta_now - timedelta(days=1)
+    date_begin = prev_day.strftime("%Y-%m-%dT22:00:00.000Z")
+    date_end = jakarta_now.strftime("%Y-%m-%dT22:00:00.000Z")
+
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        is_plant = item.get("componentType") == "Plant"
+        has_id_only = "componentType" not in item and "componentId" in item
+        if not (is_plant or has_id_only):
+            continue
+        component_id = str(item.get("componentId") or "")
+        if not component_id:
+            continue
+
+        calls.append({
+            "id": f"sma_plant_detail_{component_id}",
+            "site": "sma",
+            "name": f"sma_plant_detail_{component_id}",
+            "method": "GET",
+            "url": f"{api_base}/plants/{component_id}",
+            "headers": {
+                "Accept": "application/json, text/plain, */*",
+                "Origin": "https://ennexos.sunnyportal.com",
+                "Referer": "https://ennexos.sunnyportal.com/",
+            },
+            "payload_raw": "",
+        })
+        calls.append({
+            "id": f"sma_plant_power_{component_id}",
+            "site": "sma",
+            "name": f"sma_plant_power_{component_id}",
+            "method": "GET",
+            "url": f"{api_base}/widgets/gauge/power?componentId={component_id}&type=PvProduction",
+            "headers": {
+                "Accept": "application/json, text/plain, */*",
+                "Origin": "https://ennexos.sunnyportal.com",
+                "Referer": "https://ennexos.sunnyportal.com/",
+            },
+            "payload_raw": "",
+        })
+        calls.append({
+            "id": f"sma_plant_daily_energy_{component_id}",
+            "site": "sma",
+            "name": f"sma_plant_daily_energy_{component_id}",
+            "method": "POST",
+            "url": f"{api_base}/measurements/search",
+            "headers": {
+                "Accept": "application/json, text/plain, */*",
+                "Content-Type": "application/json",
+                "Origin": "https://ennexos.sunnyportal.com",
+                "Referer": "https://ennexos.sunnyportal.com/",
+            },
+            "payload_raw": json.dumps({
+                "queryItems": [{
+                    "componentId": component_id,
+                    "channelId": "Measurement.Metering.TotWhOut.Pv",
+                    "resolution": "OneDay",
+                    "aggregate": "Dif",
+                    "multiAggregate": "Sum",
+                }],
+                "dateTimeBegin": date_begin,
+                "dateTimeEnd": date_end,
+            }),
+        })
+        calls.append({
+            "id": f"sma_plant_weather_{component_id}",
+            "site": "sma",
+            "name": f"sma_plant_weather_{component_id}",
+            "method": "GET",
+            "url": f"{api_base}/components/{component_id}/forecast/weather",
+            "headers": {
+                "Accept": "application/json, text/plain, */*",
+                "Origin": "https://ennexos.sunnyportal.com",
+                "Referer": "https://ennexos.sunnyportal.com/",
+            },
+            "payload_raw": "",
+        })
+    return calls
+
+
 def normalize_latest(results: list[dict[str, Any]]) -> dict[str, Any]:
     latest: dict[str, Any] = {"schema": "monitoring_current.v2", "by_site": {}, "updated_at": now_iso()}
     for site_result in results:
@@ -864,6 +1103,12 @@ def build_normalized_site(site_result: dict[str, Any]) -> dict[str, Any]:
         alarms = normalize_kehua_alarms(grouped)
         charts = normalize_kehua_charts(grouped)
         devices = normalize_kehua_devices(grouped)
+    elif site_name == "sma":
+        stations = normalize_sma_stations(grouped)
+        overview = normalize_sma_overview(grouped, stations)
+        alarms = normalize_sma_alarms(grouped)
+        charts = normalize_sma_charts(grouped)
+        devices = normalize_sma_devices(grouped, stations)
     else:
         stations = []
         overview = {}
@@ -1508,6 +1753,194 @@ def normalize_kehua_company_power_charts(calls: list[dict[str, Any]]) -> dict[st
     return by_dimension or None
 
 
+def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
+    nav_calls = grouped.get("navigation") or []
+    nav_body = response_data(nav_calls[0]) if nav_calls else None
+    items = nav_body if isinstance(nav_body, list) else ([nav_body] if isinstance(nav_body, dict) else [])
+
+    plants_calls = grouped.get("plants") or []
+    plants_body = response_data(plants_calls[0]) if plants_calls else None
+    if isinstance(plants_body, list) and not items:
+        items = plants_body
+
+    stations: list[dict[str, Any]] = []
+
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        is_plant = item.get("componentType") == "Plant"
+        has_id_only = "componentType" not in item and "componentId" in item
+        if not (is_plant or has_id_only):
+            continue
+        component_id = str(item.get("componentId") or "")
+        if not component_id:
+            continue
+
+        plant_name = str(item.get("name") or f"SMA Plant {component_id}")
+
+        detail_call = grouped.get(f"sma_plant_detail_{component_id}") or []
+        detail = response_data(detail_call[0]) if detail_call else {}
+        if isinstance(detail, list) and detail:
+            detail = detail[0]
+        if isinstance(detail, dict):
+            plant_name = str(detail.get("name") or plant_name)
+            capacity_kwp = to_float(detail.get("peakPower")) or to_float(detail.get("nominalPower"))
+        else:
+            capacity_kwp = None
+
+        power_call = grouped.get(f"sma_plant_power_{component_id}") or grouped.get("gauge_power") or []
+        power_body = response_data(power_call[0]) if power_call else {}
+        power_val = to_float(power_body.get("value")) if isinstance(power_body, dict) else None
+        current_power_kw = power_val if power_val is not None else 0.0
+
+        energy_call = grouped.get(f"sma_plant_daily_energy_{component_id}") or grouped.get("daily_energy") or []
+        energy_body = response_data(energy_call[0]) if energy_call else []
+        daily_kwh = 0.0
+        energy_values = []
+        energy_labels = []
+        if isinstance(energy_body, list):
+            for channel in energy_body:
+                if isinstance(channel, dict) and "values" in channel:
+                    for v in channel.get("values", []):
+                        if isinstance(v, dict) and v.get("value") is not None:
+                            val = to_float(v["value"])
+                            if val is not None:
+                                kwh = round(val / 1000.0, 4)
+                                daily_kwh = kwh
+                                time_str = str(v.get("time") or "")
+                                label = time_str[:10] if len(time_str) >= 10 else "Today"
+                                energy_labels.append(label)
+                                energy_values.append(kwh)
+
+        daily_income = round(daily_kwh * SMA_TARIFF_PER_KWH, 2)
+        total_kwh = daily_kwh
+        total_income = round(total_kwh * SMA_TARIFF_PER_KWH, 2)
+
+        weather_call = grouped.get(f"sma_plant_weather_{component_id}") or grouped.get("weather") or []
+        weather_body = response_data(weather_call[0]) if weather_call else {}
+
+        now = now_stamp()
+        today_label = now[:8]
+        month_label = now[:6]
+        year_label = now[:4]
+
+        station_record = {
+            "station_id": component_id,
+            "name": plant_name,
+            "platform": "sma",
+            "source": "sma",
+            "capacity_kwp": capacity_kwp or 10.0,
+            "current_power_kw": current_power_kw,
+            "daily_energy_kwh": daily_kwh,
+            "monthly_energy_kwh": daily_kwh,
+            "yearly_energy_kwh": daily_kwh,
+            "cumulative_energy_kwh": total_kwh,
+            "daily_income": daily_income,
+            "monthly_income": daily_income,
+            "yearly_income": daily_income,
+            "cumulative_income": total_income,
+            "income_currency": "IDR",
+            "grid_status": "online" if current_power_kw > 0 else "offline",
+            "updated_at": now_iso(),
+            "energy_charts": {
+                "daily": {
+                    "labels": energy_labels if energy_labels else [today_label],
+                    "values": energy_values if energy_values else [daily_kwh],
+                },
+                "monthly": {
+                    "labels": [month_label],
+                    "values": [daily_kwh],
+                },
+                "yearly": {
+                    "labels": [year_label],
+                    "values": [daily_kwh],
+                },
+            },
+            "revenue_charts": {
+                "daily": {
+                    "labels": energy_labels if energy_labels else [today_label],
+                    "values": [round(val * SMA_TARIFF_PER_KWH, 2) for val in (energy_values if energy_values else [daily_kwh])],
+                },
+                "monthly": {
+                    "labels": [month_label],
+                    "values": [daily_income],
+                },
+                "yearly": {
+                    "labels": [year_label],
+                    "values": [daily_income],
+                },
+            },
+        }
+        if isinstance(weather_body, dict) and weather_body:
+            station_record["weather"] = weather_body
+
+        stations.append(station_record)
+
+    return stations
+
+
+def normalize_sma_overview(grouped: dict[str, list[dict[str, Any]]], stations: list[dict[str, Any]]) -> dict[str, Any]:
+    station_count = len(stations)
+    connected = sum(1 for s in stations if s.get("grid_status") == "online")
+    disconnected = sum(1 for s in stations if s.get("grid_status") != "online")
+    total_capacity = sum(to_float(s.get("capacity_kwp")) or 0.0 for s in stations)
+    total_power = sum(to_float(s.get("current_power_kw")) or 0.0 for s in stations)
+    daily_energy = sum(to_float(s.get("daily_energy_kwh")) or 0.0 for s in stations)
+    total_energy = sum(to_float(s.get("cumulative_energy_kwh")) or 0.0 for s in stations)
+    daily_income = sum(to_float(s.get("daily_income")) or 0.0 for s in stations)
+    total_income = sum(to_float(s.get("cumulative_income")) or 0.0 for s in stations)
+
+    return compact_non_null({
+        "station_count": station_count,
+        "connected_station_count": connected,
+        "disconnected_station_count": disconnected,
+        "trouble_station_count": 0,
+        "no_device_station_count": 0,
+        "capacity_kwp": round(total_capacity, 2),
+        "current_power_kw": round(total_power, 2),
+        "daily_energy_kwh": round(daily_energy, 4),
+        "monthly_energy_kwh": round(daily_energy, 4),
+        "yearly_energy_kwh": round(daily_energy, 4),
+        "cumulative_energy_kwh": round(total_energy, 4),
+        "daily_income": round(daily_income, 2),
+        "monthly_income": round(daily_income, 2),
+        "yearly_income": round(daily_income, 2),
+        "cumulative_income": round(total_income, 2),
+        "income_currency": "IDR",
+        "inverter_count": station_count,
+    })
+
+
+def normalize_sma_alarms(grouped: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
+    return {"events": [], "count": 0}
+
+
+def normalize_sma_charts(grouped: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
+    return {}
+
+
+def normalize_sma_devices(grouped: dict[str, list[dict[str, Any]]], stations: list[dict[str, Any]]) -> dict[str, Any]:
+    devices = []
+    for s in stations:
+        devices.append({
+            "device_id": f"sma_inv_{s.get('station_id')}",
+            "name": f"SMA Inverter {s.get('name')}",
+            "station_id": s.get("station_id"),
+            "station_name": s.get("name"),
+            "status": s.get("grid_status"),
+            "power_kw": s.get("current_power_kw"),
+            "capacity_kwp": s.get("capacity_kwp"),
+            "type": "inverter",
+            "vendor": "sma",
+        })
+    return {
+        "devices": devices,
+        "device_count": len(devices),
+        "online_count": sum(1 for d in devices if d.get("status") == "online"),
+        "offline_count": sum(1 for d in devices if d.get("status") != "online"),
+    }
+
+
 def normalize_status(value: Any, platform: str | None = None) -> str | None:
     text = str(value).lower() if value is not None else ""
     if platform == "kehua":
@@ -1784,6 +2217,12 @@ def scrape_site(
                     time.sleep(delay)
         if site_name == "kehua" and call.get("name") == "listStationCardInfoByCondition" and result.get("success"):
             for extra_call in kehua_extra_station_calls(site, result):
+                extra_result = replay_call(session, extra_call, timeout)
+                calls.append(extra_result)
+                if delay:
+                    time.sleep(delay)
+        if site_name == "sma" and call.get("name") == "navigation" and result.get("success"):
+            for extra_call in sma_extra_plant_calls(site, result):
                 extra_result = replay_call(session, extra_call, timeout)
                 calls.append(extra_result)
                 if delay:
