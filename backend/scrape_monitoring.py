@@ -847,16 +847,22 @@ def sma_extra_plant_calls(site: dict[str, Any], navigation_call: dict[str, Any])
     calls: list[dict[str, Any]] = []
 
     jakarta_now = datetime.now(timezone(timedelta(hours=7)))
-    # Query current month daily readings for daily curve & monthly sum
-    month_start_begin = f"{jakarta_now.year:04d}-{jakarta_now.month:02d}-01T00:00:00.000Z"
+    jakarta_today_start = datetime(jakarta_now.year, jakarta_now.month, jakarta_now.day, 0, 0, 0, tzinfo=timezone(timedelta(hours=7)))
+    jakarta_today_end = jakarta_today_start + timedelta(days=1) - timedelta(seconds=1)
+
+    today_begin_utc = jakarta_today_start.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    today_end_utc = jakarta_today_end.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+    # Query current year daily readings (from Jan 1) for current month daily curve and 12-month annual curve
+    year_start_begin = f"{jakarta_now.year:04d}-01-01T00:00:00.000Z"
     now_end = jakarta_now.strftime("%Y-%m-%dT23:59:59.000Z")
 
     # Query last 7 days for latest Lifetime Total Counter
     recent_begin = (jakarta_now - timedelta(days=7)).strftime("%Y-%m-%dT00:00:00.000Z")
 
     # Query start of current year for YTD calculation
-    year_start_begin = f"{jakarta_now.year - 1:04d}-12-31T00:00:00.000Z"
-    year_start_end = f"{jakarta_now.year:04d}-01-03T23:59:59.000Z"
+    year_start_meter_begin = f"{jakarta_now.year - 1:04d}-12-31T00:00:00.000Z"
+    year_start_meter_end = f"{jakarta_now.year:04d}-01-03T23:59:59.000Z"
 
     for item in items:
         if not isinstance(item, dict):
@@ -896,6 +902,31 @@ def sma_extra_plant_calls(site: dict[str, Any], navigation_call: dict[str, Any])
             "payload_raw": "",
         })
         calls.append({
+            "id": f"sma_plant_today_hourly_{component_id}",
+            "site": "sma",
+            "name": f"sma_plant_today_hourly_{component_id}",
+            "method": "POST",
+            "url": f"{api_base}/measurements/search",
+            "headers": {
+                "Accept": "application/json, text/plain, */*",
+                "Content-Type": "application/json",
+                "Origin": "https://ennexos.sunnyportal.com",
+                "Referer": "https://ennexos.sunnyportal.com/",
+            },
+            "payload_raw": json.dumps({
+                "queryItems": [{
+                    "componentId": component_id,
+                    "channelId": "Measurement.Metering.TotWhOut.Pv",
+                    "resolution": "OneHour",
+                    "aggregate": "Dif",
+                    "multiAggregate": "Sum",
+                    "timezone": "Asia/Jakarta",
+                }],
+                "dateTimeBegin": today_begin_utc,
+                "dateTimeEnd": today_end_utc,
+            }),
+        })
+        calls.append({
             "id": f"sma_plant_daily_energy_{component_id}",
             "site": "sma",
             "name": f"sma_plant_daily_energy_{component_id}",
@@ -916,7 +947,7 @@ def sma_extra_plant_calls(site: dict[str, Any], navigation_call: dict[str, Any])
                     "multiAggregate": "Sum",
                     "timezone": "Asia/Jakarta",
                 }],
-                "dateTimeBegin": month_start_begin,
+                "dateTimeBegin": year_start_begin,
                 "dateTimeEnd": now_end,
             }),
         })
@@ -966,8 +997,8 @@ def sma_extra_plant_calls(site: dict[str, Any], navigation_call: dict[str, Any])
                     "multiAggregate": "Max",
                     "timezone": "Asia/Jakarta",
                 }],
-                "dateTimeBegin": year_start_begin,
-                "dateTimeEnd": year_start_end,
+                "dateTimeBegin": year_start_meter_begin,
+                "dateTimeEnd": year_start_meter_end,
             }),
         })
     return calls
@@ -1842,11 +1873,38 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
         capacity_from_max = round(max_val / 1000.0, 2) if max_val else None
         capacity_kwp = capacity_kwp or capacity_from_max or 15.0
 
+        # 1. Hourly curve for today (24 hours)
+        today_call = grouped.get(f"sma_plant_today_hourly_{component_id}") or []
+        today_body = response_data(today_call[0]) if today_call else []
+        today_hourly_labels = [f"{h:02d}:00" for h in range(24)]
+        today_hourly_values = [0.0] * 24
+        if isinstance(today_body, list):
+            for channel in today_body:
+                if isinstance(channel, dict) and "values" in channel:
+                    for v in channel.get("values", []):
+                        if isinstance(v, dict) and v.get("value") is not None:
+                            val = to_float(v["value"])
+                            time_str = str(v.get("time") or "")
+                            try:
+                                t_utc = datetime.fromisoformat(time_str.replace("Z", "+00:00"))
+                                t_jkt = t_utc.astimezone(timezone(timedelta(hours=7)))
+                                if 0 <= t_jkt.hour < 24:
+                                    today_hourly_values[t_jkt.hour] = round((val or 0.0) / 1000.0, 3)
+                            except Exception:
+                                pass
+
+        # 2. Daily energy points across the current year (Jan 1 to now)
         energy_call = grouped.get(f"sma_plant_daily_energy_{component_id}") or grouped.get("daily_energy") or []
         energy_body = response_data(energy_call[0]) if energy_call else []
         daily_kwh = 0.0
-        energy_values = []
-        energy_labels = []
+        month_daily_labels = []
+        month_daily_values = []
+        year_monthly_labels = [f"{m:02d}" for m in range(1, 13)]
+        year_monthly_values = [0.0] * 12
+
+        jakarta_now = datetime.now(timezone(timedelta(hours=7)))
+        current_month_prefix = f"{jakarta_now.year:04d}-{jakarta_now.month:02d}"
+
         if isinstance(energy_body, list):
             for channel in energy_body:
                 if isinstance(channel, dict) and "values" in channel:
@@ -1855,13 +1913,25 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
                             val = to_float(v["value"])
                             if val is not None:
                                 kwh = round(val / 1000.0, 4)
-                                daily_kwh = kwh
                                 time_str = str(v.get("time") or "")
-                                label = time_str[:10] if len(time_str) >= 10 else "Today"
-                                energy_labels.append(label)
-                                energy_values.append(kwh)
+                                date_part = time_str[:10]
+                                if len(date_part) == 10:
+                                    try:
+                                        m_idx = int(date_part[5:7]) - 1
+                                        if 0 <= m_idx < 12:
+                                            year_monthly_values[m_idx] = round(year_monthly_values[m_idx] + kwh, 2)
+                                    except Exception:
+                                        pass
+                                    if date_part.startswith(current_month_prefix):
+                                        day_str = date_part[8:10]
+                                        month_daily_labels.append(day_str)
+                                        month_daily_values.append(kwh)
+                                        daily_kwh = kwh
 
-        monthly_kwh = round(sum(energy_values), 2) if energy_values else daily_kwh
+        if sum(today_hourly_values) > 0:
+            daily_kwh = round(sum(today_hourly_values), 3)
+
+        monthly_kwh = round(sum(month_daily_values), 2) if month_daily_values else daily_kwh
 
         # Cumulative / Lifetime Energy Counter
         lifetime_call = grouped.get(f"sma_plant_lifetime_energy_{component_id}") or []
@@ -1956,31 +2026,55 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
             "address": address,
             "updated_at": now_iso(),
             "energy_charts": {
+                "today": {
+                    "labels": today_hourly_labels,
+                    "values": today_hourly_values,
+                },
+                "hourly": {
+                    "labels": today_hourly_labels,
+                    "values": today_hourly_values,
+                },
                 "daily": {
-                    "labels": energy_labels if energy_labels else [today_label],
-                    "values": energy_values if energy_values else [daily_kwh],
+                    "labels": month_daily_labels if month_daily_labels else [today_label],
+                    "values": month_daily_values if month_daily_values else [daily_kwh],
                 },
                 "monthly": {
-                    "labels": [month_label],
-                    "values": [monthly_kwh],
+                    "labels": year_monthly_labels,
+                    "values": year_monthly_values,
                 },
                 "yearly": {
                     "labels": [year_label],
                     "values": [yearly_energy_kwh],
                 },
+                "lifetime": {
+                    "labels": ["Total"],
+                    "values": [cumulative_energy_kwh],
+                },
             },
             "revenue_charts": {
+                "today": {
+                    "labels": today_hourly_labels,
+                    "values": [round(val * SMA_TARIFF_PER_KWH, 2) for val in today_hourly_values],
+                },
+                "hourly": {
+                    "labels": today_hourly_labels,
+                    "values": [round(val * SMA_TARIFF_PER_KWH, 2) for val in today_hourly_values],
+                },
                 "daily": {
-                    "labels": energy_labels if energy_labels else [today_label],
-                    "values": [round(val * SMA_TARIFF_PER_KWH, 2) for val in (energy_values if energy_values else [daily_kwh])],
+                    "labels": month_daily_labels if month_daily_labels else [today_label],
+                    "values": [round(val * SMA_TARIFF_PER_KWH, 2) for val in (month_daily_values if month_daily_values else [daily_kwh])],
                 },
                 "monthly": {
-                    "labels": [month_label],
-                    "values": [monthly_income],
+                    "labels": year_monthly_labels,
+                    "values": [round(val * SMA_TARIFF_PER_KWH, 2) for val in year_monthly_values],
                 },
                 "yearly": {
                     "labels": [year_label],
                     "values": [yearly_income],
+                },
+                "lifetime": {
+                    "labels": ["Total"],
+                    "values": [cumulative_income],
                 },
             },
         }
