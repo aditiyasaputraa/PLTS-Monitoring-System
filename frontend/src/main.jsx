@@ -1802,20 +1802,20 @@ function EnergyView({ location, fleet, locations }) {
     ? (activeStation.source.charAt(0).toUpperCase() + activeStation.source.slice(1))
     : "Kehua";
 
-  const todayKwh = Number(activeStation.today_energy_kwh ?? activeStation.daily_energy_kwh ?? 16.6);
-  const monthKwh = Number(activeStation.monthly_energy_kwh ?? activeStation.month_energy_kwh ?? 326.4);
-  const yearKwh = Number(activeStation.yearly_energy_kwh ?? activeStation.year_energy_kwh ?? 16170);
-  const lifetimeKwh = Number(activeStation.total_energy_kwh ?? activeStation.cumulative_energy_kwh ?? 49740);
+  const todayKwh = Number(activeStation.today_energy_kwh ?? activeStation.daily_energy_kwh ?? 0);
+  const monthKwh = Number(activeStation.monthly_energy_kwh ?? activeStation.month_energy_kwh ?? 0);
+  const yearKwh = Number(activeStation.yearly_energy_kwh ?? activeStation.year_energy_kwh ?? 0);
+  const lifetimeKwh = Number(activeStation.total_energy_kwh ?? activeStation.cumulative_energy_kwh ?? 0);
 
   const todayMwh = (todayKwh / 1000).toFixed(3);
   const monthMwh = (monthKwh / 1000).toFixed(3);
   const yearMwh = (yearKwh / 1000).toFixed(2);
   const lifetimeMwh = (lifetimeKwh / 1000).toFixed(2);
 
-  const fleetTodayKwh = formatNumber(fleet.daily || 112.1, 1);
-  const fleetMonthKwh = formatNumber(fleet.monthly || 1663, 0);
-  const fleetYearKwh = formatNumber(fleet.yearly || 95323.2, 1);
-  const fleetLifetimeKwh = formatNumber(fleet.lifetime || 189033.6, 1);
+  const fleetTodayKwh = formatNumber(fleet.daily ?? 0, 1);
+  const fleetMonthKwh = formatNumber(fleet.monthly ?? 0, 0);
+  const fleetYearKwh = formatNumber(fleet.yearly ?? 0, 1);
+  const fleetLifetimeKwh = formatNumber(fleet.cumulative ?? fleet.lifetime ?? 0, 1);
 
   const series = useMemo(() => getEnergySeries(activeStation, period), [activeStation, period]);
 
@@ -2992,6 +2992,7 @@ function buildFleet(sites, locations) {
     monthly,
     yearly,
     cumulative,
+    lifetime: cumulative,
     totalIncome,
     monthlyIncome,
     yearlyIncome,
