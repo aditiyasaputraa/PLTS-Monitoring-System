@@ -100,6 +100,28 @@ class SmaAuthAndNormalizationTests(unittest.TestCase):
                     }
                 ],
             }],
+            "sma_plant_lifetime_energy_plant_101": [{
+                "success": True,
+                "response_body": [
+                    {
+                        "channelId": "Measurement.Metering.TotWhOut",
+                        "values": [
+                            {"time": "2026-10-15T00:00:00Z", "value": 150000000}
+                        ],
+                    }
+                ],
+            }],
+            "sma_plant_year_start_energy_plant_101": [{
+                "success": True,
+                "response_body": [
+                    {
+                        "channelId": "Measurement.Metering.TotWhOut",
+                        "values": [
+                            {"time": "2026-01-01T00:00:00Z", "value": 130000000}
+                        ],
+                    }
+                ],
+            }],
         }
 
         stations = normalize_sma_stations(grouped)
@@ -113,8 +135,13 @@ class SmaAuthAndNormalizationTests(unittest.TestCase):
         self.assertEqual(st["capacity_kwp"], 25.5)
         self.assertEqual(st["current_power_kw"], 14.8)
         self.assertEqual(st["daily_energy_kwh"], 78.5)
+        self.assertEqual(st["monthly_energy_kwh"], 78.5)
+        self.assertEqual(st["yearly_energy_kwh"], 20000.0)
+        self.assertEqual(st["cumulative_energy_kwh"], 150000.0)
         self.assertEqual(st["income_currency"], "IDR")
         self.assertEqual(st["daily_income"], round(78.5 * 900.0, 2))
+        self.assertEqual(st["yearly_income"], round(20000.0 * 900.0, 2))
+        self.assertEqual(st["cumulative_income"], round(150000.0 * 900.0, 2))
 
         overview = normalize_sma_overview(grouped, stations)
         self.assertEqual(overview["station_count"], 1)
@@ -122,6 +149,9 @@ class SmaAuthAndNormalizationTests(unittest.TestCase):
         self.assertEqual(overview["capacity_kwp"], 25.5)
         self.assertEqual(overview["current_power_kw"], 14.8)
         self.assertEqual(overview["daily_energy_kwh"], 78.5)
+        self.assertEqual(overview["monthly_energy_kwh"], 78.5)
+        self.assertEqual(overview["yearly_energy_kwh"], 20000.0)
+        self.assertEqual(overview["cumulative_energy_kwh"], 150000.0)
 
         devices = normalize_sma_devices(grouped, stations)
         self.assertEqual(devices["device_count"], 1)

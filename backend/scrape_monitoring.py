@@ -847,9 +847,16 @@ def sma_extra_plant_calls(site: dict[str, Any], navigation_call: dict[str, Any])
     calls: list[dict[str, Any]] = []
 
     jakarta_now = datetime.now(timezone(timedelta(hours=7)))
-    prev_day = jakarta_now - timedelta(days=1)
-    date_begin = prev_day.strftime("%Y-%m-%dT22:00:00.000Z")
-    date_end = jakarta_now.strftime("%Y-%m-%dT22:00:00.000Z")
+    # Query current month daily readings for daily curve & monthly sum
+    month_start_begin = f"{jakarta_now.year:04d}-{jakarta_now.month:02d}-01T00:00:00.000Z"
+    now_end = jakarta_now.strftime("%Y-%m-%dT23:59:59.000Z")
+
+    # Query last 7 days for latest Lifetime Total Counter
+    recent_begin = (jakarta_now - timedelta(days=7)).strftime("%Y-%m-%dT00:00:00.000Z")
+
+    # Query start of current year for YTD calculation
+    year_start_begin = f"{jakarta_now.year - 1:04d}-12-31T00:00:00.000Z"
+    year_start_end = f"{jakarta_now.year:04d}-01-03T23:59:59.000Z"
 
     for item in items:
         if not isinstance(item, dict):
@@ -909,8 +916,58 @@ def sma_extra_plant_calls(site: dict[str, Any], navigation_call: dict[str, Any])
                     "multiAggregate": "Sum",
                     "timezone": "Asia/Jakarta",
                 }],
-                "dateTimeBegin": date_begin,
-                "dateTimeEnd": date_end,
+                "dateTimeBegin": month_start_begin,
+                "dateTimeEnd": now_end,
+            }),
+        })
+        calls.append({
+            "id": f"sma_plant_lifetime_energy_{component_id}",
+            "site": "sma",
+            "name": f"sma_plant_lifetime_energy_{component_id}",
+            "method": "POST",
+            "url": f"{api_base}/measurements/search",
+            "headers": {
+                "Accept": "application/json, text/plain, */*",
+                "Content-Type": "application/json",
+                "Origin": "https://ennexos.sunnyportal.com",
+                "Referer": "https://ennexos.sunnyportal.com/",
+            },
+            "payload_raw": json.dumps({
+                "queryItems": [{
+                    "componentId": component_id,
+                    "channelId": "Measurement.Metering.TotWhOut",
+                    "resolution": "OneDay",
+                    "aggregate": "Max",
+                    "multiAggregate": "Max",
+                    "timezone": "Asia/Jakarta",
+                }],
+                "dateTimeBegin": recent_begin,
+                "dateTimeEnd": now_end,
+            }),
+        })
+        calls.append({
+            "id": f"sma_plant_year_start_energy_{component_id}",
+            "site": "sma",
+            "name": f"sma_plant_year_start_energy_{component_id}",
+            "method": "POST",
+            "url": f"{api_base}/measurements/search",
+            "headers": {
+                "Accept": "application/json, text/plain, */*",
+                "Content-Type": "application/json",
+                "Origin": "https://ennexos.sunnyportal.com",
+                "Referer": "https://ennexos.sunnyportal.com/",
+            },
+            "payload_raw": json.dumps({
+                "queryItems": [{
+                    "componentId": component_id,
+                    "channelId": "Measurement.Metering.TotWhOut",
+                    "resolution": "OneDay",
+                    "aggregate": "Max",
+                    "multiAggregate": "Max",
+                    "timezone": "Asia/Jakarta",
+                }],
+                "dateTimeBegin": year_start_begin,
+                "dateTimeEnd": year_start_end,
             }),
         })
     return calls
@@ -1805,10 +1862,44 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
                                 energy_values.append(kwh)
 
         monthly_kwh = round(sum(energy_values), 2) if energy_values else daily_kwh
+
+        # Cumulative / Lifetime Energy Counter
+        lifetime_call = grouped.get(f"sma_plant_lifetime_energy_{component_id}") or []
+        lifetime_body = response_data(lifetime_call[0]) if lifetime_call else []
+        total_lifetime_wh = None
+        if isinstance(lifetime_body, list):
+            for channel in lifetime_body:
+                if isinstance(channel, dict) and "values" in channel:
+                    for v in channel.get("values", []):
+                        if isinstance(v, dict) and v.get("value") is not None:
+                            total_lifetime_wh = to_float(v["value"])
+
+        # Year Start Energy Counter (for 2026 YTD)
+        year_start_call = grouped.get(f"sma_plant_year_start_energy_{component_id}") or []
+        year_start_body = response_data(year_start_call[0]) if year_start_call else []
+        year_start_wh = None
+        if isinstance(year_start_body, list):
+            for channel in year_start_body:
+                if isinstance(channel, dict) and "values" in channel:
+                    for v in channel.get("values", []):
+                        if isinstance(v, dict) and v.get("value") is not None:
+                            year_start_wh = to_float(v["value"])
+                            break
+
+        if total_lifetime_wh is not None:
+            cumulative_energy_kwh = round(total_lifetime_wh / 1000.0, 2)
+        else:
+            cumulative_energy_kwh = monthly_kwh
+
+        if total_lifetime_wh is not None and year_start_wh is not None and total_lifetime_wh >= year_start_wh:
+            yearly_energy_kwh = round((total_lifetime_wh - year_start_wh) / 1000.0, 2)
+        else:
+            yearly_energy_kwh = monthly_kwh
+
         daily_income = round(daily_kwh * SMA_TARIFF_PER_KWH, 2)
         monthly_income = round(monthly_kwh * SMA_TARIFF_PER_KWH, 2)
-        total_kwh = monthly_kwh
-        total_income = monthly_income
+        yearly_income = round(yearly_energy_kwh * SMA_TARIFF_PER_KWH, 2)
+        cumulative_income = round(cumulative_energy_kwh * SMA_TARIFF_PER_KWH, 2)
 
         weather_call = grouped.get(f"sma_plant_weather_{component_id}") or grouped.get("weather") or []
         weather_body = response_data(weather_call[0]) if weather_call else {}
@@ -1852,12 +1943,12 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
             "current_power_kw": current_power_kw,
             "daily_energy_kwh": daily_kwh,
             "monthly_energy_kwh": monthly_kwh,
-            "yearly_energy_kwh": monthly_kwh,
-            "cumulative_energy_kwh": total_kwh,
+            "yearly_energy_kwh": yearly_energy_kwh,
+            "cumulative_energy_kwh": cumulative_energy_kwh,
             "daily_income": daily_income,
             "monthly_income": monthly_income,
-            "yearly_income": monthly_income,
-            "cumulative_income": total_income,
+            "yearly_income": yearly_income,
+            "cumulative_income": cumulative_income,
             "income_currency": "IDR",
             "grid_status": "online" if current_power_kw > 0 else "offline",
             "latitude": lat,
@@ -1875,7 +1966,7 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
                 },
                 "yearly": {
                     "labels": [year_label],
-                    "values": [monthly_kwh],
+                    "values": [yearly_energy_kwh],
                 },
             },
             "revenue_charts": {
@@ -1889,7 +1980,7 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
                 },
                 "yearly": {
                     "labels": [year_label],
-                    "values": [monthly_income],
+                    "values": [yearly_income],
                 },
             },
         }
@@ -1909,9 +2000,11 @@ def normalize_sma_overview(grouped: dict[str, list[dict[str, Any]]], stations: l
     total_power = sum(to_float(s.get("current_power_kw")) or 0.0 for s in stations)
     daily_energy = sum(to_float(s.get("daily_energy_kwh")) or 0.0 for s in stations)
     monthly_energy = sum(to_float(s.get("monthly_energy_kwh")) or 0.0 for s in stations)
+    yearly_energy = sum(to_float(s.get("yearly_energy_kwh")) or 0.0 for s in stations)
     total_energy = sum(to_float(s.get("cumulative_energy_kwh")) or 0.0 for s in stations)
     daily_income = sum(to_float(s.get("daily_income")) or 0.0 for s in stations)
     monthly_income = sum(to_float(s.get("monthly_income")) or 0.0 for s in stations)
+    yearly_income = sum(to_float(s.get("yearly_income")) or 0.0 for s in stations)
     total_income = sum(to_float(s.get("cumulative_income")) or 0.0 for s in stations)
 
     return compact_non_null({
@@ -1924,11 +2017,11 @@ def normalize_sma_overview(grouped: dict[str, list[dict[str, Any]]], stations: l
         "current_power_kw": round(total_power, 2),
         "daily_energy_kwh": round(daily_energy, 4),
         "monthly_energy_kwh": round(monthly_energy, 4),
-        "yearly_energy_kwh": round(monthly_energy, 4),
+        "yearly_energy_kwh": round(yearly_energy, 4),
         "cumulative_energy_kwh": round(total_energy, 4),
         "daily_income": round(daily_income, 2),
         "monthly_income": round(monthly_income, 2),
-        "yearly_income": round(monthly_income, 2),
+        "yearly_income": round(yearly_income, 2),
         "cumulative_income": round(total_income, 2),
         "income_currency": "IDR",
         "inverter_count": station_count,
