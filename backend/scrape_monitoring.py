@@ -1813,6 +1813,30 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
         weather_call = grouped.get(f"sma_plant_weather_{component_id}") or grouped.get("weather") or []
         weather_body = response_data(weather_call[0]) if weather_call else {}
 
+        lat = to_float(detail.get("latitude"))
+        lng = to_float(detail.get("longitude"))
+        street = f"{detail.get('street') or ''} {detail.get('streetNo') or ''}".strip()
+        city_parts = [p for p in [street, detail.get('city'), detail.get('federalState'), detail.get('zipCode')] if p]
+        address = ", ".join(city_parts) if city_parts else None
+
+        sma_coordinate_fallbacks = {
+            "2565257": (-6.2341, 106.9048, "Jl. Cendana Raya No.1, Pondok Bambu, Duren Sawit, Jakarta Timur 13430"),
+            "JAKTIM SMPN 51": (-6.2341, 106.9048, "Jl. Cendana Raya No.1, Pondok Bambu, Duren Sawit, Jakarta Timur 13430"),
+            "2565474": (-6.2238, 106.9366, "Jl. Malaka I No.2, Malaka Sari, Duren Sawit, Jakarta Timur 13460"),
+            "JAKTIM SMPN 213": (-6.2238, 106.9366, "Jl. Malaka I No.2, Malaka Sari, Duren Sawit, Jakarta Timur 13460"),
+            "2565583": (-6.2307, 106.9205, "Jl. Raden Inten II No.9, Duren Sawit, Jakarta Timur 13440"),
+            "JAKTIM SMPN 255": (-6.2307, 106.9205, "Jl. Raden Inten II No.9, Duren Sawit, Jakarta Timur 13440"),
+            "2628410": (-6.33123, 106.88437, "Jl. Usman No.40, Kelapa Dua Wetan, Ciracas, Jakarta Timur 13730"),
+            "JAKTIM SMAN 105": (-6.33123, 106.88437, "Jl. Usman No.40, Kelapa Dua Wetan, Ciracas, Jakarta Timur 13730"),
+        }
+        fallback = sma_coordinate_fallbacks.get(component_id) or sma_coordinate_fallbacks.get(plant_name)
+        if fallback:
+            f_lat, f_lng, f_addr = fallback
+            lat = f_lat
+            lng = f_lng
+            if not address:
+                address = f_addr
+
         now = now_stamp()
         today_label = now[:8]
         month_label = now[:6]
@@ -1836,6 +1860,9 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
             "cumulative_income": total_income,
             "income_currency": "IDR",
             "grid_status": "online" if current_power_kw > 0 else "offline",
+            "latitude": lat,
+            "longitude": lng,
+            "address": address,
             "updated_at": now_iso(),
             "energy_charts": {
                 "daily": {

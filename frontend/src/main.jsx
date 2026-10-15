@@ -887,7 +887,11 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt }) {
         {/* Right: Selected Site Mini Map Card */}
         <div className="dashboard-card selected-site-map-card">
           <div className="mini-map-preview">
-            <span className="mini-map-badge">NORTH JAKARTA</span>
+            <span className="mini-map-badge">
+              {selected?.address?.toLowerCase().includes("timur") || selected?.name?.includes("JAKTIM")
+                ? "EAST JAKARTA"
+                : "NORTH JAKARTA"}
+            </span>
             <MiniStationMap location={selected} />
           </div>
 
@@ -908,7 +912,7 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt }) {
               )}
             </div>
             <div className="site-geo-row">
-              <span>📍 {selected?.address?.includes("Jakarta") ? "Jakarta Utara" : (selected?.address || "Jakarta Utara")}</span>
+              <span>📍 {selected?.address || (selected?.name?.includes("JAKTIM") ? "Jakarta Timur" : "Jakarta Utara")}</span>
               {selected?.latitude && selected?.longitude && (
                 <a
                   className="coords-link"
