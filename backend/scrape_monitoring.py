@@ -1397,6 +1397,19 @@ def normalize_huawei_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[
         })
         station.update(kpi_by_station.get(str(item.get("dn") or ""), {}))
         station.update(energy_balance_by_station.get(str(item.get("dn") or ""), {}))
+
+        st_name_l = str(station.get("name") or "").lower()
+        if "204" in st_name_l:
+            station["latitude"] = -6.13980
+            station["longitude"] = 106.70133
+            station["address"] = "SMP Negeri 204 Jakarta, Jl. Peta Utara III, Pegadungan, Kalideres, Jakarta Barat 11830"
+            station["region"] = "Jakarta Barat"
+        elif "sukabumi utara" in st_name_l:
+            station["latitude"] = -6.20849
+            station["longitude"] = 106.77832
+            station["address"] = "SD Negeri Sukabumi Utara 01, Jl. Adam No. 1 / Jl. Saleh, Sukabumi Utara, Kebon Jeruk, Jakarta Barat 11540"
+            station["region"] = "Jakarta Barat"
+
         stations.append(station)
     return stations
 

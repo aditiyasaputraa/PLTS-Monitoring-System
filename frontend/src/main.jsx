@@ -570,6 +570,16 @@ function Dashboard({ session, onSignOut }) {
         longitude = 106.73428;
         address = "SMP Negeri 201 Jakarta, Jl. Kayu Besar Dalam No. 2, Cengkareng Timur, Jakarta Barat 11730";
       }
+      // Jakarta Barat (Huawei: SMPN 204, SDN Sukabumi Utara 01)
+      else if (nameLower.includes("204")) {
+        latitude = -6.13980;
+        longitude = 106.70133;
+        address = "SMP Negeri 204 Jakarta, Jl. Peta Utara III, Pegadungan, Kalideres, Jakarta Barat 11830";
+      } else if (nameLower.includes("sukabumi utara")) {
+        latitude = -6.20849;
+        longitude = 106.77832;
+        address = "SD Negeri Sukabumi Utara 01, Jl. Adam No. 1 / Jl. Saleh, Sukabumi Utara, Kebon Jeruk, Jakarta Barat 11540";
+      }
       // Jakarta Timur (SMA: SMPN 51, SMPN 213, SMPN 255, SMAN 105)
       else if (nameLower.includes("smpn 51")) {
         latitude = -6.23900;
