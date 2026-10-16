@@ -2091,80 +2091,59 @@ function EnergyProductionChart({ series, period }) {
   );
 }
 
-function EmptyRegionView({ title }) {
-  return (
-    <div style={{
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      minHeight: "360px",
-      background: "#ffffff",
-      borderRadius: "16px",
-      border: "1px dashed #cbd5cb",
-      padding: "48px 24px",
-      textAlign: "center",
-      margin: "24px 0",
-      boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-    }}>
-      <div style={{
-        width: "56px",
-        height: "56px",
-        borderRadius: "50%",
-        background: "rgba(16, 185, 129, 0.1)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: "26px",
-        marginBottom: "14px",
-      }}>
-        📍
-      </div>
-      <h3 style={{ fontSize: "17px", fontWeight: 700, color: "#16231a", margin: "0 0 6px" }}>
-        Belum Ada PLTS di Wilayah Ini
-      </h3>
-      <p style={{ fontSize: "13px", color: "#6e8074", maxWidth: "420px", margin: 0, lineHeight: 1.5 }}>
-        Tidak ada data {title || "monitoring"} yang dapat ditampilkan karena belum ada instalasi PLTS terpasang di wilayah ini. Silakan pilih "All Regions" atau wilayah lain pada menu di atas.
-      </p>
-    </div>
-  );
-}
-
 function EnergyView({ location, fleet, locations }) {
-  if (!locations || locations.length === 0) {
-    return <EmptyRegionView title="energi" />;
-  }
   const [period, setPeriod] = useState("today");
 
-  const activeStation = location || locations?.[0] || {};
-  const stationName = activeStation.name || "SDN 09 JAKUT";
-  const platformName = activeStation.source
+  const hasLocations = Boolean(locations && locations.length > 0);
+  const activeStation = location || (hasLocations ? locations[0] : null);
+  const stationName = activeStation?.name || (hasLocations ? "Pilih PLTS" : "Tidak Ada PLTS");
+  const platformName = activeStation?.source
     ? (activeStation.source.charAt(0).toUpperCase() + activeStation.source.slice(1))
-    : "Kehua";
+    : "—";
 
-  const todayKwh = Number(activeStation.today_energy_kwh ?? activeStation.daily_energy_kwh ?? 0);
-  const monthKwh = Number(activeStation.monthly_energy_kwh ?? activeStation.month_energy_kwh ?? 0);
-  const yearKwh = Number(activeStation.yearly_energy_kwh ?? activeStation.year_energy_kwh ?? 0);
-  const lifetimeKwh = Number(activeStation.total_energy_kwh ?? activeStation.cumulative_energy_kwh ?? 0);
+  const todayKwh = Number(activeStation?.today_energy_kwh ?? activeStation?.daily_energy_kwh ?? 0);
+  const monthKwh = Number(activeStation?.monthly_energy_kwh ?? activeStation?.month_energy_kwh ?? 0);
+  const yearKwh = Number(activeStation?.yearly_energy_kwh ?? activeStation?.year_energy_kwh ?? 0);
+  const lifetimeKwh = Number(activeStation?.total_energy_kwh ?? activeStation?.cumulative_energy_kwh ?? 0);
 
   const todayMwh = (todayKwh / 1000).toFixed(3);
   const monthMwh = (monthKwh / 1000).toFixed(3);
   const yearMwh = (yearKwh / 1000).toFixed(2);
   const lifetimeMwh = (lifetimeKwh / 1000).toFixed(2);
 
-  const fleetTodayKwh = formatNumber(fleet.daily ?? 0, 1);
-  const fleetMonthKwh = formatNumber(fleet.monthly ?? 0, 0);
-  const fleetYearKwh = formatNumber(fleet.yearly ?? 0, 1);
-  const fleetLifetimeKwh = formatNumber(fleet.cumulative ?? fleet.lifetime ?? 0, 1);
+  const fleetTodayKwh = formatNumber(fleet?.daily ?? 0, 1);
+  const fleetMonthKwh = formatNumber(fleet?.monthly ?? 0, 0);
+  const fleetYearKwh = formatNumber(fleet?.yearly ?? 0, 1);
+  const fleetLifetimeKwh = formatNumber(fleet?.cumulative ?? fleet?.lifetime ?? 0, 1);
 
-  const series = useMemo(() => getEnergySeries(activeStation, period), [activeStation, period]);
+  const series = useMemo(() => {
+    if (!activeStation || !activeStation.id) {
+      const count = period === "today" ? 24 : (period === "month" ? 31 : (period === "year" ? 12 : 5));
+      const labels = period === "today"
+        ? Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`)
+        : (period === "month"
+            ? Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0"))
+            : (period === "year"
+                ? ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
+                : ["2022", "2023", "2024", "2025", "2026"]));
+      return {
+        available: true,
+        labels,
+        values: Array(count).fill(0),
+        unit: "kWh",
+        title: "Energy history",
+      };
+    }
+    return getEnergySeries(activeStation, period);
+  }, [activeStation, period]);
 
   const curveSubtitle = useMemo(() => {
+    if (!hasLocations) return "Belum ada instalasi PLTS di wilayah ini (0 kWh)";
     if (period === "today") return `${stationName} · Hourly generation reported by ${platformName}`;
     if (period === "month") return `${stationName} · Daily generation reported by ${platformName}`;
     if (period === "year") return `${stationName} · Monthly generation reported by ${platformName}`;
     return `${stationName} · Yearly generation reported by ${platformName}`;
-  }, [stationName, platformName, period]);
+  }, [hasLocations, stationName, platformName, period]);
 
   const curveTitle = useMemo(() => {
     if (period === "today") return "Today's production curve";
@@ -2182,7 +2161,7 @@ function EnergyView({ location, fleet, locations }) {
 
   const highestVal = useMemo(() => {
     const vals = (series?.values || []).map((v) => Number(v) || 0);
-    return vals.length > 0 ? Math.max(...vals) : 1;
+    return vals.length > 0 ? Math.max(...vals) : 0;
   }, [series]);
 
   const latestVal = useMemo(() => {
@@ -2580,32 +2559,48 @@ function RevenueProductionChart({ series, period, isKehua }) {
 }
 
 function RevenueView({ location, fleet, locations }) {
-  if (!locations || locations.length === 0) {
-    return <EmptyRegionView title="pendapatan (revenue)" />;
-  }
   const [period, setPeriod] = useState("year");
 
-  const activeStation = location || locations.find((l) => l.source === "huawei") || locations?.[0] || {};
-  const stationName = activeStation.name || "GOR Sekda Saefullah";
-  const platformName = activeStation.source || "huawei";
-  const isAutoTariff = ["kehua", "sma"].includes((activeStation.source || "").toLowerCase());
+  const hasLocations = Boolean(locations && locations.length > 0);
+  const activeStation = location || (hasLocations ? (locations.find((l) => l.source === "huawei") || locations[0]) : null);
+  const stationName = activeStation?.name || (hasLocations ? "Pilih PLTS" : "Tidak Ada PLTS");
+  const platformName = activeStation?.source || "—";
+  const isAutoTariff = ["kehua", "sma"].includes((activeStation?.source || "").toLowerCase());
 
-  const todayRev = Number(activeStation.daily_income) || Math.round(Number(activeStation.daily_energy_kwh || activeStation.today_energy_kwh || 0) * 900);
-  const monthRev = Number(activeStation.monthly_income) || Math.round(Number(activeStation.monthly_energy_kwh || 0) * 900);
-  const yearRev = Number(activeStation.yearly_income) || Math.round(Number(activeStation.yearly_energy_kwh || 0) * 900);
-  const lifetimeRev = Number(activeStation.cumulative_income ?? activeStation.total_income) || Math.round(Number(activeStation.cumulative_energy_kwh || 0) * 900);
+  const todayRev = Number(activeStation?.daily_income) || Math.round(Number(activeStation?.daily_energy_kwh || activeStation?.today_energy_kwh || 0) * 900);
+  const monthRev = Number(activeStation?.monthly_income) || Math.round(Number(activeStation?.monthly_energy_kwh || 0) * 900);
+  const yearRev = Number(activeStation?.yearly_income) || Math.round(Number(activeStation?.yearly_energy_kwh || 0) * 900);
+  const lifetimeRev = Number(activeStation?.cumulative_income ?? activeStation?.total_income) || Math.round(Number(activeStation?.cumulative_energy_kwh || 0) * 900);
 
-  const fleetMonthRev = Number(fleet.monthlyIncome || 0);
-  const fleetYearRev = Number(fleet.yearlyIncome || 0);
-  const fleetTotalRev = Number(fleet.totalIncome || 0);
+  const fleetMonthRev = Number(fleet?.monthlyIncome || 0);
+  const fleetYearRev = Number(fleet?.yearlyIncome || 0);
+  const fleetTotalRev = Number(fleet?.totalIncome || 0);
 
-  const series = useMemo(() => getRevenueSeries(activeStation, period), [activeStation, period]);
+  const series = useMemo(() => {
+    if (!activeStation || !activeStation.id) {
+      const count = period === "month" ? 31 : (period === "year" ? 12 : 5);
+      const labels = period === "month"
+        ? Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0"))
+        : (period === "year"
+            ? ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
+            : ["2022", "2023", "2024", "2025", "2026"]);
+      return {
+        available: true,
+        labels,
+        values: Array(count).fill(0),
+        unit: "IDR",
+        title: "Revenue history",
+      };
+    }
+    return getRevenueSeries(activeStation, period);
+  }, [activeStation, period]);
 
   const curveSubtitle = useMemo(() => {
+    if (!hasLocations) return "Belum ada instalasi PLTS di wilayah ini (Rp 0 IDR)";
     if (period === "year") return `${stationName} · Revenue recorded in each month${isAutoTariff ? " (Rp 900/kWh)" : ""}`;
     if (period === "month") return `${stationName} · Revenue through the latest reported day${isAutoTariff ? " (Rp 900/kWh)" : ""}`;
     return `${stationName} · Available lifetime revenue history${isAutoTariff ? " (Rp 900/kWh)" : ""}`;
-  }, [stationName, period, isAutoTariff]);
+  }, [hasLocations, stationName, period, isAutoTariff]);
 
   const curveTitle = useMemo(() => {
     if (period === "year") return "Monthly revenue this year";
@@ -3053,21 +3048,19 @@ function EmissionProductionChart({ series, period }) {
 }
 
 function EmissionView({ location, fleet, locations }) {
-  if (!locations || locations.length === 0) {
-    return <EmptyRegionView title="reduksi emisi CO₂" />;
-  }
   const [period, setPeriod] = useState("year");
 
-  const activeStation = location || locations.find((l) => l.source === "huawei") || locations?.[0] || {};
-  const stationName = activeStation.name || "GOR Sekda Saefullah";
-  const platformName = activeStation.source || "huawei";
+  const hasLocations = Boolean(locations && locations.length > 0);
+  const activeStation = location || (hasLocations ? (locations.find((l) => l.source === "huawei") || locations[0]) : null);
+  const stationName = activeStation?.name || (hasLocations ? "Pilih PLTS" : "Tidak Ada PLTS");
+  const platformName = activeStation?.source || "—";
 
   const EMISSION_FACTOR = 0.85; // kg CO2 / kWh
 
-  const todayKwh = Number(activeStation.daily_energy_kwh || activeStation.today_energy_kwh || 0);
-  const monthKwh = Number(activeStation.monthly_energy_kwh || 0);
-  const yearKwh = Number(activeStation.yearly_energy_kwh || 0);
-  const lifetimeKwh = Number(activeStation.cumulative_energy_kwh || 0);
+  const todayKwh = Number(activeStation?.daily_energy_kwh || activeStation?.today_energy_kwh || 0);
+  const monthKwh = Number(activeStation?.monthly_energy_kwh || 0);
+  const yearKwh = Number(activeStation?.yearly_energy_kwh || 0);
+  const lifetimeKwh = Number(activeStation?.cumulative_energy_kwh || 0);
 
   const todayEmissionKg = todayKwh * EMISSION_FACTOR;
   const monthEmissionKg = monthKwh * EMISSION_FACTOR;
@@ -3075,21 +3068,39 @@ function EmissionView({ location, fleet, locations }) {
   const lifetimeEmissionKg = lifetimeKwh * EMISSION_FACTOR;
 
   // Fleet totals
-  const fleetMonthlyKwh = Number(fleet.monthly || 0);
-  const fleetYearlyKwh = Number(fleet.yearly || 0);
-  const fleetCumulativeKwh = Number(fleet.cumulative || 0);
+  const fleetMonthlyKwh = Number(fleet?.monthly || 0);
+  const fleetYearlyKwh = Number(fleet?.yearly || 0);
+  const fleetCumulativeKwh = Number(fleet?.cumulative || 0);
 
   const fleetMonthEmissionKg = fleetMonthlyKwh * EMISSION_FACTOR;
   const fleetYearEmissionKg = fleetYearlyKwh * EMISSION_FACTOR;
   const fleetTotalEmissionKg = fleetCumulativeKwh * EMISSION_FACTOR;
 
-  const series = useMemo(() => getEmissionSeries(activeStation, period), [activeStation, period]);
+  const series = useMemo(() => {
+    if (!activeStation || !activeStation.id) {
+      const count = period === "month" ? 31 : (period === "year" ? 12 : 5);
+      const labels = period === "month"
+        ? Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0"))
+        : (period === "year"
+            ? ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
+            : ["2022", "2023", "2024", "2025", "2026"]);
+      return {
+        available: true,
+        labels,
+        values: Array(count).fill(0),
+        unit: "kg",
+        title: "Emission history",
+      };
+    }
+    return getEmissionSeries(activeStation, period);
+  }, [activeStation, period]);
 
   const curveSubtitle = useMemo(() => {
+    if (!hasLocations) return "Belum ada instalasi PLTS di wilayah ini (0 kg CO₂)";
     if (period === "year") return `${stationName} · Reduksi emisi CO₂ bulanan tahun ini (0.85 kg CO₂/kWh)`;
     if (period === "month") return `${stationName} · Reduksi emisi CO₂ harian bulan ini (0.85 kg CO₂/kWh)`;
     return `${stationName} · Histori akumulasi reduksi emisi CO₂ per tahun`;
-  }, [stationName, period]);
+  }, [hasLocations, stationName, period]);
 
   const curveTitle = useMemo(() => {
     if (period === "year") return "Monthly emission reduction this year";
