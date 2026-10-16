@@ -191,6 +191,8 @@ def huawei_password_login(session: requests.Session, site: dict[str, Any], usern
 
     redirection_address = quote(f"{base_url}/rest/pvms/web/login/v1/redirecturl?isFirst=false", safe="")
     final = session.get(f"{base_url}{redirect_url}&redirectionAddress={redirection_address}", timeout=timeout, allow_redirects=True)
+    if final.url:
+        session.headers["X-Huawei-Referer"] = final.url.split("#")[0]
     return {"success": response.ok and final.ok, "status_code": final.status_code, "final_url": final.url}
 
 
@@ -727,6 +729,8 @@ def build_request_headers(session: requests.Session, call: dict[str, Any]) -> di
     # Dynamic Huawei session nonce must come from keep-alive, not stale HAR.
     if "roarand" in session.headers:
         headers["roarand"] = session.headers["roarand"]
+    if "X-Huawei-Referer" in session.headers and "Referer" in headers:
+        headers["Referer"] = session.headers["X-Huawei-Referer"]
     return headers
 
 
