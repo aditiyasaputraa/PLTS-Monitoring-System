@@ -459,17 +459,19 @@ def prepare_session(
     meta: dict[str, Any] = {"cookies": load_cookies_into_session(session, cookies_file, site)}
 
     if site.get("auth_type") == "huawei_fusionsolar":
-        auth = check_auth(session, site, timeout)
+        use_shared = not credentials or credentials.get("use_shared_cookies", True)
+        auth = check_auth(session, site, timeout) if use_shared else {"success": False}
         meta["auth_check_before_login"] = auth
-        username = os.getenv("HUAWEI_USERNAME")
-        password = os.getenv("HUAWEI_PASSWORD")
+        username = credentials.get("username") if credentials else os.getenv("HUAWEI_USERNAME")
+        password = credentials.get("password") if credentials else os.getenv("HUAWEI_PASSWORD")
         if not auth.get("success") and username and password:
             meta["password_login"] = huawei_password_login(session, site, username, password, timeout)
             meta["auth_check_after_login"] = check_auth(session, site, timeout)
         meta["keep_alive"] = refresh_huawei_roarand(session, site, timeout)
 
     if site.get("auth_type") == "kehua_energy":
-        auth = kehua_check_auth(session, site, timeout)
+        use_shared = not credentials or credentials.get("use_shared_cookies", True)
+        auth = kehua_check_auth(session, site, timeout) if use_shared else {"success": False}
         meta["auth_check_before_login"] = auth
         if not auth.get("success"):
             username = credentials.get("username") if credentials else os.getenv("KEHUA_USERNAME")
@@ -481,7 +483,8 @@ def prepare_session(
                 meta["password_login"] = {"success": False, "reason": "credentials_not_configured"}
 
     if site.get("auth_type") == "sma_ennexos":
-        auth = sma_check_auth(session, site, timeout)
+        use_shared = not credentials or credentials.get("use_shared_cookies", True)
+        auth = sma_check_auth(session, site, timeout) if use_shared else {"success": False}
         meta["auth_check_before_login"] = auth
         if not auth.get("success"):
             username = credentials.get("username") if credentials else os.getenv("SMA_USERNAME")
@@ -541,6 +544,112 @@ def load_kehua_accounts_from_env() -> list[dict[str, Any]]:
                 if item.get(key) not in (None, ""):
                     account[key] = str(item[key])
             accounts.append(account)
+
+    unique: list[dict[str, Any]] = []
+    seen_usernames: set[str] = set()
+    for account in accounts:
+        if account["username"] not in seen_usernames:
+            unique.append(account)
+            seen_usernames.add(account["username"])
+    return unique
+
+
+def load_huawei_accounts_from_env() -> list[dict[str, Any]]:
+    accounts: list[dict[str, Any]] = []
+    legacy_username = os.getenv("HUAWEI_USERNAME", "").strip()
+    legacy_password = os.getenv("HUAWEI_PASSWORD", "").strip()
+    if legacy_username and legacy_password:
+        accounts.append({
+            "name": "primary",
+            "username": legacy_username,
+            "password": legacy_password,
+            "use_shared_cookies": True,
+        })
+
+    second_username = os.getenv("HUAWEI_USERNAME_2", "").strip()
+    second_password = os.getenv("HUAWEI_PASSWORD_2", "").strip()
+    if second_username and second_password:
+        accounts.append({
+            "name": "secondary",
+            "username": second_username,
+            "password": second_password,
+            "use_shared_cookies": False,
+        })
+
+    raw = os.getenv("HUAWEI_ACCOUNTS_JSON", "").strip()
+    if raw:
+        try:
+            configured = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(f"HUAWEI_ACCOUNTS_JSON is not valid JSON: {exc.msg}") from exc
+        if not isinstance(configured, list):
+            raise RuntimeError("HUAWEI_ACCOUNTS_JSON must be a JSON list")
+        for index, item in enumerate(configured, start=1):
+            if not isinstance(item, dict):
+                raise RuntimeError(f"HUAWEI_ACCOUNTS_JSON item {index} must be an object")
+            username = str(item.get("username") or "").strip()
+            password = str(item.get("password") or "").strip()
+            if not username or not password:
+                raise RuntimeError(f"HUAWEI_ACCOUNTS_JSON item {index} requires username and password")
+            accounts.append({
+                "name": str(item.get("name") or f"additional_{index}"),
+                "username": username,
+                "password": password,
+                "use_shared_cookies": False,
+            })
+
+    unique: list[dict[str, Any]] = []
+    seen_usernames: set[str] = set()
+    for account in accounts:
+        if account["username"] not in seen_usernames:
+            unique.append(account)
+            seen_usernames.add(account["username"])
+    return unique
+
+
+def load_sma_accounts_from_env() -> list[dict[str, Any]]:
+    accounts: list[dict[str, Any]] = []
+    legacy_username = os.getenv("SMA_USERNAME", "").strip()
+    legacy_password = os.getenv("SMA_PASSWORD", "").strip()
+    if legacy_username and legacy_password:
+        accounts.append({
+            "name": "primary",
+            "username": legacy_username,
+            "password": legacy_password,
+            "use_shared_cookies": True,
+        })
+
+    second_username = os.getenv("SMA_USERNAME_2", "").strip()
+    second_password = os.getenv("SMA_PASSWORD_2", "").strip()
+    if second_username and second_password:
+        accounts.append({
+            "name": "secondary",
+            "username": second_username,
+            "password": second_password,
+            "use_shared_cookies": False,
+        })
+
+    raw = os.getenv("SMA_ACCOUNTS_JSON", "").strip()
+    if raw:
+        try:
+            configured = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(f"SMA_ACCOUNTS_JSON is not valid JSON: {exc.msg}") from exc
+        if not isinstance(configured, list):
+            raise RuntimeError("SMA_ACCOUNTS_JSON must be a JSON list")
+        for index, item in enumerate(configured, start=1):
+            if not isinstance(item, dict):
+                raise RuntimeError(f"SMA_ACCOUNTS_JSON item {index} must be an object")
+            username = str(item.get("username") or "").strip()
+            password = str(item.get("password") or "").strip()
+            if not username or not password:
+                raise RuntimeError(f"SMA_ACCOUNTS_JSON item {index} requires username and password")
+            accounts.append({
+                "name": str(item.get("name") or f"additional_{index}"),
+                "username": username,
+                "password": password,
+                "use_shared_cookies": False,
+            })
 
     unique: list[dict[str, Any]] = []
     seen_usernames: set[str] = set()
@@ -1034,7 +1143,7 @@ def normalize_latest(results: list[dict[str, Any]]) -> dict[str, Any]:
     for site_result in results:
         site_name = site_result["site"]
         account_results = site_result.get("account_results")
-        if site_name == "kehua" and isinstance(account_results, list) and account_results:
+        if isinstance(account_results, list) and account_results:
             normalized_accounts = [build_normalized_site(item) for item in account_results]
             latest["by_site"][site_name] = merge_normalized_sites(normalized_accounts)
         else:
@@ -1116,7 +1225,7 @@ def merge_normalized_sites(sites: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
     return {
-        "platform": "kehua",
+        "platform": sites[0].get("platform", "kehua") if sites else "kehua",
         "updated_at": max(str(site.get("updated_at") or "") for site in sites),
         "scrape_status": scrape_status,
         "overview": overview,
@@ -2475,6 +2584,14 @@ def scrape_site(
             re_meta = kehua_password_login(session, site, account["username"], account["password"], timeout)
             if re_meta.get("success"):
                 result = replay_call(session, prepared_call, timeout)
+        if site_name == "huawei" and result.get("auth_error") and account and account.get("username") and account.get("password"):
+            re_meta = huawei_password_login(session, site, account["username"], account["password"], timeout)
+            if re_meta.get("success"):
+                result = replay_call(session, prepared_call, timeout)
+        if site_name == "sma" and result.get("auth_error") and account and account.get("username") and account.get("password"):
+            re_meta = sma_password_login(session, site, account["username"], account["password"], timeout)
+            if re_meta.get("success"):
+                result = replay_call(session, prepared_call, timeout)
         calls.append(result)
         if site_name == "huawei" and call.get("name") == "station-list" and result.get("success"):
             for extra_call in huawei_energy_balance_calls(site, result):
@@ -2553,7 +2670,14 @@ def run_once(args: argparse.Namespace) -> dict[str, Any]:
         if site_name not in sites_config:
             raise SystemExit(f"Unknown site {site_name}. Available: {', '.join(sites_config)}")
         cookies_file = Path(paths["cookies"]) if paths["cookies"] else None
-        accounts = load_kehua_accounts_from_env() if site_name == "kehua" else []
+        if site_name == "kehua":
+            accounts = load_kehua_accounts_from_env()
+        elif site_name == "huawei":
+            accounts = load_huawei_accounts_from_env()
+        elif site_name == "sma":
+            accounts = load_sma_accounts_from_env()
+        else:
+            accounts = []
         if accounts:
             with ThreadPoolExecutor(max_workers=max(1, len(accounts))) as acc_exec:
                 acc_futures = [

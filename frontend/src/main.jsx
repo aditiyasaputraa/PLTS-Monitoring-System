@@ -26,6 +26,32 @@ function getStationRegion(station) {
   const name = String(station.name || "").toLowerCase();
   const address = String(station.address || "").toLowerCase();
 
+  // Jakarta Barat (Huawei & SMA Jakarta Barat)
+  if (
+    name.includes("jakbar") ||
+    name.includes("jakarta barat") ||
+    name.includes("cengkareng") ||
+    name.includes("kalideres") ||
+    name.includes("kebon jeruk") ||
+    name.includes("kembangan") ||
+    name.includes("palmerah") ||
+    name.includes("grogol") ||
+    name.includes("tambora") ||
+    name.includes("taman sari") ||
+    address.includes("jakarta barat") ||
+    address.includes("jakbar") ||
+    address.includes("cengkareng") ||
+    address.includes("kalideres") ||
+    address.includes("kebon jeruk") ||
+    address.includes("kembangan") ||
+    address.includes("palmerah") ||
+    address.includes("grogol") ||
+    address.includes("tambora") ||
+    address.includes("taman sari")
+  ) {
+    return "jakbar";
+  }
+
   // Jakarta Timur (SMA Platform: SMPN 51, SMPN 213, SMPN 255, SMAN 105)
   if (
     name.includes("jaktim") ||
