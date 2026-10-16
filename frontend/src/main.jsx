@@ -669,10 +669,10 @@ function Dashboard({ session, onSignOut }) {
               className="sync-header-btn"
               onClick={handleSyncNow}
               disabled={isSyncing}
-              title="Tarik data terbaru sekarang"
+              title={isSyncing ? "Sedang menarik data..." : "Tarik data terbaru"}
+              aria-label={isSyncing ? "Sedang menarik data..." : "Tarik data terbaru"}
             >
-              <RefreshIcon style={{ width: "12px", height: "12px", animation: isSyncing ? "spin 1s linear infinite" : "none" }} />
-              <span>{isSyncing ? "Menarik..." : "Tarik Data"}</span>
+              <RefreshIcon style={{ width: "15px", height: "15px", animation: isSyncing ? "spin 1s linear infinite" : "none" }} />
             </button>
 
             {/* Export Slot */}
