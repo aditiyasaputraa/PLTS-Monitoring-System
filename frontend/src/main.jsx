@@ -11,6 +11,38 @@ const OPENFREEMAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
 const AUTH_STORAGE_KEY = "plts-monitoring.supabase-session";
 const UI_STATE_STORAGE_KEY = "plts-monitoring.ui-state";
 
+const REGIONS = [
+  { id: "all", name: "All Regions", shortName: "All Regions" },
+  { id: "jakut", name: "Jakarta Utara", shortName: "Jakarta Utara" },
+  { id: "jaktim", name: "Jakarta Timur", shortName: "Jakarta Timur" },
+  { id: "jakbar", name: "Jakarta Barat", shortName: "Jakarta Barat" },
+  { id: "jakpus", name: "Jakarta Pusat", shortName: "Jakarta Pusat" },
+  { id: "jaksel", name: "Jakarta Selatan", shortName: "Jakarta Selatan" },
+  { id: "seribu", name: "Kepulauan Seribu", shortName: "Kep. Seribu" },
+];
+
+function getStationRegion(station) {
+  if (!station) return "jakut";
+  const str = `${station.name || ""} ${station.address || ""}`.toLowerCase();
+  if (str.includes("timur") || str.includes("jaktim") || str.includes("duren sawit") || str.includes("ciracas") || str.includes("klender") || str.includes("pondok bambu")) {
+    return "jaktim";
+  }
+  if (str.includes("barat") || str.includes("jakbar")) {
+    return "jakbar";
+  }
+  if (str.includes("pusat") || str.includes("jakpus")) {
+    return "jakpus";
+  }
+  if (str.includes("selatan") || str.includes("jaksel")) {
+    return "jaksel";
+  }
+  if (str.includes("seribu")) {
+    return "seribu";
+  }
+  // Default Northern Jakarta if Tj Priok, Sunter, Cilincing, Koja, Jakut, or Huawei/Kehua
+  return "jakut";
+}
+
 function apiBase() {
   const configuredApiBase = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
   if (configuredApiBase) return configuredApiBase;
@@ -77,9 +109,10 @@ function readUiState() {
     return {
       activeTab: TABS.includes(stored.activeTab) ? stored.activeTab : "Overview",
       selectedId: typeof stored.selectedId === "string" ? stored.selectedId : null,
+      selectedRegion: typeof stored.selectedRegion === "string" ? stored.selectedRegion : "all",
     };
   } catch {
-    return { activeTab: "Overview", selectedId: null };
+    return { activeTab: "Overview", selectedId: null, selectedRegion: "all" };
   }
 }
 
@@ -436,16 +469,17 @@ function Dashboard({ session, onSignOut }) {
   const { data, error, refresh } = useMonitoringData(session, onSignOut);
   const [activeTab, setActiveTab] = useState(() => readUiState().activeTab);
   const [selectedId, setSelectedId] = useState(() => readUiState().selectedId);
+  const [selectedRegion, setSelectedRegion] = useState(() => readUiState().selectedRegion || "all");
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncNotice, setSyncNotice] = useState(null);
-  const [siteDropdownOpen, setSiteDropdownOpen] = useState(false);
+  const [regionDropdownOpen, setRegionDropdownOpen] = useState(false);
 
   const sites = useMemo(() => {
     if (!data?.by_site) return [];
     return Object.entries(data.by_site).map(([key, site]) => ({ key, ...site }));
   }, [data]);
 
-  const locations = useMemo(() => {
+  const allLocations = useMemo(() => {
     return sites.flatMap((site) => (site.stations || []).map((station) => {
       const id = String(station.station_id || station.station_numeric_id || station.id);
       const name = station.station_name || station.name || `Station ${id}`;
@@ -469,10 +503,13 @@ function Dashboard({ session, onSignOut }) {
         ? (Number(station.cumulative_income ?? station.total_income) || Math.round(cumulativeKwh * 900))
         : (station.cumulative_income ?? station.total_income);
 
+      const region = getStationRegion(station);
+
       return {
         ...station,
         id,
         name,
+        region,
         source: site.platform,
         site,
         uid: `${site.platform}-${id}`,
@@ -485,22 +522,33 @@ function Dashboard({ session, onSignOut }) {
     }));
   }, [sites]);
 
+  // Filter locations based on chosen region
+  const locations = useMemo(() => {
+    if (selectedRegion === "all") return allLocations;
+    return allLocations.filter((l) => l.region === selectedRegion);
+  }, [allLocations, selectedRegion]);
+
   useEffect(() => {
     if (!locations.length) return;
     if (!selectedId || !locations.some((l) => l.uid === selectedId)) {
-      const defaultSite = locations.find((l) => l.name?.includes("SDN 09")) || locations[0];
-      setSelectedId(defaultSite.uid);
-      writeUiState({ selectedId: defaultSite.uid });
+      const firstLoc = locations[0];
+      setSelectedId(firstLoc.uid);
+      writeUiState({ selectedId: firstLoc.uid });
     }
   }, [locations, selectedId]);
 
-  const selected = locations.find((l) => l.uid === selectedId) || locations[0] || {};
+  const selected = locations.find((l) => l.uid === selectedId) || locations[0] || allLocations[0] || {};
   const fleet = useMemo(() => buildFleet(sites, locations), [sites, locations]);
 
   const handleSelectSite = useCallback((uid) => {
     setSelectedId(uid);
     writeUiState({ selectedId: uid });
-    setSiteDropdownOpen(false);
+  }, []);
+
+  const handleSelectRegion = useCallback((regionId) => {
+    setSelectedRegion(regionId);
+    writeUiState({ selectedRegion: regionId });
+    setRegionDropdownOpen(false);
   }, []);
 
   const handleSyncNow = useCallback(async () => {
@@ -568,12 +616,20 @@ function Dashboard({ session, onSignOut }) {
           </nav>
 
           <div className="top-nav-controls">
-            {/* Site Dropdown */}
+            {/* Region Dropdown */}
             <div style={{ position: "relative" }}>
               <button
                 type="button"
                 className="site-picker-btn"
-                onClick={() => setSiteDropdownOpen(!siteDropdownOpen)}
+                onClick={() => setRegionDropdownOpen(!regionDropdownOpen)}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "7px",
+                  background: selectedRegion !== "all" ? "rgba(16, 185, 129, 0.2)" : "rgba(255, 255, 255, 0.08)",
+                  border: selectedRegion !== "all" ? "1px solid rgba(16, 185, 129, 0.45)" : "1px solid rgba(255, 255, 255, 0.12)",
+                  color: selectedRegion !== "all" ? "#34d399" : "#e5ede7",
+                }}
               >
                 <span
                   style={{
@@ -581,16 +637,16 @@ function Dashboard({ session, onSignOut }) {
                     height: "7px",
                     borderRadius: "50%",
                     flexShrink: 0,
-                    background: selected?.status === "offline" || selected?.status === "disconnected" ? "#ef4444" : "#10b981",
-                    boxShadow: selected?.status === "offline" || selected?.status === "disconnected"
-                      ? "0 0 6px rgba(239, 68, 68, 0.7)"
-                      : "0 0 6px rgba(16, 185, 129, 0.7)",
+                    background: "#10b981",
+                    boxShadow: "0 0 6px rgba(16, 185, 129, 0.7)",
                   }}
                 />
-                <span>{selected?.name ? (selected.name.length > 14 ? `${selected.name.slice(0, 14)}...` : selected.name) : "All PLTS"}</span>
+                <span style={{ fontWeight: 700 }}>
+                  {REGIONS.find((r) => r.id === selectedRegion)?.name || "All Regions"}
+                </span>
                 <span style={{ fontSize: "10px", opacity: 0.6 }}>▾</span>
               </button>
-              {siteDropdownOpen && (
+              {regionDropdownOpen && (
                 <div style={{
                   position: "absolute",
                   top: "100%",
@@ -599,53 +655,66 @@ function Dashboard({ session, onSignOut }) {
                   background: "#111a14",
                   border: "1px solid rgba(255,255,255,0.12)",
                   borderRadius: "12px",
-                  boxShadow: "0 10px 25px rgba(0,0,0,0.4)",
-                  width: "245px",
+                  boxShadow: "0 10px 25px rgba(0,0,0,0.5)",
+                  width: "210px",
                   zIndex: 200,
                   overflow: "hidden",
-                  padding: "4px",
+                  padding: "5px",
                 }}>
-                  {locations.map((loc) => {
-                    const isLocOffline = loc.status === "offline" || loc.status === "disconnected";
-                    const isLocSelected = loc.uid === selected?.uid;
+                  <div style={{ padding: "6px 10px 4px", fontSize: "10px", fontWeight: 700, color: "#6e8074", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+                    Filter Wilayah
+                  </div>
+                  {REGIONS.map((reg) => {
+                    const isRegSelected = reg.id === selectedRegion;
+                    const countInReg = reg.id === "all"
+                      ? allLocations.length
+                      : allLocations.filter((l) => l.region === reg.id).length;
+
                     return (
                       <button
-                        key={loc.uid}
+                        key={reg.id}
                         type="button"
-                        onClick={() => handleSelectSite(loc.uid)}
+                        onClick={() => handleSelectRegion(reg.id)}
                         style={{
                           width: "100%",
                           textAlign: "left",
                           padding: "8px 12px",
-                          background: isLocSelected ? "rgba(16,185,129,0.18)" : "transparent",
-                          color: isLocSelected ? "#34d399" : "#ffffff",
+                          background: isRegSelected ? "rgba(16,185,129,0.18)" : "transparent",
+                          color: isRegSelected ? "#34d399" : "#ffffff",
                           border: "none",
                           borderRadius: "8px",
                           fontSize: "12px",
-                          fontWeight: isLocSelected ? "700" : "500",
+                          fontWeight: isRegSelected ? "700" : "500",
                           cursor: "pointer",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "space-between",
                           gap: "8px",
+                          transition: "background 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isRegSelected) e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isRegSelected) e.currentTarget.style.background = "transparent";
                         }}
                       >
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, overflow: "hidden" }}>
-                          <span
-                            style={{
-                              width: "7px",
-                              height: "7px",
-                              borderRadius: "50%",
-                              flexShrink: 0,
-                              background: isLocOffline ? "#ef4444" : "#10b981",
-                              boxShadow: isLocOffline
-                                ? "0 0 6px rgba(239, 68, 68, 0.7)"
-                                : "0 0 6px rgba(16, 185, 129, 0.7)",
-                            }}
-                          />
-                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{loc.name}</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span style={{ fontSize: "12px" }}>
+                            {reg.id === "all" ? "🌐" : "📍"}
+                          </span>
+                          <span>{reg.name}</span>
                         </div>
-                        <small style={{ color: "#7d8f82", fontSize: "10px", flexShrink: 0 }}>{loc.source}</small>
+                        <span style={{
+                          fontSize: "10px",
+                          fontWeight: 700,
+                          padding: "1px 6px",
+                          borderRadius: "10px",
+                          background: countInReg > 0 ? "rgba(16,185,129,0.2)" : "rgba(255,255,255,0.06)",
+                          color: countInReg > 0 ? "#a7f3d0" : "#6e8074",
+                        }}>
+                          {countInReg}
+                        </span>
                       </button>
                     );
                   })}
@@ -1369,6 +1438,29 @@ function formatStationLabel(name, isCrowded = false) {
 }
 
 function TodayEnergyBySiteChart({ locations, selectedId, onSelect }) {
+  if (!locations || locations.length === 0) {
+    return (
+      <div style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        height: "170px",
+        background: "#fafbfa",
+        borderRadius: "12px",
+        border: "1px dashed #cbd5cb",
+        color: "#6e8074",
+        fontSize: "13px",
+        textAlign: "center",
+        padding: "16px",
+      }}>
+        <span style={{ fontSize: "22px", marginBottom: "6px" }}>📍</span>
+        <strong style={{ color: "#16231a" }}>Belum ada PLTS di wilayah ini</strong>
+        <span style={{ fontSize: "11px", marginTop: "2px" }}>Pilih "All Regions" atau wilayah lain untuk melihat data.</span>
+      </div>
+    );
+  }
+
   const sitesData = useMemo(() => {
     const fallbacks = [1.7, 1.5, 3.1, 0.08, 0.08, 4.1];
     return locations.map((loc, idx) => {
