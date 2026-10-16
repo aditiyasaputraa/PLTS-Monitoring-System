@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import patch
 
 from scrape_monitoring import (
+    build_normalized_site,
     kehua_request_sign,
     load_kehua_accounts_from_env,
     merge_normalized_sites,
@@ -49,6 +50,48 @@ class KehuaAccountsTests(unittest.TestCase):
         self.assertEqual(accounts[0]["username"], "primary-user")
         self.assertEqual(accounts[1]["username"], "second-user")
         self.assertFalse(accounts[1]["use_shared_cookies"])
+
+    def test_loads_third_account_from_simple_env(self):
+        with patch.dict(os.environ, {
+            "KEHUA_USERNAME": "primary-user",
+            "KEHUA_PASSWORD": "primary-password",
+            "KEHUA_USERNAME_2": "second-user",
+            "KEHUA_PASSWORD_2": "second-password",
+            "KEHUA_USERNAME_3": "third-user",
+            "KEHUA_PASSWORD_3": "third-password",
+        }, clear=True):
+            accounts = load_kehua_accounts_from_env()
+
+        self.assertEqual(len(accounts), 3)
+        self.assertEqual(accounts[0]["username"], "primary-user")
+        self.assertEqual(accounts[1]["username"], "second-user")
+        self.assertEqual(accounts[2]["username"], "third-user")
+        self.assertEqual(accounts[2]["name"], "account_3")
+        self.assertFalse(accounts[2]["use_shared_cookies"])
+
+    def test_build_normalized_site_assigns_jakarta_barat_to_additional_accounts(self):
+        site_result = {
+            "site": "kehua",
+            "scraped_at": "2026-10-16T10:00:00+00:00",
+            "account": {"name": "account_2"},
+            "summary": {"success_count": 1, "failed_count": 0, "auth_error_count": 0},
+            "calls": [{
+                "name": "listStationCardInfoByCondition",
+                "response_body": {
+                    "code": "0",
+                    "data": {
+                        "result": [{
+                            "stationId": "99999",
+                            "stationName": "SMKN 53 JAKBAR",
+                            "capacity": 15.0,
+                        }]
+                    }
+                }
+            }],
+        }
+        normalized = build_normalized_site(site_result)
+        self.assertEqual(len(normalized["stations"]), 1)
+        self.assertEqual(normalized["stations"][0]["region"], "Jakarta Barat")
 
     def test_rewrites_account_identifiers_and_resigns_the_request(self):
         call = {

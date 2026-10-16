@@ -512,15 +512,16 @@ def load_kehua_accounts_from_env() -> list[dict[str, Any]]:
             "use_shared_cookies": True,
         })
 
-    second_username = os.getenv("KEHUA_USERNAME_2", "").strip()
-    second_password = os.getenv("KEHUA_PASSWORD_2", "").strip()
-    if second_username and second_password:
-        accounts.append({
-            "name": "secondary",
-            "username": second_username,
-            "password": second_password,
-            "use_shared_cookies": False,
-        })
+    for index in range(2, 10):
+        second_username = os.getenv(f"KEHUA_USERNAME_{index}", "").strip()
+        second_password = os.getenv(f"KEHUA_PASSWORD_{index}", "").strip()
+        if second_username and second_password:
+            accounts.append({
+                "name": "secondary" if index == 2 else f"account_{index}",
+                "username": second_username,
+                "password": second_password,
+                "use_shared_cookies": False,
+            })
 
     raw = os.getenv("KEHUA_ACCOUNTS_JSON", "").strip()
     if raw:
@@ -1323,6 +1324,9 @@ def build_normalized_site(site_result: dict[str, Any]) -> dict[str, Any]:
         devices = normalize_huawei_devices(grouped, stations)
     elif site_name == "kehua":
         stations = normalize_kehua_stations(grouped)
+        if account_name in ("secondary", "account_2", "account_3", "account_4", "jakbar") or (account_name and account_name != "primary"):
+            for st in stations:
+                st["region"] = "Jakarta Barat"
         overview = normalize_kehua_overview(grouped, stations)
         alarms = normalize_kehua_alarms(grouped)
         charts = normalize_kehua_charts(grouped)

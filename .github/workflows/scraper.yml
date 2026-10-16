@@ -51,6 +51,8 @@ jobs:
           KEHUA_PASSWORD: ${{ secrets.KEHUA_PASSWORD }}
           KEHUA_USERNAME_2: ${{ secrets.KEHUA_USERNAME_2 }}
           KEHUA_PASSWORD_2: ${{ secrets.KEHUA_PASSWORD_2 }}
+          KEHUA_USERNAME_3: ${{ secrets.KEHUA_USERNAME_3 }}
+          KEHUA_PASSWORD_3: ${{ secrets.KEHUA_PASSWORD_3 }}
           KEHUA_ACCOUNTS_JSON: ${{ secrets.KEHUA_ACCOUNTS_JSON }}
           HUAWEI_COOKIES_JSON: ${{ secrets.HUAWEI_COOKIES_JSON }}
           KEHUA_COOKIES_JSON: ${{ secrets.KEHUA_COOKIES_JSON }}
