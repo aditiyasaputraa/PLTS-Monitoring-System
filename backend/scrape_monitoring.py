@@ -2160,24 +2160,25 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
         address = ", ".join(city_parts) if city_parts else None
 
         sma_coordinate_fallbacks = {
-            "2565257": (-6.2341, 106.9048, "Jl. Cendana Raya No.1, Pondok Bambu, Duren Sawit, Jakarta Timur 13430"),
-            "JAKTIM SMPN 51": (-6.2341, 106.9048, "Jl. Cendana Raya No.1, Pondok Bambu, Duren Sawit, Jakarta Timur 13430"),
-            "2565474": (-6.2238, 106.9366, "Jl. Malaka I No.2, Malaka Sari, Duren Sawit, Jakarta Timur 13460"),
-            "JAKTIM SMPN 213": (-6.2238, 106.9366, "Jl. Malaka I No.2, Malaka Sari, Duren Sawit, Jakarta Timur 13460"),
-            "2565583": (-6.2307, 106.9205, "Jl. Raden Inten II No.9, Duren Sawit, Jakarta Timur 13440"),
-            "JAKTIM SMPN 255": (-6.2307, 106.9205, "Jl. Raden Inten II No.9, Duren Sawit, Jakarta Timur 13440"),
-            "2628410": (-6.33123, 106.88437, "Jl. Usman No.40, Kelapa Dua Wetan, Ciracas, Jakarta Timur 13730"),
-            "JAKTIM SMAN 105": (-6.33123, 106.88437, "Jl. Usman No.40, Kelapa Dua Wetan, Ciracas, Jakarta Timur 13730"),
+            # Jakarta Timur (SMPN 51, SMPN 213, SMPN 255, SMAN 105)
+            "2565257": (-6.23900, 106.90316, "SMP Negeri 51 Jakarta, Jl. Kejaksaan / Cendana Raya No. 1, Pondok Bambu, Duren Sawit, Jakarta Timur 13430"),
+            "JAKTIM SMPN 51": (-6.23900, 106.90316, "SMP Negeri 51 Jakarta, Jl. Kejaksaan / Cendana Raya No. 1, Pondok Bambu, Duren Sawit, Jakarta Timur 13430"),
+            "2565474": (-6.22337, 106.92937, "SMP Negeri 213 Jakarta, Jl. Delima V / Malaka I No. 2, Malaka Sari, Duren Sawit, Jakarta Timur 13450"),
+            "JAKTIM SMPN 213": (-6.22337, 106.92937, "SMP Negeri 213 Jakarta, Jl. Delima V / Malaka I No. 2, Malaka Sari, Duren Sawit, Jakarta Timur 13450"),
+            "2565583": (-6.22290, 106.92270, "SMP Negeri 255 Jakarta, Jl. Raden Inten II No. 9 / Madrasah II, Duren Sawit, Jakarta Timur 13440"),
+            "JAKTIM SMPN 255": (-6.22290, 106.92270, "SMP Negeri 255 Jakarta, Jl. Raden Inten II No. 9 / Madrasah II, Duren Sawit, Jakarta Timur 13440"),
+            "2628410": (-6.33175, 106.88423, "SMA Negeri 105 Jakarta, Jl. Usman No. 40, Kelapa Dua Wetan, Ciracas, Jakarta Timur 13730"),
+            "JAKTIM SMAN 105": (-6.33175, 106.88423, "SMA Negeri 105 Jakarta, Jl. Usman No. 40, Kelapa Dua Wetan, Ciracas, Jakarta Timur 13730"),
 
             # Jakarta Barat (SMPN 190, SMPN 54, SMPN 88, SMPN 201)
-            "2576004": (-6.1086, 106.7026, "Jl. Prepedan Kamal, Kamal, Kalideres, Jakarta Barat 11820"),
-            "SMPN 190 JAKBAR": (-6.1086, 106.7026, "Jl. Prepedan Kamal, Kamal, Kalideres, Jakarta Barat 11820"),
-            "2620780": (-6.1436, 106.8109, "Jl. Blandongan No. 37, Glodok, Taman Sari, Jakarta Barat 11120"),
-            "SMPN 54 JAKBAR": (-6.1436, 106.8109, "Jl. Blandongan No. 37, Glodok, Taman Sari, Jakarta Barat 11120"),
-            "2768874": (-6.1932, 106.7949, "Jl. Anggrek Garuda Blok G4 No. 40, Kemanggisan, Palmerah, Jakarta Barat 11480"),
-            "SMPN 88 JAKBAR": (-6.1932, 106.7949, "Jl. Anggrek Garuda Blok G4 No. 40, Kemanggisan, Palmerah, Jakarta Barat 11480"),
-            "3538228": (-6.1566, 106.7326, "Jl. Kayu Besar Dalam No. 2, Cengkareng Timur, Cengkareng, Jakarta Barat 11730"),
-            "SMPN 201 JAKBAR": (-6.1566, 106.7326, "Jl. Kayu Besar Dalam No. 2, Cengkareng Timur, Cengkareng, Jakarta Barat 11730"),
+            "2576004": (-6.10850, 106.70265, "SMP Negeri 190 Jakarta, Jl. Prepedan Raya, Kamal, Kalideres, Jakarta Barat 11810"),
+            "SMPN 190 JAKBAR": (-6.10850, 106.70265, "SMP Negeri 190 Jakarta, Jl. Prepedan Raya, Kamal, Kalideres, Jakarta Barat 11810"),
+            "2620780": (-6.14239, 106.81054, "SMP Negeri 54 Jakarta, Jl. Blandongan No. 37, Tambora, Glodok, Jakarta Barat 11120"),
+            "SMPN 54 JAKBAR": (-6.14239, 106.81054, "SMP Negeri 54 Jakarta, Jl. Blandongan No. 37, Tambora, Glodok, Jakarta Barat 11120"),
+            "2768874": (-6.19304, 106.79509, "SMP Negeri 88 Jakarta, Jl. Anggrek Garuda Blok G4 No. 40, Kemanggisan, Palmerah, Jakarta Barat 11480"),
+            "SMPN 88 JAKBAR": (-6.19304, 106.79509, "SMP Negeri 88 Jakarta, Jl. Anggrek Garuda Blok G4 No. 40, Kemanggisan, Palmerah, Jakarta Barat 11480"),
+            "3538228": (-6.12711, 106.73428, "SMP Negeri 201 Jakarta, Jl. Kayu Besar Dalam No. 2, Cengkareng Timur, Jakarta Barat 11730"),
+            "SMPN 201 JAKBAR": (-6.12711, 106.73428, "SMP Negeri 201 Jakarta, Jl. Kayu Besar Dalam No. 2, Cengkareng Timur, Jakarta Barat 11730"),
         }
         fallback = sma_coordinate_fallbacks.get(component_id) or sma_coordinate_fallbacks.get(plant_name)
         if fallback:

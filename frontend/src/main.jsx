@@ -542,22 +542,41 @@ function Dashboard({ session, onSignOut }) {
       let address = station.address;
 
       const nameLower = name.toLowerCase();
+      // Jakarta Barat (SMA: SMPN 190, SMPN 54, SMPN 88, SMPN 201)
       if (nameLower.includes("smpn 190")) {
-        latitude = -6.1086;
-        longitude = 106.7026;
-        address = "Jl. Prepedan Kamal, Kamal, Kalideres, Jakarta Barat 11820";
+        latitude = -6.10850;
+        longitude = 106.70265;
+        address = "SMP Negeri 190 Jakarta, Jl. Prepedan Raya, Kamal, Kalideres, Jakarta Barat 11810";
       } else if (nameLower.includes("smpn 54")) {
-        latitude = -6.1436;
-        longitude = 106.8109;
-        address = "Jl. Blandongan No. 37, Glodok, Taman Sari, Jakarta Barat 11120";
+        latitude = -6.14239;
+        longitude = 106.81054;
+        address = "SMP Negeri 54 Jakarta, Jl. Blandongan No. 37, Tambora, Glodok, Jakarta Barat 11120";
       } else if (nameLower.includes("smpn 88")) {
-        latitude = -6.1932;
-        longitude = 106.7949;
-        address = "Jl. Anggrek Garuda Blok G4 No. 40, Kemanggisan, Palmerah, Jakarta Barat 11480";
+        latitude = -6.19304;
+        longitude = 106.79509;
+        address = "SMP Negeri 88 Jakarta, Jl. Anggrek Garuda Blok G4 No. 40, Kemanggisan, Palmerah, Jakarta Barat 11480";
       } else if (nameLower.includes("smpn 201")) {
-        latitude = -6.1566;
-        longitude = 106.7326;
-        address = "Jl. Kayu Besar Dalam No. 2, Cengkareng Timur, Cengkareng, Jakarta Barat 11730";
+        latitude = -6.12711;
+        longitude = 106.73428;
+        address = "SMP Negeri 201 Jakarta, Jl. Kayu Besar Dalam No. 2, Cengkareng Timur, Jakarta Barat 11730";
+      }
+      // Jakarta Timur (SMA: SMPN 51, SMPN 213, SMPN 255, SMAN 105)
+      else if (nameLower.includes("smpn 51")) {
+        latitude = -6.23900;
+        longitude = 106.90316;
+        address = "SMP Negeri 51 Jakarta, Jl. Kejaksaan / Cendana Raya No. 1, Pondok Bambu, Duren Sawit, Jakarta Timur 13430";
+      } else if (nameLower.includes("smpn 213")) {
+        latitude = -6.22337;
+        longitude = 106.92937;
+        address = "SMP Negeri 213 Jakarta, Jl. Delima V / Malaka I No. 2, Malaka Sari, Duren Sawit, Jakarta Timur 13450";
+      } else if (nameLower.includes("smpn 255")) {
+        latitude = -6.22290;
+        longitude = 106.92270;
+        address = "SMP Negeri 255 Jakarta, Jl. Raden Inten II No. 9 / Madrasah II, Duren Sawit, Jakarta Timur 13440";
+      } else if (nameLower.includes("sman 105")) {
+        latitude = -6.33175;
+        longitude = 106.88423;
+        address = "SMA Negeri 105 Jakarta, Jl. Usman No. 40, Kelapa Dua Wetan, Ciracas, Jakarta Timur 13730";
       }
 
       return {
