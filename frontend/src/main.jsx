@@ -12,7 +12,7 @@ const AUTH_STORAGE_KEY = "plts-monitoring.supabase-session";
 const UI_STATE_STORAGE_KEY = "plts-monitoring.ui-state";
 
 const REGIONS = [
-  { id: "all", name: "All Regions", shortName: "All Regions" },
+  { id: "all", name: "DKI Jakarta", shortName: "DKI Jakarta" },
   { id: "jakut", name: "Jakarta Utara", shortName: "Jakarta Utara" },
   { id: "jaktim", name: "Jakarta Timur", shortName: "Jakarta Timur" },
   { id: "jakbar", name: "Jakarta Barat", shortName: "Jakarta Barat" },
@@ -626,7 +626,7 @@ function Dashboard({ session, onSignOut }) {
                   cursor: "pointer",
                 }}
               >
-                <span>{REGIONS.find((r) => r.id === selectedRegion)?.name || "All Regions"}</span>
+                <span>{REGIONS.find((r) => r.id === selectedRegion)?.name || "DKI Jakarta"}</span>
                 <span style={{ fontSize: "9px", opacity: 0.7, transform: regionDropdownOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>▾</span>
                 {activeTab === "Overview" && <span className="tab-active-dot" />}
               </button>
@@ -773,7 +773,7 @@ function Dashboard({ session, onSignOut }) {
                   padding: "4px",
                 }}>
                   <div style={{ padding: "6px 10px 4px", fontSize: "10px", fontWeight: 700, color: "#6e8074", letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                    Daftar PLTS ({REGIONS.find((r) => r.id === selectedRegion)?.shortName || "All"})
+                    Daftar PLTS ({REGIONS.find((r) => r.id === selectedRegion)?.shortName || "DKI Jakarta"})
                   </div>
                   {locations.length === 0 ? (
                     <div style={{ padding: "14px 12px", color: "#6e8074", fontSize: "12px", textAlign: "center" }}>
@@ -1624,7 +1624,7 @@ function TodayEnergyBySiteChart({ locations, selectedId, onSelect }) {
       }}>
         <span style={{ fontSize: "22px", marginBottom: "6px" }}>📍</span>
         <strong style={{ color: "#16231a" }}>Belum ada PLTS di wilayah ini</strong>
-        <span style={{ fontSize: "11px", marginTop: "2px" }}>Pilih "All Regions" atau wilayah lain untuk melihat data.</span>
+        <span style={{ fontSize: "11px", marginTop: "2px" }}>Pilih "DKI Jakarta" atau wilayah lain untuk melihat data.</span>
       </div>
     );
   }
