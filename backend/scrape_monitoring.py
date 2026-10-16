@@ -1324,7 +1324,7 @@ def build_normalized_site(site_result: dict[str, Any]) -> dict[str, Any]:
         devices = normalize_huawei_devices(grouped, stations)
     elif site_name == "kehua":
         stations = normalize_kehua_stations(grouped)
-        if account_name in ("secondary", "account_2", "account_3", "account_4", "jakbar") or (account_name and account_name != "primary"):
+        if account_name in ("account_3", "account_4", "account_5", "jakbar") or "jakbar" in account_name:
             for st in stations:
                 st["region"] = "Jakarta Barat"
         overview = normalize_kehua_overview(grouped, stations)

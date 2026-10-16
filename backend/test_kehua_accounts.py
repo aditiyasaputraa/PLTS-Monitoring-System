@@ -70,10 +70,10 @@ class KehuaAccountsTests(unittest.TestCase):
         self.assertFalse(accounts[2]["use_shared_cookies"])
 
     def test_build_normalized_site_assigns_jakarta_barat_to_additional_accounts(self):
-        site_result = {
+        site_result_jakbar = {
             "site": "kehua",
             "scraped_at": "2026-10-16T10:00:00+00:00",
-            "account": {"name": "account_2"},
+            "account": {"name": "account_3"},
             "summary": {"success_count": 1, "failed_count": 0, "auth_error_count": 0},
             "calls": [{
                 "name": "listStationCardInfoByCondition",
@@ -89,9 +89,32 @@ class KehuaAccountsTests(unittest.TestCase):
                 }
             }],
         }
-        normalized = build_normalized_site(site_result)
-        self.assertEqual(len(normalized["stations"]), 1)
-        self.assertEqual(normalized["stations"][0]["region"], "Jakarta Barat")
+        normalized_jakbar = build_normalized_site(site_result_jakbar)
+        self.assertEqual(len(normalized_jakbar["stations"]), 1)
+        self.assertEqual(normalized_jakbar["stations"][0]["region"], "Jakarta Barat")
+
+        # Verify account 2 (secondary Jakarta Utara) does NOT get overwritten as Jakarta Barat
+        site_result_jakut = {
+            "site": "kehua",
+            "scraped_at": "2026-10-16T10:00:00+00:00",
+            "account": {"name": "secondary"},
+            "summary": {"success_count": 1, "failed_count": 0, "auth_error_count": 0},
+            "calls": [{
+                "name": "listStationCardInfoByCondition",
+                "response_body": {
+                    "code": "0",
+                    "data": {
+                        "result": [{
+                            "stationId": "17483",
+                            "stationName": "SDN 09 JAKUT",
+                            "capacity": 15.0,
+                        }]
+                    }
+                }
+            }],
+        }
+        normalized_jakut = build_normalized_site(site_result_jakut)
+        self.assertNotEqual(normalized_jakut["stations"][0].get("region"), "Jakarta Barat")
 
     def test_rewrites_account_identifiers_and_resigns_the_request(self):
         call = {
