@@ -2168,14 +2168,23 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
             "JAKTIM SMPN 255": (-6.2307, 106.9205, "Jl. Raden Inten II No.9, Duren Sawit, Jakarta Timur 13440"),
             "2628410": (-6.33123, 106.88437, "Jl. Usman No.40, Kelapa Dua Wetan, Ciracas, Jakarta Timur 13730"),
             "JAKTIM SMAN 105": (-6.33123, 106.88437, "Jl. Usman No.40, Kelapa Dua Wetan, Ciracas, Jakarta Timur 13730"),
+
+            # Jakarta Barat (SMPN 190, SMPN 54, SMPN 88, SMPN 201)
+            "2576004": (-6.1086, 106.7026, "Jl. Prepedan Kamal, Kamal, Kalideres, Jakarta Barat 11820"),
+            "SMPN 190 JAKBAR": (-6.1086, 106.7026, "Jl. Prepedan Kamal, Kamal, Kalideres, Jakarta Barat 11820"),
+            "2620780": (-6.1436, 106.8109, "Jl. Blandongan No. 37, Glodok, Taman Sari, Jakarta Barat 11120"),
+            "SMPN 54 JAKBAR": (-6.1436, 106.8109, "Jl. Blandongan No. 37, Glodok, Taman Sari, Jakarta Barat 11120"),
+            "2768874": (-6.1932, 106.7949, "Jl. Anggrek Garuda Blok G4 No. 40, Kemanggisan, Palmerah, Jakarta Barat 11480"),
+            "SMPN 88 JAKBAR": (-6.1932, 106.7949, "Jl. Anggrek Garuda Blok G4 No. 40, Kemanggisan, Palmerah, Jakarta Barat 11480"),
+            "3538228": (-6.1566, 106.7326, "Jl. Kayu Besar Dalam No. 2, Cengkareng Timur, Cengkareng, Jakarta Barat 11730"),
+            "SMPN 201 JAKBAR": (-6.1566, 106.7326, "Jl. Kayu Besar Dalam No. 2, Cengkareng Timur, Cengkareng, Jakarta Barat 11730"),
         }
         fallback = sma_coordinate_fallbacks.get(component_id) or sma_coordinate_fallbacks.get(plant_name)
         if fallback:
             f_lat, f_lng, f_addr = fallback
             lat = f_lat
             lng = f_lng
-            if not address:
-                address = f_addr
+            address = f_addr
 
         now = now_stamp()
         today_label = now[:8]

@@ -537,10 +537,36 @@ function Dashboard({ session, onSignOut }) {
 
       const region = getStationRegion(station);
 
+      let latitude = Number(station.latitude);
+      let longitude = Number(station.longitude);
+      let address = station.address;
+
+      const nameLower = name.toLowerCase();
+      if (nameLower.includes("smpn 190")) {
+        latitude = -6.1086;
+        longitude = 106.7026;
+        address = "Jl. Prepedan Kamal, Kamal, Kalideres, Jakarta Barat 11820";
+      } else if (nameLower.includes("smpn 54")) {
+        latitude = -6.1436;
+        longitude = 106.8109;
+        address = "Jl. Blandongan No. 37, Glodok, Taman Sari, Jakarta Barat 11120";
+      } else if (nameLower.includes("smpn 88")) {
+        latitude = -6.1932;
+        longitude = 106.7949;
+        address = "Jl. Anggrek Garuda Blok G4 No. 40, Kemanggisan, Palmerah, Jakarta Barat 11480";
+      } else if (nameLower.includes("smpn 201")) {
+        latitude = -6.1566;
+        longitude = 106.7326;
+        address = "Jl. Kayu Besar Dalam No. 2, Cengkareng Timur, Cengkareng, Jakarta Barat 11730";
+      }
+
       return {
         ...station,
         id,
         name,
+        latitude,
+        longitude,
+        address,
         region,
         source: site.platform,
         site,
