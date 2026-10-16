@@ -973,16 +973,19 @@ def sma_extra_plant_calls(site: dict[str, Any], navigation_call: dict[str, Any])
     year_start_meter_begin = f"{jakarta_now.year - 1:04d}-12-31T00:00:00.000Z"
     year_start_meter_end = f"{jakarta_now.year:04d}-01-03T23:59:59.000Z"
 
+    seen_ids: set[str] = set()
+
     for item in items:
-        if not isinstance(item, dict):
+        if not isinstance(item, dict) or item.get("componentType") == "PlantGroup":
             continue
-        is_plant = item.get("componentType") == "Plant"
+        component_id = str(item.get("componentId") or item.get("plantId") or "")
+        if not component_id or component_id in seen_ids:
+            continue
+        is_plant = item.get("componentType") == "Plant" or "plantId" in item
         has_id_only = "componentType" not in item and "componentId" in item
         if not (is_plant or has_id_only):
             continue
-        component_id = str(item.get("componentId") or "")
-        if not component_id:
-            continue
+        seen_ids.add(component_id)
 
         calls.append({
             "id": f"sma_plant_detail_{component_id}",
@@ -1964,25 +1967,35 @@ def normalize_kehua_company_power_charts(calls: list[dict[str, Any]]) -> dict[st
 
 
 def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
-    nav_calls = grouped.get("navigation") or []
-    nav_body = response_data(nav_calls[0]) if nav_calls else None
-    items = nav_body if isinstance(nav_body, list) else ([nav_body] if isinstance(nav_body, dict) else [])
+    plant_items: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
 
-    plants_calls = grouped.get("plants") or []
-    plants_body = response_data(plants_calls[0]) if plants_calls else None
-    if isinstance(plants_body, list) and not items:
-        items = plants_body
+    for call in grouped.get("navigation", []):
+        nav_body = response_data(call)
+        cand_list = nav_body if isinstance(nav_body, list) else ([nav_body] if isinstance(nav_body, dict) else [])
+        for item in cand_list:
+            if not isinstance(item, dict) or item.get("componentType") == "PlantGroup":
+                continue
+            cid = str(item.get("componentId") or item.get("plantId") or "")
+            if cid and cid not in seen_ids:
+                seen_ids.add(cid)
+                plant_items.append(item)
+
+    for call in grouped.get("plants", []):
+        plants_body = response_data(call)
+        cand_list = plants_body if isinstance(plants_body, list) else ([plants_body] if isinstance(plants_body, dict) else [])
+        for item in cand_list:
+            if not isinstance(item, dict) or item.get("componentType") == "PlantGroup":
+                continue
+            cid = str(item.get("componentId") or item.get("plantId") or "")
+            if cid and cid not in seen_ids:
+                seen_ids.add(cid)
+                plant_items.append(item)
 
     stations: list[dict[str, Any]] = []
 
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-        is_plant = item.get("componentType") == "Plant"
-        has_id_only = "componentType" not in item and "componentId" in item
-        if not (is_plant or has_id_only):
-            continue
-        component_id = str(item.get("componentId") or "")
+    for item in plant_items:
+        component_id = str(item.get("componentId") or item.get("plantId") or "")
         if not component_id:
             continue
 
@@ -1993,10 +2006,10 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
         if isinstance(detail, list) and detail:
             detail = detail[0]
         if isinstance(detail, dict):
-            plant_name = str(detail.get("name") or plant_name)
-            capacity_kwp = to_float(detail.get("peakPower")) or to_float(detail.get("nominalPower"))
+            plant_name = str(detail.get("name") or item.get("name") or plant_name)
+            capacity_kwp = to_float(detail.get("peakPower")) or to_float(detail.get("nominalPower")) or to_float(item.get("peakPower"))
         else:
-            capacity_kwp = None
+            capacity_kwp = to_float(item.get("peakPower")) if isinstance(item, dict) else None
 
         power_call = grouped.get(f"sma_plant_power_{component_id}") or grouped.get("gauge_power") or []
         power_body = response_data(power_call[0]) if power_call else {}
@@ -2004,8 +2017,9 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
         max_val = to_float(power_body.get("max")) if isinstance(power_body, dict) else None
         # SMA gauge power is in Watts (W), convert to kW
         current_power_kw = round(power_val / 1000.0, 3) if power_val is not None else 0.0
-        capacity_from_max = round(max_val / 1000.0, 2) if max_val else None
         capacity_kwp = capacity_kwp or capacity_from_max or 15.0
+        if capacity_kwp and capacity_kwp > 500:
+            capacity_kwp = round(capacity_kwp / 1000.0, 2)
 
         # 1. Hourly curve for today (24 hours)
         today_call = grouped.get(f"sma_plant_today_hourly_{component_id}") or []
@@ -2605,7 +2619,7 @@ def scrape_site(
                 calls.append(extra_result)
                 if delay:
                     time.sleep(delay)
-        if site_name == "sma" and call.get("name") == "navigation" and result.get("success"):
+        if site_name == "sma" and call.get("name") in ("navigation", "plants") and result.get("success"):
             for extra_call in sma_extra_plant_calls(site, result):
                 extra_result = replay_call(session, extra_call, timeout)
                 calls.append(extra_result)
