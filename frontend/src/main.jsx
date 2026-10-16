@@ -23,6 +23,16 @@ const REGIONS = [
 
 function getStationRegion(station) {
   if (!station) return "jakut";
+  if (station.region) {
+    const r = String(station.region).toLowerCase();
+    if (r.includes("barat") || r.includes("jakbar")) return "jakbar";
+    if (r.includes("timur") || r.includes("jaktim")) return "jaktim";
+    if (r.includes("utara") || r.includes("jakut")) return "jakut";
+    if (r.includes("selatan") || r.includes("jaksel")) return "jaksel";
+    if (r.includes("pusat") || r.includes("jakpus")) return "jakpus";
+    if (r.includes("seribu")) return "seribu";
+  }
+
   const name = String(station.name || "").toLowerCase();
   const address = String(station.address || "").toLowerCase();
 

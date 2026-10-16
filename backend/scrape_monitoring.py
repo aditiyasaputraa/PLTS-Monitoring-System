@@ -1305,9 +1305,14 @@ def compact_non_null(value: dict[str, Any]) -> dict[str, Any]:
 def build_normalized_site(site_result: dict[str, Any]) -> dict[str, Any]:
     site_name = site_result["site"]
     calls = site_result["calls"]
+    account = site_result.get("account") or {}
+    account_name = str(account.get("name") or "").lower()
     grouped = calls_by_name(calls)
     if site_name == "huawei":
         stations = normalize_huawei_stations(grouped)
+        if account_name in ("secondary", "account_2", "account_3", "jakbar") or "jakbar" in account_name:
+            for st in stations:
+                st["region"] = "Jakarta Barat"
         overview = normalize_huawei_overview(grouped, stations)
         alarms = normalize_huawei_alarms(grouped)
         charts = normalize_huawei_charts(grouped)
@@ -2645,6 +2650,7 @@ def scrape_site(
         "scraped_at": now_iso(),
         "blueprint": str(blueprint_file),
         "session": session_meta,
+        "account": account,
         "summary": {
             "total": len(calls),
             "success_count": sum(1 for item in calls if item["success"]),
