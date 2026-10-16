@@ -843,9 +843,9 @@ function Dashboard({ session, onSignOut }) {
               <span className="pulse-dot" />
               <span>DATA STREAM: {streamTimeWib}</span>
               <span style={{ opacity: 0.4, margin: "0 2px" }}>•</span>
-              <span style={{ color: "#a7f3d0" }}>FUSIONSOLAR</span>
+              <span style={{ color: "#60a5fa" }}>HUAWEI</span>
               <span style={{ color: "#a7f3d0" }}>KEHUA</span>
-              <span style={{ color: "#93c5fd" }}>SMA</span>
+              <span style={{ color: "#f87171" }}>SMA</span>
             </div>
 
             {/* Sync Button */}
