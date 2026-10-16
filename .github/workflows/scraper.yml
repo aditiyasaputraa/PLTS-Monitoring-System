@@ -42,6 +42,9 @@ jobs:
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           HUAWEI_USERNAME: ${{ secrets.HUAWEI_USERNAME }}
           HUAWEI_PASSWORD: ${{ secrets.HUAWEI_PASSWORD }}
+          HUAWEI_USERNAME_2: ${{ secrets.HUAWEI_USERNAME_2 }}
+          HUAWEI_PASSWORD_2: ${{ secrets.HUAWEI_PASSWORD_2 }}
+          HUAWEI_ACCOUNTS_JSON: ${{ secrets.HUAWEI_ACCOUNTS_JSON }}
           KEHUA_USERNAME: ${{ secrets.KEHUA_USERNAME }}
           KEHUA_PASSWORD: ${{ secrets.KEHUA_PASSWORD }}
           KEHUA_USERNAME_2: ${{ secrets.KEHUA_USERNAME_2 }}
@@ -52,6 +55,9 @@ jobs:
           ENABLE_SMA: ${{ secrets.ENABLE_SMA || 'true' }}
           SMA_USERNAME: ${{ secrets.SMA_USERNAME }}
           SMA_PASSWORD: ${{ secrets.SMA_PASSWORD }}
+          SMA_USERNAME_2: ${{ secrets.SMA_USERNAME_2 }}
+          SMA_PASSWORD_2: ${{ secrets.SMA_PASSWORD_2 }}
+          SMA_ACCOUNTS_JSON: ${{ secrets.SMA_ACCOUNTS_JSON }}
           SMA_COOKIES_JSON: ${{ secrets.SMA_COOKIES_JSON }}
           ONESIGNAL_APP_ID: ${{ secrets.ONESIGNAL_APP_ID }}
           ONESIGNAL_REST_API_KEY: ${{ secrets.ONESIGNAL_REST_API_KEY }}
