@@ -107,23 +107,23 @@ function storeSession(session) {
   window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
 }
 
-function readUiState() {
+function clearUiState() {
   try {
-    const stored = JSON.parse(window.localStorage.getItem(UI_STATE_STORAGE_KEY) || "{}");
-    return {
-      activeTab: TABS.includes(stored.activeTab) ? stored.activeTab : "Overview",
-      selectedId: typeof stored.selectedId === "string" ? stored.selectedId : null,
-      selectedRegion: typeof stored.selectedRegion === "string" ? stored.selectedRegion : "all",
-    };
-  } catch {
-    return { activeTab: "Overview", selectedId: null, selectedRegion: "all" };
-  }
+    window.localStorage.removeItem(UI_STATE_STORAGE_KEY);
+  } catch {}
+}
+
+function readUiState() {
+  // Selalu mulai dari menu Dashboard DKI Jakarta saat login atau refresh browser
+  clearUiState();
+  return { activeTab: "Overview", selectedId: null, selectedRegion: "all" };
 }
 
 function writeUiState(updates) {
   try {
+    const current = JSON.parse(window.localStorage.getItem(UI_STATE_STORAGE_KEY) || "{}");
     window.localStorage.setItem(UI_STATE_STORAGE_KEY, JSON.stringify({
-      ...readUiState(),
+      ...current,
       ...updates,
     }));
   } catch {}
@@ -221,12 +221,14 @@ function useAuthSession() {
 
   const signIn = useCallback(async (email, password) => {
     setError(null);
+    clearUiState();
     const nextSession = await signInWithPassword(email, password);
     setSession(nextSession);
     return nextSession;
   }, []);
 
   const signInDemo = useCallback(() => {
+    clearUiState();
     const demoSession = {
       access_token: "local_session_default",
       refresh_token: "local_session_default",
@@ -246,6 +248,7 @@ function useAuthSession() {
 
   const signOut = useCallback(() => {
     storeSession(null);
+    clearUiState();
     setSession(null);
     setError(null);
   }, []);
@@ -715,7 +718,6 @@ function Dashboard({ session, onSignOut }) {
                 className={`nav-tab-btn ${activeTab === tab ? "active" : ""}`}
                 onClick={() => {
                   setActiveTab(tab);
-                  writeUiState({ activeTab: tab });
                   setRegionDropdownOpen(false);
                 }}
               >
