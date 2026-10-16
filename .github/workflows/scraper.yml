@@ -44,6 +44,8 @@ jobs:
           HUAWEI_PASSWORD: ${{ secrets.HUAWEI_PASSWORD }}
           HUAWEI_USERNAME_2: ${{ secrets.HUAWEI_USERNAME_2 }}
           HUAWEI_PASSWORD_2: ${{ secrets.HUAWEI_PASSWORD_2 }}
+          HUAWEI_USERNAME_3: ${{ secrets.HUAWEI_USERNAME_3 }}
+          HUAWEI_PASSWORD_3: ${{ secrets.HUAWEI_PASSWORD_3 }}
           HUAWEI_ACCOUNTS_JSON: ${{ secrets.HUAWEI_ACCOUNTS_JSON }}
           KEHUA_USERNAME: ${{ secrets.KEHUA_USERNAME }}
           KEHUA_PASSWORD: ${{ secrets.KEHUA_PASSWORD }}
@@ -57,6 +59,8 @@ jobs:
           SMA_PASSWORD: ${{ secrets.SMA_PASSWORD }}
           SMA_USERNAME_2: ${{ secrets.SMA_USERNAME_2 }}
           SMA_PASSWORD_2: ${{ secrets.SMA_PASSWORD_2 }}
+          SMA_USERNAME_3: ${{ secrets.SMA_USERNAME_3 }}
+          SMA_PASSWORD_3: ${{ secrets.SMA_PASSWORD_3 }}
           SMA_ACCOUNTS_JSON: ${{ secrets.SMA_ACCOUNTS_JSON }}
           SMA_COOKIES_JSON: ${{ secrets.SMA_COOKIES_JSON }}
           ONESIGNAL_APP_ID: ${{ secrets.ONESIGNAL_APP_ID }}

@@ -566,15 +566,16 @@ def load_huawei_accounts_from_env() -> list[dict[str, Any]]:
             "use_shared_cookies": True,
         })
 
-    second_username = os.getenv("HUAWEI_USERNAME_2", "").strip()
-    second_password = os.getenv("HUAWEI_PASSWORD_2", "").strip()
-    if second_username and second_password:
-        accounts.append({
-            "name": "secondary",
-            "username": second_username,
-            "password": second_password,
-            "use_shared_cookies": False,
-        })
+    for index in range(2, 10):
+        second_username = os.getenv(f"HUAWEI_USERNAME_{index}", "").strip()
+        second_password = os.getenv(f"HUAWEI_PASSWORD_{index}", "").strip()
+        if second_username and second_password:
+            accounts.append({
+                "name": f"account_{index}",
+                "username": second_username,
+                "password": second_password,
+                "use_shared_cookies": False,
+            })
 
     raw = os.getenv("HUAWEI_ACCOUNTS_JSON", "").strip()
     if raw:
@@ -619,15 +620,16 @@ def load_sma_accounts_from_env() -> list[dict[str, Any]]:
             "use_shared_cookies": True,
         })
 
-    second_username = os.getenv("SMA_USERNAME_2", "").strip()
-    second_password = os.getenv("SMA_PASSWORD_2", "").strip()
-    if second_username and second_password:
-        accounts.append({
-            "name": "secondary",
-            "username": second_username,
-            "password": second_password,
-            "use_shared_cookies": False,
-        })
+    for index in range(2, 10):
+        second_username = os.getenv(f"SMA_USERNAME_{index}", "").strip()
+        second_password = os.getenv(f"SMA_PASSWORD_{index}", "").strip()
+        if second_username and second_password:
+            accounts.append({
+                "name": f"account_{index}",
+                "username": second_username,
+                "password": second_password,
+                "use_shared_cookies": False,
+            })
 
     raw = os.getenv("SMA_ACCOUNTS_JSON", "").strip()
     if raw:
