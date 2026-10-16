@@ -532,7 +532,13 @@ function Dashboard({ session, onSignOut }) {
   }, [allLocations, selectedRegion]);
 
   useEffect(() => {
-    if (!locations.length) return;
+    if (!locations.length) {
+      if (selectedId !== null) {
+        setSelectedId(null);
+        writeUiState({ selectedId: null });
+      }
+      return;
+    }
     if (!selectedId || !locations.some((l) => l.uid === selectedId)) {
       const firstLoc = locations[0];
       setSelectedId(firstLoc.uid);
@@ -540,7 +546,7 @@ function Dashboard({ session, onSignOut }) {
     }
   }, [locations, selectedId]);
 
-  const selected = locations.find((l) => l.uid === selectedId) || locations[0] || allLocations[0] || {};
+  const selected = locations.find((l) => l.uid === selectedId) || locations[0] || null;
   const fleet = useMemo(() => buildFleet(sites, locations), [sites, locations]);
 
   const [regionDropdownOpen, setRegionDropdownOpen] = useState(false);
@@ -977,25 +983,26 @@ function Dashboard({ session, onSignOut }) {
 }
 
 function OverviewView({ fleet, selected, locations, onSelect, updatedAt }) {
-  // Current live power calculations
-  const totalPowerNow = fleet.current > 0 ? fleet.current : 13.7;
-  const currentMonthKwh = fleet.monthly > 0 ? fleet.monthly : 1153;
-  const currentTotalIncome = fleet.totalIncome > 0 ? fleet.totalIncome : 84520705;
+  const hasLocations = Boolean(locations && locations.length > 0);
+
+  // Current live power calculations - 0 if no locations in this region
+  const totalPowerNow = hasLocations ? (fleet.current > 0 ? fleet.current : 0) : 0;
+  const currentMonthKwh = hasLocations ? (fleet.monthly > 0 ? fleet.monthly : 0) : 0;
+  const currentTotalIncome = hasLocations ? (fleet.totalIncome > 0 ? fleet.totalIncome : 0) : 0;
 
   const siteTodayEnergies = useMemo(() => {
-    const fallbacks = [1.7, 1.5, 3.1, 0.08, 0.08, 4.1];
-    return locations.map((loc, idx) => {
-      const realVal = Number(loc.today_energy_kwh ?? loc.daily_energy_kwh ?? 0);
-      return realVal > 0 ? realVal : (fallbacks[idx % fallbacks.length] || 1.5);
+    if (!hasLocations) return [];
+    return locations.map((loc) => {
+      return Number(loc.today_energy_kwh ?? loc.daily_energy_kwh ?? 0);
     });
-  }, [locations]);
+  }, [locations, hasLocations]);
 
-  const highestTodayEnergy = Math.round(Math.max(...siteTodayEnergies, 4));
-  const latestTodayEnergy = Math.round(
-    Number(selected?.today_energy_kwh ?? selected?.daily_energy_kwh ?? 0) > 0
-      ? Number(selected.today_energy_kwh ?? selected.daily_energy_kwh)
-      : (siteTodayEnergies[siteTodayEnergies.length - 1] ?? 4)
-  );
+  const highestTodayEnergy = hasLocations && siteTodayEnergies.length > 0
+    ? Math.round(Math.max(...siteTodayEnergies, 0))
+    : 0;
+  const latestTodayEnergy = hasLocations && selected
+    ? Math.round(Number(selected?.today_energy_kwh ?? selected?.daily_energy_kwh ?? 0))
+    : 0;
 
   return (
     <>
@@ -1065,9 +1072,11 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt }) {
         <div className="dashboard-card selected-site-map-card">
           <div className="mini-map-preview">
             <span className="mini-map-badge">
-              {selected?.address?.toLowerCase().includes("timur") || selected?.name?.includes("JAKTIM")
-                ? "EAST JAKARTA"
-                : "NORTH JAKARTA"}
+              {selected
+                ? (selected?.address?.toLowerCase().includes("timur") || selected?.name?.includes("JAKTIM")
+                    ? "EAST JAKARTA"
+                    : "NORTH JAKARTA")
+                : "TIDAK ADA PLTS"}
             </span>
             <MiniStationMap location={selected} />
           </div>
@@ -1075,21 +1084,27 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt }) {
           <div className="site-detail-bottom">
             <span className="card-eyebrow">SELECTED SITE</span>
             <div className="site-name-status-row">
-              <span className="site-selected-title">{selected?.name || "SDN 09 JAKUT"}</span>
-              {selected?.status === "offline" || selected?.status === "disconnected" ? (
-                <span className="offline-pill">
-                  <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#ef4444" }} />
-                  Offline
-                </span>
+              <span className="site-selected-title">{selected?.name || "Belum Ada PLTS Terpasang"}</span>
+              {selected ? (
+                selected?.status === "offline" || selected?.status === "disconnected" ? (
+                  <span className="offline-pill">
+                    <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#ef4444" }} />
+                    Offline
+                  </span>
+                ) : (
+                  <span className="online-pill">
+                    <span className="pulse-dot" style={{ width: "5px", height: "5px" }} />
+                    Online
+                  </span>
+                )
               ) : (
-                <span className="online-pill">
-                  <span className="pulse-dot" style={{ width: "5px", height: "5px" }} />
-                  Online
+                <span className="offline-pill" style={{ background: "rgba(255,255,255,0.08)", color: "#a3b8aa", border: "1px solid rgba(255,255,255,0.12)" }}>
+                  Kosong
                 </span>
               )}
             </div>
             <div className="site-geo-row">
-              <span>📍 {selected?.address || (selected?.name?.includes("JAKTIM") ? "Jakarta Timur" : "Jakarta Utara")}</span>
+              <span>📍 {selected ? (selected?.address || (selected?.name?.includes("JAKTIM") ? "Jakarta Timur" : "Jakarta Utara")) : "Tidak ada unit PLTS di wilayah ini"}</span>
               {selected?.latitude && selected?.longitude && (
                 <a
                   className="coords-link"
@@ -1145,7 +1160,7 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt }) {
                 <FlashIcon style={{ width: "12px", height: "12px", color: "#10b981" }} />
               </div>
               <div className="total-stat-num">
-                {formatNumber(selected?.current_power_kw ?? selected?.output_power_kw ?? selected?.inverter_power_kw ?? 0, 1)} <small>kW</small>
+                {formatNumber(selected ? (selected?.current_power_kw ?? selected?.output_power_kw ?? selected?.inverter_power_kw ?? 0) : 0, 1)} <small>kW</small>
               </div>
             </div>
 
@@ -1155,7 +1170,7 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt }) {
                 <TrendUpIcon style={{ width: "12px", height: "12px", color: "#10b981" }} />
               </div>
               <div className="total-stat-num">
-                {formatNumber(selected?.monthly_energy_kwh ?? 248, 0)} <small>kWh</small>
+                {formatNumber(selected ? (selected?.monthly_energy_kwh ?? 0) : 0, 0)} <small>kWh</small>
               </div>
             </div>
 
@@ -1165,7 +1180,7 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt }) {
                 <SolarIcon style={{ width: "12px", height: "12px", color: "#10b981" }} />
               </div>
               <div className="total-stat-num">
-                {formatNumber(selected?.cumulative_energy_kwh ?? 49670, 0)} <small>kWh</small>
+                {formatNumber(selected ? (selected?.cumulative_energy_kwh ?? 0) : 0, 0)} <small>kWh</small>
               </div>
             </div>
 
@@ -1175,7 +1190,7 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt }) {
                 <LeafIcon style={{ width: "12px", height: "12px", color: "#10b981" }} />
               </div>
               <div className="total-stat-num">
-                {formatNumber(selected?.cumulative_income ?? (Number(selected?.cumulative_energy_kwh || 0) * 900), 0)} <small>IDR</small>
+                {formatNumber(selected ? (selected?.cumulative_income ?? (Number(selected?.cumulative_energy_kwh || 0) * 900)) : 0, 0)} <small>IDR</small>
               </div>
             </div>
           </div>
@@ -1217,7 +1232,7 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt }) {
               <div className="kpi-mini-card">
                 <span className="kpi-mini-label">DAILY ENERGY</span>
                 <div className="kpi-mini-val">
-                  {formatNumber(fleet.daily > 0 ? fleet.daily : 7.9, 1)} <small>kWh</small>
+                  {formatNumber(hasLocations ? (fleet.daily > 0 ? fleet.daily : 0) : 0, 1)} <small>kWh</small>
                 </div>
               </div>
 
@@ -1231,7 +1246,7 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt }) {
               <div className="kpi-mini-card">
                 <span className="kpi-mini-label">YEARLY ENERGY</span>
                 <div className="kpi-mini-val">
-                  {formatNumber(fleet.yearly > 0 ? fleet.yearly : 73786, 0)} <small>kWh</small>
+                  {formatNumber(hasLocations ? (fleet.yearly > 0 ? fleet.yearly : 0) : 0, 0)} <small>kWh</small>
                 </div>
               </div>
 
@@ -1295,37 +1310,37 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt }) {
             <div className="spec-row">
               <span className="spec-label">Station</span>
               <span className="spec-val" style={{ maxWidth: "160px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {selected?.name || "SDN 09 JAKUT"}
+                {selected?.name || "—"}
               </span>
             </div>
             <div className="spec-row">
               <span className="spec-label">Power</span>
-              <span className="spec-val">{formatNumber(selected?.current_power_kw ?? selected?.output_power_kw ?? selected?.inverter_power_kw ?? 0, 1)} kW</span>
+              <span className="spec-val">{formatNumber(selected ? (selected?.current_power_kw ?? selected?.output_power_kw ?? selected?.inverter_power_kw ?? 0) : 0, 1)} kW</span>
             </div>
             <div className="spec-row">
               <span className="spec-label">Status</span>
-              <span className={`spec-val ${selected?.status === "offline" || selected?.status === "disconnected" ? "offline" : (selected?.status === "abnormal" ? "abnormal" : "normal")}`}>
-                {selected?.status || "normal"}
+              <span className={`spec-val ${selected ? (selected?.status === "offline" || selected?.status === "disconnected" ? "offline" : (selected?.status === "abnormal" ? "abnormal" : "normal")) : ""}`}>
+                {selected?.status || "—"}
               </span>
             </div>
             <div className="spec-row">
               <span className="spec-label">Capacity</span>
-              <span className="spec-val">{formatNumber(selected?.capacity_kwp ?? selected?.installed_capacity ?? 15, 0)} kWp</span>
+              <span className="spec-val">{formatNumber(selected ? (selected?.capacity_kwp ?? selected?.installed_capacity ?? 0) : 0, 0)} kWp</span>
             </div>
             <div className="spec-row">
               <span className="spec-label">Platform</span>
-              <span className="spec-val" style={{ textTransform: "capitalize" }}>{selected?.source || "kehua"}</span>
+              <span className="spec-val" style={{ textTransform: "capitalize" }}>{selected?.source || "—"}</span>
             </div>
             <div className="spec-row">
               <span className="spec-label">Station ID</span>
-              <span className="spec-val">{selected?.id || "17483"}</span>
+              <span className="spec-val">{selected?.id || "—"}</span>
             </div>
           </div>
 
           <div className="spec-address-box">
             <span className="spec-address-label">Address</span>
             <p className="spec-address-text">
-              {selected?.address || "Jl. Cemp. 1 No.Rt 09/03, no 69, RT.10/RW.6, Sunter Agung, Kec. Tj. Priok, Kota Jkt Utara, Daerah Khusus Ibukota Jakarta 14350, Indonesia"}
+              {selected?.address || (hasLocations ? "Alamat tidak tersedia" : "Belum ada unit PLTS di wilayah ini.")}
             </p>
           </div>
         </div>
@@ -1375,6 +1390,28 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt }) {
 /* ==================== CHARTS COMPONENTS ==================== */
 
 function LiveCurveChart({ powerNow }) {
+  if (!powerNow || powerNow <= 0) {
+    return (
+      <div style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        height: "130px",
+        color: "#6e8074",
+        fontSize: "12px",
+        textAlign: "center",
+        background: "#fafbfa",
+        borderRadius: "8px",
+        border: "1px dashed #d1ded4",
+      }}>
+        <span style={{ fontSize: "20px", marginBottom: "4px" }}>⚡</span>
+        <strong style={{ color: "#2d3d32" }}>0.0 kW</strong>
+        <span style={{ fontSize: "11px", color: "#8a9e90" }}>Tidak ada daya aktif saat ini</span>
+      </div>
+    );
+  }
+
   // 5-minute curve representation from 06:00 to 18:00
   const points = useMemo(() => [
     { time: "06:00", val: 0.1 },
@@ -1454,6 +1491,29 @@ function LiveCurveChart({ powerNow }) {
 }
 
 function MonthlyProductionChart({ currentMonthKwh }) {
+  if (!currentMonthKwh || currentMonthKwh <= 0) {
+    return (
+      <div style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        height: "180px",
+        color: "#6e8074",
+        fontSize: "12px",
+        textAlign: "center",
+        background: "#fafbfa",
+        borderRadius: "8px",
+        border: "1px dashed #d1ded4",
+        marginTop: "10px",
+      }}>
+        <span style={{ fontSize: "22px", marginBottom: "4px" }}>📊</span>
+        <strong style={{ color: "#2d3d32" }}>Belum Ada Data Produksi</strong>
+        <span style={{ fontSize: "11px", color: "#8a9e90" }}>0 kWh tercatat untuk wilayah ini</span>
+      </div>
+    );
+  }
+
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const currentMonthIdx = new Date().getMonth(); // 9 for Oct
   const baseValues = [8.5, 9.8, 10.2, 8.9, 11.0, 11.2, 11.5, 12.0, 12.8, 11.4, 10.8, 11.2];
@@ -1680,8 +1740,8 @@ function TodayEnergyBySiteChart({ locations, selectedId, onSelect }) {
 function MiniStationMap({ location }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
-  const lat = Number(location?.latitude) || -6.12775;
-  const lng = Number(location?.longitude) || 106.858751;
+  const lat = Number(location?.latitude) || -6.2088;
+  const lng = Number(location?.longitude) || 106.8456;
   const isOffline = location?.status === "offline" || location?.status === "disconnected";
 
   useEffect(() => {
@@ -1691,7 +1751,7 @@ function MiniStationMap({ location }) {
         container: containerRef.current,
         style: OPENFREEMAP_STYLE,
         center: [lng, lat],
-        zoom: 15,
+        zoom: location ? 15 : 10.5,
         interactive: true,
         attributionControl: false,
       });
@@ -1704,9 +1764,11 @@ function MiniStationMap({ location }) {
       map.dragPan.enable();
       map.doubleClickZoom.enable();
 
-      const el = document.createElement("div");
-      el.className = `station-map-marker ${isOffline ? "offline" : "online"} selected`;
-      new maplibregl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
+      if (location && Number(location?.latitude) && Number(location?.longitude)) {
+        const el = document.createElement("div");
+        el.className = `station-map-marker ${isOffline ? "offline" : "online"} selected`;
+        new maplibregl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
+      }
 
       mapRef.current = map;
 
@@ -1720,7 +1782,7 @@ function MiniStationMap({ location }) {
         mapRef.current = null;
       };
     } catch (_) {}
-  }, [lat, lng, isOffline]);
+  }, [lat, lng, isOffline, Boolean(location)]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -1745,8 +1807,8 @@ function FullFleetMap({ locations, selectedId, onSelect }) {
       const map = new maplibregl.Map({
         container: containerRef.current,
         style: OPENFREEMAP_STYLE,
-        center: [106.91, -6.13],
-        zoom: 12,
+        center: [106.8456, -6.2088],
+        zoom: 11,
         attributionControl: false,
       });
 
@@ -1766,6 +1828,11 @@ function FullFleetMap({ locations, selectedId, onSelect }) {
 
     markersRef.current.forEach((m) => m.remove());
     markersRef.current.clear();
+
+    if (!locations || locations.length === 0) {
+      map.flyTo({ center: [106.8456, -6.2088], zoom: 10.5 });
+      return;
+    }
 
     const bounds = new maplibregl.LngLatBounds();
     locations.forEach((loc) => {
@@ -2024,7 +2091,49 @@ function EnergyProductionChart({ series, period }) {
   );
 }
 
+function EmptyRegionView({ title }) {
+  return (
+    <div style={{
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      minHeight: "360px",
+      background: "#ffffff",
+      borderRadius: "16px",
+      border: "1px dashed #cbd5cb",
+      padding: "48px 24px",
+      textAlign: "center",
+      margin: "24px 0",
+      boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+    }}>
+      <div style={{
+        width: "56px",
+        height: "56px",
+        borderRadius: "50%",
+        background: "rgba(16, 185, 129, 0.1)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: "26px",
+        marginBottom: "14px",
+      }}>
+        📍
+      </div>
+      <h3 style={{ fontSize: "17px", fontWeight: 700, color: "#16231a", margin: "0 0 6px" }}>
+        Belum Ada PLTS di Wilayah Ini
+      </h3>
+      <p style={{ fontSize: "13px", color: "#6e8074", maxWidth: "420px", margin: 0, lineHeight: 1.5 }}>
+        Tidak ada data {title || "monitoring"} yang dapat ditampilkan karena belum ada instalasi PLTS terpasang di wilayah ini. Silakan pilih "All Regions" atau wilayah lain pada menu di atas.
+      </p>
+    </div>
+  );
+}
+
 function EnergyView({ location, fleet, locations }) {
+  if (!locations || locations.length === 0) {
+    return <EmptyRegionView title="energi" />;
+  }
   const [period, setPeriod] = useState("today");
 
   const activeStation = location || locations?.[0] || {};
@@ -2471,6 +2580,9 @@ function RevenueProductionChart({ series, period, isKehua }) {
 }
 
 function RevenueView({ location, fleet, locations }) {
+  if (!locations || locations.length === 0) {
+    return <EmptyRegionView title="pendapatan (revenue)" />;
+  }
   const [period, setPeriod] = useState("year");
 
   const activeStation = location || locations.find((l) => l.source === "huawei") || locations?.[0] || {};
@@ -2483,9 +2595,9 @@ function RevenueView({ location, fleet, locations }) {
   const yearRev = Number(activeStation.yearly_income) || Math.round(Number(activeStation.yearly_energy_kwh || 0) * 900);
   const lifetimeRev = Number(activeStation.cumulative_income ?? activeStation.total_income) || Math.round(Number(activeStation.cumulative_energy_kwh || 0) * 900);
 
-  const fleetMonthRev = Number(fleet.monthlyIncome || 893619);
-  const fleetYearRev = Number(fleet.yearlyIncome || 75428228);
-  const fleetTotalRev = Number(fleet.totalIncome || 84786673);
+  const fleetMonthRev = Number(fleet.monthlyIncome || 0);
+  const fleetYearRev = Number(fleet.yearlyIncome || 0);
+  const fleetTotalRev = Number(fleet.totalIncome || 0);
 
   const series = useMemo(() => getRevenueSeries(activeStation, period), [activeStation, period]);
 
@@ -2941,6 +3053,9 @@ function EmissionProductionChart({ series, period }) {
 }
 
 function EmissionView({ location, fleet, locations }) {
+  if (!locations || locations.length === 0) {
+    return <EmptyRegionView title="reduksi emisi CO₂" />;
+  }
   const [period, setPeriod] = useState("year");
 
   const activeStation = location || locations.find((l) => l.source === "huawei") || locations?.[0] || {};
@@ -2960,9 +3075,9 @@ function EmissionView({ location, fleet, locations }) {
   const lifetimeEmissionKg = lifetimeKwh * EMISSION_FACTOR;
 
   // Fleet totals
-  const fleetMonthlyKwh = Number(fleet.monthly || 1153);
-  const fleetYearlyKwh = Number(fleet.yearly || 73786);
-  const fleetCumulativeKwh = Number(fleet.cumulative || 106000);
+  const fleetMonthlyKwh = Number(fleet.monthly || 0);
+  const fleetYearlyKwh = Number(fleet.yearly || 0);
+  const fleetCumulativeKwh = Number(fleet.cumulative || 0);
 
   const fleetMonthEmissionKg = fleetMonthlyKwh * EMISSION_FACTOR;
   const fleetYearEmissionKg = fleetYearlyKwh * EMISSION_FACTOR;
@@ -3202,21 +3317,39 @@ function EmissionView({ location, fleet, locations }) {
 /* ==================== DATA BUILDERS & HELPERS ==================== */
 
 function buildFleet(sites, locations) {
+  if (!locations || locations.length === 0) {
+    return {
+      stations: 0,
+      platforms: 0,
+      offline: 0,
+      capacity: 0,
+      current: 0,
+      daily: 0,
+      monthly: 0,
+      yearly: 0,
+      cumulative: 0,
+      lifetime: 0,
+      totalIncome: 0,
+      monthlyIncome: 0,
+      yearlyIncome: 0,
+    };
+  }
+
   const overview = sites.map((s) => s.overview || {});
-  const capacity = locations.reduce((sum, l) => sum + (Number(l.capacity_kwp || l.installed_capacity) || 0), 0) || 126.8;
+  const capacity = locations.reduce((sum, l) => sum + (Number(l.capacity_kwp || l.installed_capacity) || 0), 0);
   const current = locations.reduce((sum, l) => sum + (Number(l.current_power_kw ?? l.output_power_kw ?? l.inverter_power_kw) || 0), 0);
-  const daily = locations.reduce((sum, l) => sum + (Number(l.today_energy_kwh || l.daily_energy_kwh) || 0), 0) || 7.9;
-  const monthly = locations.reduce((sum, l) => sum + (Number(l.monthly_energy_kwh) || 0), 0) || overview.reduce((sum, o) => sum + (Number(o.monthly_energy_kwh) || 0), 0) || 1153;
-  const yearly = locations.reduce((sum, l) => sum + (Number(l.yearly_energy_kwh) || 0), 0) || overview.reduce((sum, o) => sum + (Number(o.yearly_energy_kwh) || 0), 0) || 73786;
-  const cumulative = locations.reduce((sum, l) => sum + (Number(l.cumulative_energy_kwh) || 0), 0) || overview.reduce((sum, o) => sum + (Number(o.cumulative_energy_kwh) || 0), 0) || 106000;
-  const totalIncome = locations.reduce((sum, l) => sum + (Number(l.cumulative_income) || 0), 0) || overview.reduce((sum, o) => sum + (Number(o.cumulative_income) || 0), 0) || 84520705;
-  const monthlyIncome = locations.reduce((sum, l) => sum + (Number(l.monthly_income) || 0), 0) || overview.reduce((sum, o) => sum + (Number(o.monthly_income) || 0), 0) || 893619;
-  const yearlyIncome = locations.reduce((sum, l) => sum + (Number(l.yearly_income) || 0), 0) || overview.reduce((sum, o) => sum + (Number(o.yearly_income) || 0), 0) || 75428228;
+  const daily = locations.reduce((sum, l) => sum + (Number(l.today_energy_kwh || l.daily_energy_kwh) || 0), 0);
+  const monthly = locations.reduce((sum, l) => sum + (Number(l.monthly_energy_kwh) || 0), 0);
+  const yearly = locations.reduce((sum, l) => sum + (Number(l.yearly_energy_kwh) || 0), 0);
+  const cumulative = locations.reduce((sum, l) => sum + (Number(l.cumulative_energy_kwh) || 0), 0);
+  const totalIncome = locations.reduce((sum, l) => sum + (Number(l.cumulative_income) || 0), 0);
+  const monthlyIncome = locations.reduce((sum, l) => sum + (Number(l.monthly_income) || 0), 0);
+  const yearlyIncome = locations.reduce((sum, l) => sum + (Number(l.yearly_income) || 0), 0);
 
   return {
-    stations: locations.length || 6,
-    platforms: sites.length || 2,
-    offline: locations.filter((l) => l.status === "offline").length,
+    stations: locations.length,
+    platforms: new Set(locations.map((l) => l.source).filter(Boolean)).size,
+    offline: locations.filter((l) => l.status === "offline" || l.status === "disconnected").length,
     capacity,
     current,
     daily,
