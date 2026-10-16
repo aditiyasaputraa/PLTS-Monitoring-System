@@ -23,23 +23,27 @@ const REGIONS = [
 
 function getStationRegion(station) {
   if (!station) return "jakut";
-  const str = `${station.name || ""} ${station.address || ""}`.toLowerCase();
-  if (str.includes("timur") || str.includes("jaktim") || str.includes("duren sawit") || str.includes("ciracas") || str.includes("klender") || str.includes("pondok bambu")) {
+  const name = String(station.name || "").toLowerCase();
+  const address = String(station.address || "").toLowerCase();
+
+  // Jakarta Timur (SMA Platform: SMPN 51, SMPN 213, SMPN 255, SMAN 105)
+  if (
+    name.includes("jaktim") ||
+    name.includes("smpn 51") ||
+    name.includes("smpn 213") ||
+    name.includes("smpn 255") ||
+    name.includes("sman 105") ||
+    address.includes("jakarta timur") ||
+    address.includes("jaktim") ||
+    address.includes("duren sawit") ||
+    address.includes("ciracas") ||
+    address.includes("klender") ||
+    address.includes("pondok bambu")
+  ) {
     return "jaktim";
   }
-  if (str.includes("barat") || str.includes("jakbar")) {
-    return "jakbar";
-  }
-  if (str.includes("pusat") || str.includes("jakpus")) {
-    return "jakpus";
-  }
-  if (str.includes("selatan") || str.includes("jaksel")) {
-    return "jaksel";
-  }
-  if (str.includes("seribu")) {
-    return "seribu";
-  }
-  // Default Northern Jakarta if Tj Priok, Sunter, Cilincing, Koja, Jakut, or Huawei/Kehua
+
+  // Jakarta Utara (Kehua & Huawei: SDN 09, SMPN 282, GOR Sekda, SDN Rawa Badak, SMAN 75, SDN Sukapura 02)
   return "jakut";
 }
 
