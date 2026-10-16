@@ -525,7 +525,8 @@ function Dashboard({ session, onSignOut }) {
     return sites.flatMap((site) => (site.stations || []).map((station) => {
       const id = String(station.station_id || station.station_numeric_id || station.id);
       const name = station.station_name || station.name || `Station ${id}`;
-      const isAutoTariff = ["kehua", "sma"].includes((site.platform || "").toLowerCase());
+      const hasVendorIncome = Boolean(station.daily_income || station.monthly_income || station.yearly_income || station.cumulative_income);
+      const isAutoTariff = ["kehua", "sma"].includes((site.platform || "").toLowerCase()) || !hasVendorIncome;
 
       const dailyKwh = Number(station.today_energy_kwh ?? station.daily_energy_kwh ?? 0);
       const monthlyKwh = Number(station.monthly_energy_kwh ?? 0);
@@ -2658,7 +2659,8 @@ function RevenueView({ location, fleet, locations }) {
   const activeStation = location || (hasLocations ? (locations.find((l) => l.source === "huawei") || locations[0]) : null);
   const stationName = activeStation?.name || (hasLocations ? "Pilih PLTS" : "Tidak Ada PLTS");
   const platformName = activeStation?.source || "—";
-  const isAutoTariff = ["kehua", "sma"].includes((activeStation?.source || "").toLowerCase());
+  const hasVendorIncome = Boolean(activeStation?.daily_income || activeStation?.monthly_income || activeStation?.yearly_income || activeStation?.cumulative_income);
+  const isAutoTariff = ["kehua", "sma"].includes((activeStation?.source || "").toLowerCase()) || !hasVendorIncome;
 
   const todayRev = Number(activeStation?.daily_income) || Math.round(Number(activeStation?.daily_energy_kwh || activeStation?.today_energy_kwh || 0) * 900);
   const monthRev = Number(activeStation?.monthly_income) || Math.round(Number(activeStation?.monthly_energy_kwh || 0) * 900);

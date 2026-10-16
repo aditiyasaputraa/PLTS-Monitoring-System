@@ -108,6 +108,21 @@ test("maps Huawei revenue periods to daily, monthly, and yearly vendor series", 
   assert.deepEqual(getRevenueSeries(huawei, "lifetime").values, [18000, 4300]);
 });
 
+test("calculates Huawei revenue series automatically when vendor revenue charts are missing", () => {
+  const huaweiWithoutRevCharts = {
+    ...huawei,
+    energy_charts: {
+      daily: { labels: ["01", "02", "03"], values: [12, 14, 16] },
+    },
+    revenue_charts: null,
+  };
+  const seriesMonth = getRevenueSeries(huaweiWithoutRevCharts, "month");
+  assert.equal(seriesMonth.available, true);
+  assert.equal(seriesMonth.unit, "IDR");
+  assert.deepEqual(seriesMonth.values, [10800, 12600, 14400]); // [12, 14, 16] * 900
+  assert.match(seriesMonth.caption, /Rp 900\/kWh/);
+});
+
 test("calculates Kehua revenue series automatically at Rp 900/kWh", () => {
   const seriesYear = getRevenueSeries(kehua, "year");
   assert.equal(seriesYear.available, true);

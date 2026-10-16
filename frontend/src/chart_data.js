@@ -342,7 +342,7 @@ export function getRevenueSeries(location, period) {
   }
 
 
-  return chartSeries(config?.chart, {
+  const vendorSeries = chartSeries(config?.chart, {
     unit,
     kind: "bar",
     title: config?.title || "Revenue history",
@@ -351,6 +351,31 @@ export function getRevenueSeries(location, period) {
       ? "Daily revenue history is not available for the selected Huawei month yet."
       : "Revenue history is unavailable for this period.",
   });
+
+  if (vendorSeries && vendorSeries.available) {
+    return vendorSeries;
+  }
+
+  // Fallback for Huawei stations without vendor revenue charts (e.g. unconfigured tariff): calculate at Rp 900/kWh
+  const energySeries = getEnergySeries(location, period);
+  if (energySeries && energySeries.available !== false && Array.isArray(energySeries.values) && energySeries.values.some((v) => v !== null)) {
+    const isMwh = (energySeries.unit || "").toUpperCase() === "MWH";
+    const multiplier = isMwh ? (900 * 1000) : 900;
+    const revValues = energySeries.values.map((v) =>
+      v !== null && v !== undefined ? Math.round(Number(v) * multiplier) : null
+    );
+    return {
+      labels: energySeries.labels || [],
+      values: revValues,
+      unit: "IDR",
+      kind: "bar",
+      title: config?.title || "Revenue history",
+      caption: (energySeries.caption ? `${energySeries.caption} · ` : "") + "Dihitung otomatis (Rp 900/kWh)",
+      available: true,
+    };
+  }
+
+  return vendorSeries;
 }
 
 export function getEmissionSeries(location, period) {
