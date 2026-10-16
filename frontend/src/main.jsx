@@ -472,7 +472,6 @@ function Dashboard({ session, onSignOut }) {
   const [selectedRegion, setSelectedRegion] = useState(() => readUiState().selectedRegion || "all");
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncNotice, setSyncNotice] = useState(null);
-  const [regionDropdownOpen, setRegionDropdownOpen] = useState(false);
 
   const sites = useMemo(() => {
     if (!data?.by_site) return [];
@@ -540,15 +539,20 @@ function Dashboard({ session, onSignOut }) {
   const selected = locations.find((l) => l.uid === selectedId) || locations[0] || allLocations[0] || {};
   const fleet = useMemo(() => buildFleet(sites, locations), [sites, locations]);
 
+  const [regionDropdownOpen, setRegionDropdownOpen] = useState(false);
+  const [siteDropdownOpen, setSiteDropdownOpen] = useState(false);
+
   const handleSelectSite = useCallback((uid) => {
     setSelectedId(uid);
     writeUiState({ selectedId: uid });
+    setSiteDropdownOpen(false);
   }, []);
 
   const handleSelectRegion = useCallback((regionId) => {
     setSelectedRegion(regionId);
     writeUiState({ selectedRegion: regionId });
     setRegionDropdownOpen(false);
+    setActiveTab("Overview");
   }, []);
 
   const handleSyncNow = useCallback(async () => {
@@ -599,65 +603,36 @@ function Dashboard({ session, onSignOut }) {
           </div>
 
           <nav className="nav-tabs">
-            {TABS.map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                className={`nav-tab-btn ${activeTab === tab ? "active" : ""}`}
-                onClick={() => {
-                  setActiveTab(tab);
-                  writeUiState({ activeTab: tab });
-                }}
-              >
-                <span>{tab}</span>
-                {activeTab === tab && <span className="tab-active-dot" />}
-              </button>
-            ))}
-          </nav>
-
-          <div className="top-nav-controls">
-            {/* Region Dropdown */}
+            {/* Region Dropdown as the First Tab */}
             <div style={{ position: "relative" }}>
               <button
                 type="button"
-                className="site-picker-btn"
+                className={`nav-tab-btn ${activeTab === "Overview" ? "active" : ""}`}
                 onClick={() => setRegionDropdownOpen(!regionDropdownOpen)}
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
-                  gap: "7px",
-                  background: selectedRegion !== "all" ? "rgba(16, 185, 129, 0.2)" : "rgba(255, 255, 255, 0.08)",
-                  border: selectedRegion !== "all" ? "1px solid rgba(16, 185, 129, 0.45)" : "1px solid rgba(255, 255, 255, 0.12)",
-                  color: selectedRegion !== "all" ? "#34d399" : "#e5ede7",
+                  gap: "6px",
+                  cursor: "pointer",
                 }}
               >
-                <span
-                  style={{
-                    width: "7px",
-                    height: "7px",
-                    borderRadius: "50%",
-                    flexShrink: 0,
-                    background: "#10b981",
-                    boxShadow: "0 0 6px rgba(16, 185, 129, 0.7)",
-                  }}
-                />
-                <span style={{ fontWeight: 700 }}>
-                  {REGIONS.find((r) => r.id === selectedRegion)?.name || "All Regions"}
-                </span>
-                <span style={{ fontSize: "10px", opacity: 0.6 }}>▾</span>
+                <span>{REGIONS.find((r) => r.id === selectedRegion)?.name || "All Regions"}</span>
+                <span style={{ fontSize: "9px", opacity: 0.7, transform: regionDropdownOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>▾</span>
+                {activeTab === "Overview" && <span className="tab-active-dot" />}
               </button>
+
               {regionDropdownOpen && (
                 <div style={{
                   position: "absolute",
                   top: "100%",
-                  right: 0,
+                  left: 0,
                   marginTop: "6px",
                   background: "#111a14",
                   border: "1px solid rgba(255,255,255,0.12)",
                   borderRadius: "12px",
                   boxShadow: "0 10px 25px rgba(0,0,0,0.5)",
-                  width: "210px",
-                  zIndex: 200,
+                  width: "215px",
+                  zIndex: 300,
                   overflow: "hidden",
                   padding: "5px",
                 }}>
@@ -718,6 +693,135 @@ function Dashboard({ session, onSignOut }) {
                       </button>
                     );
                   })}
+                </div>
+              )}
+            </div>
+
+            {/* Other Tabs: Energy, Revenue, Emission */}
+            {TABS.filter((t) => t !== "Overview").map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                className={`nav-tab-btn ${activeTab === tab ? "active" : ""}`}
+                onClick={() => {
+                  setActiveTab(tab);
+                  writeUiState({ activeTab: tab });
+                  setRegionDropdownOpen(false);
+                }}
+              >
+                <span>{tab}</span>
+                {activeTab === tab && <span className="tab-active-dot" />}
+              </button>
+            ))}
+          </nav>
+
+          <div className="top-nav-controls">
+            {/* Site Picker Dropdown showing PLTS locations */}
+            <div style={{ position: "relative" }}>
+              <button
+                type="button"
+                className="site-picker-btn"
+                onClick={() => setSiteDropdownOpen(!siteDropdownOpen)}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "7px",
+                }}
+              >
+                <span
+                  style={{
+                    width: "7px",
+                    height: "7px",
+                    borderRadius: "50%",
+                    flexShrink: 0,
+                    background: selected?.status === "offline" || selected?.status === "disconnected" ? "#ef4444" : "#10b981",
+                    boxShadow: selected?.status === "offline" || selected?.status === "disconnected"
+                      ? "0 0 6px rgba(239, 68, 68, 0.7)"
+                      : "0 0 6px rgba(16, 185, 129, 0.7)",
+                  }}
+                />
+                <span>
+                  {locations.length === 0
+                    ? "0 PLTS Terpasang"
+                    : (selected?.name ? (selected.name.length > 15 ? `${selected.name.slice(0, 15)}...` : selected.name) : "Pilih PLTS")}
+                </span>
+                <span style={{ fontSize: "10px", opacity: 0.6 }}>▾</span>
+              </button>
+              {siteDropdownOpen && (
+                <div style={{
+                  position: "absolute",
+                  top: "100%",
+                  right: 0,
+                  marginTop: "6px",
+                  background: "#111a14",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  borderRadius: "12px",
+                  boxShadow: "0 10px 25px rgba(0,0,0,0.5)",
+                  width: "255px",
+                  zIndex: 300,
+                  overflow: "hidden",
+                  padding: "4px",
+                }}>
+                  <div style={{ padding: "6px 10px 4px", fontSize: "10px", fontWeight: 700, color: "#6e8074", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+                    Daftar PLTS ({REGIONS.find((r) => r.id === selectedRegion)?.shortName || "All"})
+                  </div>
+                  {locations.length === 0 ? (
+                    <div style={{ padding: "14px 12px", color: "#6e8074", fontSize: "12px", textAlign: "center" }}>
+                      Belum ada PLTS di wilayah ini
+                    </div>
+                  ) : (
+                    locations.map((loc) => {
+                      const isLocOffline = loc.status === "offline" || loc.status === "disconnected";
+                      const isLocSelected = loc.uid === selected?.uid;
+                      return (
+                        <button
+                          key={loc.uid}
+                          type="button"
+                          onClick={() => handleSelectSite(loc.uid)}
+                          style={{
+                            width: "100%",
+                            textAlign: "left",
+                            padding: "8px 12px",
+                            background: isLocSelected ? "rgba(16,185,129,0.18)" : "transparent",
+                            color: isLocSelected ? "#34d399" : "#ffffff",
+                            border: "none",
+                            borderRadius: "8px",
+                            fontSize: "12px",
+                            fontWeight: isLocSelected ? "700" : "500",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: "8px",
+                            transition: "background 0.15s ease",
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isLocSelected) e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isLocSelected) e.currentTarget.style.background = "transparent";
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, overflow: "hidden" }}>
+                            <span
+                              style={{
+                                width: "7px",
+                                height: "7px",
+                                borderRadius: "50%",
+                                flexShrink: 0,
+                                background: isLocOffline ? "#ef4444" : "#10b981",
+                                boxShadow: isLocOffline
+                                  ? "0 0 6px rgba(239, 68, 68, 0.7)"
+                                  : "0 0 6px rgba(16, 185, 129, 0.7)",
+                              }}
+                            />
+                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{loc.name}</span>
+                          </div>
+                          <small style={{ color: "#7d8f82", fontSize: "10px", flexShrink: 0 }}>{loc.source}</small>
+                        </button>
+                      );
+                    })
+                  )}
                 </div>
               )}
             </div>
