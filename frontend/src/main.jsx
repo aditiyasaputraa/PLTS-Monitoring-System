@@ -79,10 +79,14 @@ function getStationRegion(station) {
     return "jaktim";
   }
 
-  // Jakarta Pusat
+  // Jakarta Pusat (SMA: DPE DKI Jakarta, SMPN 2, SMKN 2, SMKN 38, SMAN 27)
+  const idStr = String(station.station_id || station.station_numeric_id || station.id || "");
   if (
+    ["784146", "2576179", "2583874", "2585338", "2606153"].includes(idStr) ||
     name.includes("jakpus") ||
     name.includes("jakarta pusat") ||
+    name.includes("jkt pusat") ||
+    name.includes("dpe") ||
     name.includes("gambir") ||
     name.includes("tanah abang") ||
     name.includes("menteng") ||
@@ -105,10 +109,15 @@ function getStationRegion(station) {
     return "jakpus";
   }
 
-  // Jakarta Selatan
+  // Jakarta Selatan (SMA: SMKN 63, SMPN 267, SMPN 182, SMAN 8)
   if (
+    ["2562591", "2571313", "2574654", "2604251"].includes(idStr) ||
     name.includes("jaksel") ||
     name.includes("jakarta selatan") ||
+    name.includes("smkn 63") ||
+    name.includes("smpn 267") ||
+    name.includes("smpn 182") ||
+    name.includes("sman 8") ||
     name.includes("kebayoran") ||
     name.includes("cilandak") ||
     name.includes("pasar minggu") ||
@@ -652,6 +661,46 @@ function Dashboard({ session, onSignOut }) {
         latitude = -6.33175;
         longitude = 106.88423;
         address = "SMA Negeri 105 Jakarta, Jl. Usman No. 40, Kelapa Dua Wetan, Ciracas, Jakarta Timur 13730";
+      }
+      // Jakarta Pusat (SMA: DPE DKI Jakarta, SMPN 2, SMKN 2, SMKN 38, SMAN 27)
+      else if (id === "784146" || nameLower.includes("dpe")) {
+        latitude = -6.18016;
+        longitude = 106.81089;
+        address = "Dinas Perindustrian dan Energi DKI Jakarta, Jl. Taman Jatibaru No. 1, Cideng, Gambir, Jakarta Pusat 10150";
+      } else if (id === "2576179" || (nameLower.includes("smpn 2") && (nameLower.includes("pusat") || nameLower.includes("jkt")))) {
+        latitude = -6.18315;
+        longitude = 106.86088;
+        address = "SMP Negeri 2 Jakarta, Jl. Johar Baru I No. 37, Johar Baru, Jakarta Pusat 10560";
+      } else if (id === "2583874" || (nameLower.includes("smkn 2") && (nameLower.includes("pusat") || nameLower.includes("jkt")))) {
+        latitude = -6.17836;
+        longitude = 106.83441;
+        address = "SMK Negeri 2 Jakarta, Jl. Batu No. 3, Gambir, Jakarta Pusat 10110";
+      } else if (id === "2585338" || nameLower.includes("smkn 38") || nameLower.includes("38")) {
+        latitude = -6.20367;
+        longitude = 106.81720;
+        address = "SMK Negeri 38 Jakarta, Jl. Karet Pasar Baru Timur II No. 17, Karet Tengsin, Tanah Abang, Jakarta Pusat 10250";
+      } else if (id === "2606153" || nameLower.includes("sman 27") || nameLower.includes("27")) {
+        latitude = -6.18246;
+        longitude = 106.86089;
+        address = "SMA Negeri 27 Jakarta, Jl. Johar Baru V No. 13, Johar Baru, Jakarta Pusat 10560";
+      }
+      // Jakarta Selatan (SMA: SMKN 63, SMPN 267, SMPN 182, SMAN 8)
+      else if (id === "2562591" || nameLower.includes("63")) {
+        latitude = -6.35140;
+        longitude = 106.79680;
+        address = "SMK Negeri 63 Jakarta, Jl. Aselih No. 47, Cipedak, Jagakarsa, Jakarta Selatan 12630";
+      } else if (id === "2571313" || nameLower.includes("267")) {
+        latitude = -6.25411;
+        longitude = 106.76430;
+        address = "SMP Negeri 267 Jakarta, Jl. Ulujami Raya No. 267, Ulujami, Pesanggrahan, Jakarta Selatan 12250";
+      } else if (id === "2574654" || nameLower.includes("182")) {
+        latitude = -6.26195;
+        longitude = 106.83306;
+        address = "SMP Negeri 182 Jakarta, Jl. Kalibata Tengah No. 182, Kalibata, Pancoran, Jakarta Selatan 12740";
+      } else if (id === "2604251" || nameLower.includes("sman 8") || nameLower.includes("sman 08") || (nameLower.includes("8") && nameLower.includes("jaksel"))) {
+        latitude = -6.21792;
+        longitude = 106.85949;
+        address = "SMA Negeri 8 Jakarta, Jl. Taman Bukit Duri No. 14, Bukit Duri, Tebet, Jakarta Selatan 12840";
       }
 
       return {
@@ -1728,11 +1777,15 @@ function formatStationLabel(name, isCrowded = false) {
   let n = String(name).trim();
   // Strip redundant administrative prefixes and suffixes
   n = n.replace(/^JAKTIM\s+/i, "");
+  n = n.replace(/^JAKSEL\s+/i, "");
+  n = n.replace(/\s+JKT\s+PUSAT$/i, "");
+  n = n.replace(/\s+JAKBAR$/i, "");
   n = n.replace(/\s+JAKUT$/i, "");
   n = n.replace(/\s+Jakarta\s+Utara.*$/i, "");
   n = n.replace(/\s+Saefullah$/i, "");
   n = n.replace(/Selatan\s+03$/i, "03");
 
+  if (n.includes("DPE")) return "DPE DKI";
   if (n.includes("Rawa Badak")) return "SDN Rawa Badak";
   if (n.includes("SMAN 75")) return "SMAN 75";
   if (n.includes("GOR Sekda")) return "GOR Sekda";
@@ -1743,6 +1796,20 @@ function formatStationLabel(name, isCrowded = false) {
   if (n.includes("SMPN 213")) return "SMPN 213";
   if (n.includes("SMPN 255")) return "SMPN 255";
   if (n.includes("SMAN 105")) return "SMAN 105";
+  if (n.includes("SMPN 190")) return "SMPN 190";
+  if (n.includes("SMPN 54")) return "SMPN 54";
+  if (n.includes("SMPN 88")) return "SMPN 88";
+  if (n.includes("SMPN 201")) return "SMPN 201";
+  if (n.includes("SMPN 204")) return "SMPN 204";
+  if (n.includes("Sukabumi Utara")) return "SDN Sukabumi Utara 01";
+  if (n.includes("SMPN 2")) return "SMPN 2";
+  if (n.includes("SMKN 2")) return "SMKN 2";
+  if (n.includes("SMKN 38")) return "SMKN 38";
+  if (n.includes("SMAN 27")) return "SMAN 27";
+  if (n.includes("SMKN 63")) return "SMKN 63";
+  if (n.includes("SMPN 267")) return "SMPN 267";
+  if (n.includes("SMPN 182")) return "SMPN 182";
+  if (n.includes("SMAN 8")) return "SMAN 8";
 
   if (isCrowded && n.length > 13) {
     return `${n.slice(0, 11)}...`;

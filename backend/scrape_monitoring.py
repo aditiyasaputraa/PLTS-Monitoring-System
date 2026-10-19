@@ -2228,6 +2228,28 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
             "SMPN 88 JAKBAR": (-6.19304, 106.79509, "SMP Negeri 88 Jakarta, Jl. Anggrek Garuda Blok G4 No. 40, Kemanggisan, Palmerah, Jakarta Barat 11480"),
             "3538228": (-6.12711, 106.73428, "SMP Negeri 201 Jakarta, Jl. Kayu Besar Dalam No. 2, Cengkareng Timur, Jakarta Barat 11730"),
             "SMPN 201 JAKBAR": (-6.12711, 106.73428, "SMP Negeri 201 Jakarta, Jl. Kayu Besar Dalam No. 2, Cengkareng Timur, Jakarta Barat 11730"),
+
+            # Jakarta Pusat (DPE DKI Jakarta, SMPN 2, SMKN 2, SMKN 38, SMAN 27)
+            "784146": (-6.18016, 106.81089, "Dinas Perindustrian dan Energi DKI Jakarta, Jl. Taman Jatibaru No. 1, Cideng, Gambir, Jakarta Pusat 10150"),
+            "DPE DKI Jakarta": (-6.18016, 106.81089, "Dinas Perindustrian dan Energi DKI Jakarta, Jl. Taman Jatibaru No. 1, Cideng, Gambir, Jakarta Pusat 10150"),
+            "2576179": (-6.18315, 106.86088, "SMP Negeri 2 Jakarta, Jl. Johar Baru I No. 37, Johar Baru, Jakarta Pusat 10560"),
+            "SMPN 2 JKT PUSAT": (-6.18315, 106.86088, "SMP Negeri 2 Jakarta, Jl. Johar Baru I No. 37, Johar Baru, Jakarta Pusat 10560"),
+            "2583874": (-6.17836, 106.83441, "SMK Negeri 2 Jakarta, Jl. Batu No. 3, Gambir, Jakarta Pusat 10110"),
+            "SMKN 2 JKT PUSAT": (-6.17836, 106.83441, "SMK Negeri 2 Jakarta, Jl. Batu No. 3, Gambir, Jakarta Pusat 10110"),
+            "2585338": (-6.20367, 106.81720, "SMK Negeri 38 Jakarta, Jl. Karet Pasar Baru Timur II No. 17, Karet Tengsin, Tanah Abang, Jakarta Pusat 10250"),
+            "SMKN 38 JKT PUSAT": (-6.20367, 106.81720, "SMK Negeri 38 Jakarta, Jl. Karet Pasar Baru Timur II No. 17, Karet Tengsin, Tanah Abang, Jakarta Pusat 10250"),
+            "2606153": (-6.18246, 106.86089, "SMA Negeri 27 Jakarta, Jl. Johar Baru V No. 13, Johar Baru, Jakarta Pusat 10560"),
+            "SMAN 27 JKT PUSAT": (-6.18246, 106.86089, "SMA Negeri 27 Jakarta, Jl. Johar Baru V No. 13, Johar Baru, Jakarta Pusat 10560"),
+
+            # Jakarta Selatan (SMKN 63, SMPN 267, SMPN 182, SMAN 8)
+            "2562591": (-6.35140, 106.79680, "SMK Negeri 63 Jakarta, Jl. Aselih No. 47, Cipedak, Jagakarsa, Jakarta Selatan 12630"),
+            "JAKSEL SMKN 63": (-6.35140, 106.79680, "SMK Negeri 63 Jakarta, Jl. Aselih No. 47, Cipedak, Jagakarsa, Jakarta Selatan 12630"),
+            "2571313": (-6.25411, 106.76430, "SMP Negeri 267 Jakarta, Jl. Ulujami Raya No. 267, Ulujami, Pesanggrahan, Jakarta Selatan 12250"),
+            "JAKSEL SMPN 267": (-6.25411, 106.76430, "SMP Negeri 267 Jakarta, Jl. Ulujami Raya No. 267, Ulujami, Pesanggrahan, Jakarta Selatan 12250"),
+            "2574654": (-6.26195, 106.83306, "SMP Negeri 182 Jakarta, Jl. Kalibata Tengah No. 182, Kalibata, Pancoran, Jakarta Selatan 12740"),
+            "JAKSEL SMPN 182": (-6.26195, 106.83306, "SMP Negeri 182 Jakarta, Jl. Kalibata Tengah No. 182, Kalibata, Pancoran, Jakarta Selatan 12740"),
+            "2604251": (-6.21792, 106.85949, "SMA Negeri 8 Jakarta, Jl. Taman Bukit Duri No. 14, Bukit Duri, Tebet, Jakarta Selatan 12840"),
+            "JAKSEL SMAN 8": (-6.21792, 106.85949, "SMA Negeri 8 Jakarta, Jl. Taman Bukit Duri No. 14, Bukit Duri, Tebet, Jakarta Selatan 12840"),
         }
         fallback = sma_coordinate_fallbacks.get(component_id) or sma_coordinate_fallbacks.get(plant_name)
         if fallback:
