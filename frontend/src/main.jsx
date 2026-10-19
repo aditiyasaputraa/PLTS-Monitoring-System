@@ -146,6 +146,28 @@ function getStationRegion(station) {
   return "jakut";
 }
 
+function getRegionBadgeName(loc) {
+  if (!loc) return "TIDAK ADA PLTS";
+  const reg = loc.region ? String(loc.region).toLowerCase() : getStationRegion(loc);
+  if (reg.includes("pusat") || reg.includes("jakpus")) return "CENTRAL JAKARTA";
+  if (reg.includes("selatan") || reg.includes("jaksel")) return "SOUTH JAKARTA";
+  if (reg.includes("barat") || reg.includes("jakbar")) return "WEST JAKARTA";
+  if (reg.includes("timur") || reg.includes("jaktim")) return "EAST JAKARTA";
+  if (reg.includes("seribu")) return "THOUSAND ISLANDS";
+  return "NORTH JAKARTA";
+}
+
+function getRegionIndoName(loc) {
+  if (!loc) return "DKI Jakarta";
+  const reg = loc.region ? String(loc.region).toLowerCase() : getStationRegion(loc);
+  if (reg.includes("pusat") || reg.includes("jakpus")) return "Jakarta Pusat";
+  if (reg.includes("selatan") || reg.includes("jaksel")) return "Jakarta Selatan";
+  if (reg.includes("barat") || reg.includes("jakbar")) return "Jakarta Barat";
+  if (reg.includes("timur") || reg.includes("jaktim")) return "Jakarta Timur";
+  if (reg.includes("seribu")) return "Kepulauan Seribu";
+  return "Jakarta Utara";
+}
+
 function apiBase() {
   const configuredApiBase = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
   if (configuredApiBase) return configuredApiBase;
@@ -664,43 +686,43 @@ function Dashboard({ session, onSignOut }) {
       }
       // Jakarta Pusat (SMA: DPE DKI Jakarta, SMPN 2, SMKN 2, SMKN 38, SMAN 27)
       else if (id === "784146" || nameLower.includes("dpe")) {
-        latitude = -6.18016;
-        longitude = 106.81089;
-        address = "Dinas Perindustrian dan Energi DKI Jakarta, Jl. Taman Jatibaru No. 1, Cideng, Gambir, Jakarta Pusat 10150";
+        latitude = -6.18173;
+        longitude = 106.81112;
+        address = "Komplek Dinas Teknis Pemprov DKI Jakarta, Jl. Taman Jatibaru No. 1, Cideng, Gambir, Jakarta Pusat 10150";
       } else if (id === "2576179" || (nameLower.includes("smpn 2") && (nameLower.includes("pusat") || nameLower.includes("jkt")))) {
-        latitude = -6.18315;
-        longitude = 106.86088;
-        address = "SMP Negeri 2 Jakarta, Jl. Johar Baru I No. 37, Johar Baru, Jakarta Pusat 10560";
+        latitude = -6.18130;
+        longitude = 106.86150;
+        address = "SMP Negeri 2 Jakarta, Jl. Mardani Raya No. 2, Johar Baru, Jakarta Pusat 10560";
       } else if (id === "2583874" || (nameLower.includes("smkn 2") && (nameLower.includes("pusat") || nameLower.includes("jkt")))) {
-        latitude = -6.17836;
-        longitude = 106.83441;
+        latitude = -6.17810;
+        longitude = 106.83350;
         address = "SMK Negeri 2 Jakarta, Jl. Batu No. 3, Gambir, Jakarta Pusat 10110";
       } else if (id === "2585338" || nameLower.includes("smkn 38") || nameLower.includes("38")) {
-        latitude = -6.20367;
-        longitude = 106.81720;
-        address = "SMK Negeri 38 Jakarta, Jl. Karet Pasar Baru Timur II No. 17, Karet Tengsin, Tanah Abang, Jakarta Pusat 10250";
+        latitude = -6.20370;
+        longitude = 106.81800;
+        address = "SMK Negeri 38 Jakarta, Jl. Karet Pasar Baru Timur II No. 13, Karet Tengsin, Tanah Abang, Jakarta Pusat 10220";
       } else if (id === "2606153" || nameLower.includes("sman 27") || nameLower.includes("27")) {
-        latitude = -6.18246;
-        longitude = 106.86089;
-        address = "SMA Negeri 27 Jakarta, Jl. Johar Baru V No. 13, Johar Baru, Jakarta Pusat 10560";
+        latitude = -6.18200;
+        longitude = 106.86120;
+        address = "SMA Negeri 27 Jakarta, Jl. Mardani Raya No. 39, Johar Baru, Jakarta Pusat 10560";
       }
       // Jakarta Selatan (SMA: SMKN 63, SMPN 267, SMPN 182, SMAN 8)
       else if (id === "2562591" || nameLower.includes("63")) {
-        latitude = -6.35140;
-        longitude = 106.79680;
-        address = "SMK Negeri 63 Jakarta, Jl. Aselih No. 47, Cipedak, Jagakarsa, Jakarta Selatan 12630";
+        latitude = -6.35760;
+        longitude = 106.80560;
+        address = "SMK Negeri 63 Jakarta, Jl. Aselih No. 100, Cipedak, Jagakarsa, Jakarta Selatan 12630";
       } else if (id === "2571313" || nameLower.includes("267")) {
-        latitude = -6.25411;
-        longitude = 106.76430;
-        address = "SMP Negeri 267 Jakarta, Jl. Ulujami Raya No. 267, Ulujami, Pesanggrahan, Jakarta Selatan 12250";
+        latitude = -6.23170;
+        longitude = 106.76460;
+        address = "SMP Negeri 267 Jakarta, Jl. Swadarma Raya / Mairin No. 3, Ulujami, Pesanggrahan, Jakarta Selatan 12250";
       } else if (id === "2574654" || nameLower.includes("182")) {
-        latitude = -6.26195;
-        longitude = 106.83306;
-        address = "SMP Negeri 182 Jakarta, Jl. Kalibata Tengah No. 182, Kalibata, Pancoran, Jakarta Selatan 12740";
+        latitude = -6.26000;
+        longitude = 106.84690;
+        address = "SMP Negeri 182 Jakarta, Jl. Kalibata Timur I No. 1, Kalibata, Pancoran, Jakarta Selatan 12740";
       } else if (id === "2604251" || nameLower.includes("sman 8") || nameLower.includes("sman 08") || (nameLower.includes("8") && nameLower.includes("jaksel"))) {
-        latitude = -6.21792;
-        longitude = 106.85949;
-        address = "SMA Negeri 8 Jakarta, Jl. Taman Bukit Duri No. 14, Bukit Duri, Tebet, Jakarta Selatan 12840";
+        latitude = -6.23300;
+        longitude = 106.85520;
+        address = "SMA Negeri 8 Jakarta, Jl. Taman Bukit Duri No. 2, Bukit Duri, Tebet, Jakarta Selatan 12840";
       }
 
       return {
@@ -1269,11 +1291,7 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt }) {
         <div className="dashboard-card selected-site-map-card">
           <div className="mini-map-preview">
             <span className="mini-map-badge">
-              {selected
-                ? (selected?.address?.toLowerCase().includes("timur") || selected?.name?.includes("JAKTIM")
-                    ? "EAST JAKARTA"
-                    : "NORTH JAKARTA")
-                : "TIDAK ADA PLTS"}
+              {getRegionBadgeName(selected)}
             </span>
             <MiniStationMap location={selected} />
           </div>
@@ -1301,7 +1319,7 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt }) {
               )}
             </div>
             <div className="site-geo-row">
-              <span>📍 {selected ? (selected?.address || (selected?.name?.includes("JAKTIM") ? "Jakarta Timur" : "Jakarta Utara")) : "Tidak ada unit PLTS di wilayah ini"}</span>
+              <span>📍 {selected ? (selected?.address || getRegionIndoName(selected)) : "Tidak ada unit PLTS di wilayah ini"}</span>
               {selected?.latitude && selected?.longitude && (
                 <a
                   className="coords-link"
