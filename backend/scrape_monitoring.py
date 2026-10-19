@@ -2230,16 +2230,16 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
             "SMPN 201 JAKBAR": (-6.12711, 106.73428, "SMP Negeri 201 Jakarta, Jl. Kayu Besar Dalam No. 2, Cengkareng Timur, Jakarta Barat 11730"),
 
             # Jakarta Pusat (DPE DKI Jakarta, SMPN 2, SMKN 2, SMKN 38, SMAN 27)
-            "784146": (-6.18016, 106.81089, "Jalan Taman Jatibaru No. 1, Gambir, Jakarta Pusat 10150"),
-            "DPE DKI Jakarta": (-6.18016, 106.81089, "Jalan Taman Jatibaru No. 1, Gambir, Jakarta Pusat 10150"),
-            "2576179": (-6.18315, 106.86088, "SMP Negeri 2 Jakarta, Jalan Johar Baru No. 2, Johar Baru, Jakarta Pusat 10560"),
-            "SMPN 2 JKT PUSAT": (-6.18315, 106.86088, "SMP Negeri 2 Jakarta, Jalan Johar Baru No. 2, Johar Baru, Jakarta Pusat 10560"),
-            "2583874": (-6.17836, 106.83441, "SMK Negeri 2 Jakarta, Jalan Batu No. 3, Gambir, Jakarta Pusat 10110"),
-            "SMKN 2 JKT PUSAT": (-6.17836, 106.83441, "SMK Negeri 2 Jakarta, Jalan Batu No. 3, Gambir, Jakarta Pusat 10110"),
-            "2585338": (-6.20367, 106.81720, "SMK Negeri 38 Jakarta, Karet Pasar Baru Timur 2 No. 17, Tanah Abang, Jakarta Pusat 10250"),
-            "SMKN 38 JKT PUSAT": (-6.20367, 106.81720, "SMK Negeri 38 Jakarta, Karet Pasar Baru Timur 2 No. 17, Tanah Abang, Jakarta Pusat 10250"),
-            "2606153": (-6.18246, 106.86089, "SMA Negeri 27 Jakarta, Jalan Johar Baru No. 5, Johar Baru, Jakarta Pusat 10560"),
-            "SMAN 27 JKT PUSAT": (-6.18246, 106.86089, "SMA Negeri 27 Jakarta, Jalan Johar Baru No. 5, Johar Baru, Jakarta Pusat 10560"),
+            "784146": (-6.18047, 106.81104, "Dinas Perindustrian dan Energi DKI Jakarta, Jl. Taman Jatibaru No. 1, Gambir, Jakarta Pusat 10150"),
+            "DPE DKI Jakarta": (-6.18047, 106.81104, "Dinas Perindustrian dan Energi DKI Jakarta, Jl. Taman Jatibaru No. 1, Gambir, Jakarta Pusat 10150"),
+            "2576179": (-6.18156, 106.86147, "SMP Negeri 2 Jakarta, Jl. Mardani Raya No. 2, Johar Baru, Jakarta Pusat 10560"),
+            "SMPN 2 JKT PUSAT": (-6.18156, 106.86147, "SMP Negeri 2 Jakarta, Jl. Mardani Raya No. 2, Johar Baru, Jakarta Pusat 10560"),
+            "2583874": (-6.17816, 106.83434, "SMK Negeri 2 Jakarta, Jl. Batu No. 3, Gambir, Jakarta Pusat 10110"),
+            "SMKN 2 JKT PUSAT": (-6.17816, 106.83434, "SMK Negeri 2 Jakarta, Jl. Batu No. 3, Gambir, Jakarta Pusat 10110"),
+            "2585338": (-6.20392, 106.81771, "SMK Negeri 38 Jakarta, Jl. Karet Pasar Baru Timur II No. 17, Tanah Abang, Jakarta Pusat 10250"),
+            "SMKN 38 JKT PUSAT": (-6.20392, 106.81771, "SMK Negeri 38 Jakarta, Jl. Karet Pasar Baru Timur II No. 17, Tanah Abang, Jakarta Pusat 10250"),
+            "2606153": (-6.18203, 106.86136, "SMA Negeri 27 Jakarta, Jl. Mardani Raya No. 39, Johar Baru, Jakarta Pusat 10560"),
+            "SMAN 27 JKT PUSAT": (-6.18203, 106.86136, "SMA Negeri 27 Jakarta, Jl. Mardani Raya No. 39, Johar Baru, Jakarta Pusat 10560"),
 
             # Jakarta Selatan (SMKN 63, SMPN 267, SMPN 182, SMAN 8)
             "2562591": (-6.35140, 106.79680, "SMK Negeri 63 Jakarta, Jalan Aselih No. 47, Cipedak, Jagakarsa, Jakarta Selatan 12630"),
