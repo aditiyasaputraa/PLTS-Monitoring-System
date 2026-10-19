@@ -986,71 +986,100 @@ function Dashboard({ session, onSignOut }) {
                   border: "1px solid rgba(255,255,255,0.12)",
                   borderRadius: "12px",
                   boxShadow: "0 10px 25px rgba(0,0,0,0.5)",
-                  width: "255px",
+                  width: "265px",
                   zIndex: 300,
-                  overflow: "hidden",
+                  display: "flex",
+                  flexDirection: "column",
+                  maxHeight: "min(75vh, 440px)",
                   padding: "4px",
                 }}>
-                  <div style={{ padding: "6px 10px 4px", fontSize: "10px", fontWeight: 700, color: "#6e8074", letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                    Daftar PLTS ({REGIONS.find((r) => r.id === selectedRegion)?.shortName || "DKI Jakarta"})
+                  <div style={{
+                    padding: "6px 10px 6px",
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    color: "#6e8074",
+                    letterSpacing: "0.05em",
+                    textTransform: "uppercase",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    borderBottom: "1px solid rgba(255,255,255,0.06)",
+                    marginBottom: "4px",
+                    flexShrink: 0,
+                  }}>
+                    <span>Daftar PLTS ({REGIONS.find((r) => r.id === selectedRegion)?.shortName || "DKI Jakarta"})</span>
+                    <span style={{ fontSize: "9px", opacity: 0.65 }}>{locations.length}</span>
                   </div>
-                  {locations.length === 0 ? (
-                    <div style={{ padding: "14px 12px", color: "#6e8074", fontSize: "12px", textAlign: "center" }}>
-                      Belum ada PLTS di wilayah ini
-                    </div>
-                  ) : (
-                    locations.map((loc) => {
-                      const isLocOffline = loc.status === "offline" || loc.status === "disconnected";
-                      const isLocSelected = loc.uid === selected?.uid;
-                      return (
-                        <button
-                          key={loc.uid}
-                          type="button"
-                          onClick={() => handleSelectSite(loc.uid)}
-                          style={{
-                            width: "100%",
-                            textAlign: "left",
-                            padding: "8px 12px",
-                            background: isLocSelected ? "rgba(16,185,129,0.18)" : "transparent",
-                            color: isLocSelected ? "#34d399" : "#ffffff",
-                            border: "none",
-                            borderRadius: "8px",
-                            fontSize: "12px",
-                            fontWeight: isLocSelected ? "700" : "500",
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            gap: "8px",
-                            transition: "background 0.15s ease",
-                          }}
-                          onMouseEnter={(e) => {
-                            if (!isLocSelected) e.currentTarget.style.background = "rgba(255,255,255,0.06)";
-                          }}
-                          onMouseLeave={(e) => {
-                            if (!isLocSelected) e.currentTarget.style.background = "transparent";
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, overflow: "hidden" }}>
-                            <span
-                              style={{
-                                width: "7px",
-                                height: "7px",
-                                borderRadius: "50%",
-                                flexShrink: 0,
-                                background: isLocOffline ? "#ef4444" : "#10b981",
-                                boxShadow: isLocOffline
-                                  ? "0 0 6px rgba(239, 68, 68, 0.7)"
-                                  : "0 0 6px rgba(16, 185, 129, 0.7)",
-                              }}
-                            />
-                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{loc.name}</span>
-                          </div>
-                          <small style={{ color: "#7d8f82", fontSize: "10px", flexShrink: 0 }}>{loc.source}</small>
-                        </button>
-                      );
-                    })
-                  )}
+                  <div
+                    className="site-dropdown-scroll"
+                    style={{
+                      overflowY: "auto",
+                      overflowX: "hidden",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "2px",
+                      paddingRight: "2px",
+                    }}
+                  >
+                    {locations.length === 0 ? (
+                      <div style={{ padding: "14px 12px", color: "#6e8074", fontSize: "12px", textAlign: "center" }}>
+                        Belum ada PLTS di wilayah ini
+                      </div>
+                    ) : (
+                      locations.map((loc) => {
+                        const isLocOffline = loc.status === "offline" || loc.status === "disconnected";
+                        const isLocSelected = loc.uid === selected?.uid;
+                        return (
+                          <button
+                            key={loc.uid}
+                            type="button"
+                            onClick={() => handleSelectSite(loc.uid)}
+                            style={{
+                              width: "100%",
+                              textAlign: "left",
+                              padding: "8px 10px",
+                              background: isLocSelected ? "rgba(16,185,129,0.18)" : "transparent",
+                              color: isLocSelected ? "#34d399" : "#ffffff",
+                              border: "none",
+                              borderRadius: "8px",
+                              fontSize: "12px",
+                              fontWeight: isLocSelected ? "700" : "500",
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              gap: "8px",
+                              transition: "background 0.15s ease",
+                              flexShrink: 0,
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!isLocSelected) e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!isLocSelected) e.currentTarget.style.background = "transparent";
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, overflow: "hidden" }}>
+                              <span
+                                style={{
+                                  width: "7px",
+                                  height: "7px",
+                                  borderRadius: "50%",
+                                  flexShrink: 0,
+                                  background: isLocOffline ? "#ef4444" : "#10b981",
+                                  boxShadow: isLocOffline
+                                    ? "0 0 6px rgba(239, 68, 68, 0.7)"
+                                    : "0 0 6px rgba(16, 185, 129, 0.7)",
+                                }}
+                              />
+                              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{loc.name}</span>
+                            </div>
+                            <small style={{ color: "#7d8f82", fontSize: "10px", flexShrink: 0 }}>{loc.source}</small>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
               )}
             </div>

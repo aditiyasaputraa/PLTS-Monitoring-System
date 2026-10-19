@@ -1650,5 +1650,25 @@ button {
   }
 }
 
+/* Custom scrollbar for site dropdown */
+.site-dropdown-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(52, 211, 153, 0.4) rgba(0, 0, 0, 0.2);
+}
+.site-dropdown-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+.site-dropdown-scroll::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+.site-dropdown-scroll::-webkit-scrollbar-thumb {
+  background: rgba(52, 211, 153, 0.35);
+  border-radius: 4px;
+}
+.site-dropdown-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(52, 211, 153, 0.7);
+}
+
 
 
