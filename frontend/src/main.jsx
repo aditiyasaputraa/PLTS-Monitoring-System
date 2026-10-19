@@ -8,8 +8,54 @@ import "./styles.css";
 
 const TABS = ["Overview", "Energy", "Revenue", "Emission"];
 const OPENFREEMAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
+
+const SATELLITE_HYBRID_STYLE = {
+  version: 8,
+  sources: {
+    "esri-satellite": {
+      type: "raster",
+      tiles: [
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      ],
+      tileSize: 256,
+      maxzoom: 19,
+      attribution: "Esri, Maxar, Earthstar Geographics",
+    },
+    "esri-labels": {
+      type: "raster",
+      tiles: [
+        "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+      ],
+      tileSize: 256,
+      maxzoom: 19,
+    },
+  },
+  layers: [
+    {
+      id: "esri-satellite-layer",
+      type: "raster",
+      source: "esri-satellite",
+      minzoom: 0,
+      maxzoom: 22,
+    },
+    {
+      id: "esri-labels-layer",
+      type: "raster",
+      source: "esri-labels",
+      minzoom: 0,
+      maxzoom: 22,
+    },
+  ],
+};
+
+const MAP_STYLES = {
+  streets: OPENFREEMAP_STYLE,
+  satellite: SATELLITE_HYBRID_STYLE,
+};
+
 const AUTH_STORAGE_KEY = "plts-monitoring.supabase-session";
 const UI_STATE_STORAGE_KEY = "plts-monitoring.ui-state";
+const MAP_MODE_STORAGE_KEY = "plts-monitoring.map-mode";
 
 const REGIONS = [
   { id: "all", name: "DKI Jakarta", shortName: "DKI Jakarta" },
@@ -2002,16 +2048,36 @@ function TodayEnergyBySiteChart({ locations, selectedId, onSelect }) {
 function MiniStationMap({ location }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
+  const markerRef = useRef(null);
+  const [mapMode, setMapMode] = useState(() => {
+    try {
+      return localStorage.getItem(MAP_MODE_STORAGE_KEY) || "streets";
+    } catch {
+      return "streets";
+    }
+  });
+
   const lat = Number(location?.latitude) || -6.2088;
   const lng = Number(location?.longitude) || 106.8456;
   const isOffline = location?.status === "offline" || location?.status === "disconnected";
+
+  const handleToggleMode = (newMode) => {
+    if (newMode === mapMode) return;
+    setMapMode(newMode);
+    try {
+      localStorage.setItem(MAP_MODE_STORAGE_KEY, newMode);
+    } catch {}
+    if (mapRef.current) {
+      mapRef.current.setStyle(MAP_STYLES[newMode]);
+    }
+  };
 
   useEffect(() => {
     if (!containerRef.current) return;
     try {
       const map = new maplibregl.Map({
         container: containerRef.current,
-        style: OPENFREEMAP_STYLE,
+        style: MAP_STYLES[mapMode],
         center: [lng, lat],
         zoom: location ? 15 : 10.5,
         interactive: true,
@@ -2029,7 +2095,7 @@ function MiniStationMap({ location }) {
       if (location && Number(location?.latitude) && Number(location?.longitude)) {
         const el = document.createElement("div");
         el.className = `station-map-marker ${isOffline ? "offline" : "online"} selected`;
-        new maplibregl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
+        markerRef.current = new maplibregl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
       }
 
       mapRef.current = map;
@@ -2040,6 +2106,7 @@ function MiniStationMap({ location }) {
 
       return () => {
         clearTimeout(resizeTimer);
+        markerRef.current?.remove();
         map.remove();
         mapRef.current = null;
       };
@@ -2055,20 +2122,99 @@ function MiniStationMap({ location }) {
     return () => observer.disconnect();
   }, []);
 
-  return <div ref={containerRef} style={{ width: "100%", height: "100%", minHeight: "240px" }} />;
+  return (
+    <div style={{ position: "relative", width: "100%", height: "100%", minHeight: "240px" }}>
+      <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
+      <div style={{
+        position: "absolute",
+        top: "10px",
+        left: "10px",
+        zIndex: 10,
+        background: "rgba(17, 26, 20, 0.85)",
+        backdropFilter: "blur(8px)",
+        border: "1px solid rgba(255, 255, 255, 0.15)",
+        borderRadius: "8px",
+        padding: "3px",
+        display: "flex",
+        gap: "3px",
+        boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
+      }}>
+        <button
+          type="button"
+          onClick={() => handleToggleMode("streets")}
+          style={{
+            padding: "4px 8px",
+            fontSize: "11px",
+            fontWeight: mapMode === "streets" ? "700" : "500",
+            color: mapMode === "streets" ? "#34d399" : "#94a3b8",
+            background: mapMode === "streets" ? "rgba(16, 185, 129, 0.22)" : "transparent",
+            border: mapMode === "streets" ? "1px solid rgba(52, 211, 153, 0.45)" : "1px solid transparent",
+            borderRadius: "6px",
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "4px",
+            transition: "all 0.15s ease",
+          }}
+        >
+          <span>🗺️</span>
+          <span>Standar</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => handleToggleMode("satellite")}
+          style={{
+            padding: "4px 8px",
+            fontSize: "11px",
+            fontWeight: mapMode === "satellite" ? "700" : "500",
+            color: mapMode === "satellite" ? "#34d399" : "#94a3b8",
+            background: mapMode === "satellite" ? "rgba(16, 185, 129, 0.22)" : "transparent",
+            border: mapMode === "satellite" ? "1px solid rgba(52, 211, 153, 0.45)" : "1px solid transparent",
+            borderRadius: "6px",
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "4px",
+            transition: "all 0.15s ease",
+          }}
+        >
+          <span>🛰️</span>
+          <span>Satelit</span>
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function FullFleetMap({ locations, selectedId, onSelect }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef(new Map());
+  const [mapMode, setMapMode] = useState(() => {
+    try {
+      return localStorage.getItem(MAP_MODE_STORAGE_KEY) || "streets";
+    } catch {
+      return "streets";
+    }
+  });
+
+  const handleToggleMode = (newMode) => {
+    if (newMode === mapMode) return;
+    setMapMode(newMode);
+    try {
+      localStorage.setItem(MAP_MODE_STORAGE_KEY, newMode);
+    } catch {}
+    if (mapRef.current) {
+      mapRef.current.setStyle(MAP_STYLES[newMode]);
+    }
+  };
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
     try {
       const map = new maplibregl.Map({
         container: containerRef.current,
-        style: OPENFREEMAP_STYLE,
+        style: MAP_STYLES[mapMode],
         center: [106.8456, -6.2088],
         zoom: 11,
         attributionControl: false,
@@ -2120,7 +2266,68 @@ function FullFleetMap({ locations, selectedId, onSelect }) {
     }
   }, [locations, onSelect, selectedId]);
 
-  return <div ref={containerRef} style={{ width: "100%", height: "100%" }} />;
+  return (
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
+      <div style={{
+        position: "absolute",
+        top: "12px",
+        left: "12px",
+        zIndex: 10,
+        background: "rgba(17, 26, 20, 0.85)",
+        backdropFilter: "blur(8px)",
+        border: "1px solid rgba(255, 255, 255, 0.15)",
+        borderRadius: "8px",
+        padding: "3px",
+        display: "flex",
+        gap: "3px",
+        boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
+      }}>
+        <button
+          type="button"
+          onClick={() => handleToggleMode("streets")}
+          style={{
+            padding: "5px 10px",
+            fontSize: "11px",
+            fontWeight: mapMode === "streets" ? "700" : "500",
+            color: mapMode === "streets" ? "#34d399" : "#94a3b8",
+            background: mapMode === "streets" ? "rgba(16, 185, 129, 0.22)" : "transparent",
+            border: mapMode === "streets" ? "1px solid rgba(52, 211, 153, 0.45)" : "1px solid transparent",
+            borderRadius: "6px",
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "5px",
+            transition: "all 0.15s ease",
+          }}
+        >
+          <span>🗺️</span>
+          <span>Standar</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => handleToggleMode("satellite")}
+          style={{
+            padding: "5px 10px",
+            fontSize: "11px",
+            fontWeight: mapMode === "satellite" ? "700" : "500",
+            color: mapMode === "satellite" ? "#34d399" : "#94a3b8",
+            background: mapMode === "satellite" ? "rgba(16, 185, 129, 0.22)" : "transparent",
+            border: mapMode === "satellite" ? "1px solid rgba(52, 211, 153, 0.45)" : "1px solid transparent",
+            borderRadius: "6px",
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "5px",
+            transition: "all 0.15s ease",
+          }}
+        >
+          <span>🛰️</span>
+          <span>Satelit</span>
+        </button>
+      </div>
+    </div>
+  );
 }
 
 /* ==================== ENERGY & REVENUE TABS ==================== */
