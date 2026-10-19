@@ -706,23 +706,23 @@ function Dashboard({ session, onSignOut }) {
         longitude = 106.86136;
         address = "SMA Negeri 27 Jakarta, Jl. Mardani Raya No. 39, Johar Baru, Jakarta Pusat 10560";
       }
-      // Jakarta Selatan (SMA: SMKN 63, SMPN 267, SMPN 182, SMAN 8)
+      // Jakarta Selatan (SMA: SMKN 63, SMPN 267, SMPN 182, SMAN 8 - Google Maps verified)
       else if (id === "2562591" || nameLower.includes("63")) {
-        latitude = -6.35140;
-        longitude = 106.79680;
-        address = "SMK Negeri 63 Jakarta, Jalan Aselih No. 47, Cipedak, Jagakarsa, Jakarta Selatan 12630";
+        latitude = -6.35251;
+        longitude = 106.79630;
+        address = "SMK Negeri 63 Jakarta, Jl. Aselih No. 47, Cipedak, Jagakarsa, Jakarta Selatan 12630";
       } else if (id === "2571313" || nameLower.includes("267")) {
-        latitude = -6.25411;
-        longitude = 106.76430;
-        address = "SMP Negeri 267 Jakarta, Jalan Ulujami Raya No. 267, Ulujami, Pesanggrahan, Jakarta Selatan 12250";
+        latitude = -6.23199;
+        longitude = 106.76443;
+        address = "SMP Negeri 267 Jakarta, Jl. Swadarma Raya / Mairin No. 3, Ulujami, Pesanggrahan, Jakarta Selatan 12250";
       } else if (id === "2574654" || nameLower.includes("182")) {
-        latitude = -6.26195;
-        longitude = 106.83306;
-        address = "SMP Negeri 182 Jakarta, Jalan Kalibata Tengah No. 182, Kalibata, Pancoran, Jakarta Selatan 12740";
+        latitude = -6.25935;
+        longitude = 106.84724;
+        address = "SMP Negeri 182 Jakarta, Jl. Kalibata Timur I No. 1, Kalibata, Pancoran, Jakarta Selatan 12740";
       } else if (id === "2604251" || nameLower.includes("sman 8") || nameLower.includes("sman 08") || (nameLower.includes("8") && nameLower.includes("jaksel"))) {
-        latitude = -6.21792;
-        longitude = 106.85949;
-        address = "SMA Negeri 8 Jakarta, Jalan Taman Bukit Duri No. 14, Bukit Duri, Tebet, Jakarta Selatan 12840";
+        latitude = -6.21811;
+        longitude = 106.85954;
+        address = "SMA Negeri 8 Jakarta, Jl. Taman Bukit Duri No. 14, Bukit Duri, Tebet, Jakarta Selatan 12840";
       }
 
       return {

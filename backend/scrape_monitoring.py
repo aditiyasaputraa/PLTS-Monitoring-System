@@ -2241,15 +2241,15 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
             "2606153": (-6.18203, 106.86136, "SMA Negeri 27 Jakarta, Jl. Mardani Raya No. 39, Johar Baru, Jakarta Pusat 10560"),
             "SMAN 27 JKT PUSAT": (-6.18203, 106.86136, "SMA Negeri 27 Jakarta, Jl. Mardani Raya No. 39, Johar Baru, Jakarta Pusat 10560"),
 
-            # Jakarta Selatan (SMKN 63, SMPN 267, SMPN 182, SMAN 8)
-            "2562591": (-6.35140, 106.79680, "SMK Negeri 63 Jakarta, Jalan Aselih No. 47, Cipedak, Jagakarsa, Jakarta Selatan 12630"),
-            "JAKSEL SMKN 63": (-6.35140, 106.79680, "SMK Negeri 63 Jakarta, Jalan Aselih No. 47, Cipedak, Jagakarsa, Jakarta Selatan 12630"),
-            "2571313": (-6.25411, 106.76430, "SMP Negeri 267 Jakarta, Jalan Ulujami Raya No. 267, Ulujami, Pesanggrahan, Jakarta Selatan 12250"),
-            "JAKSEL SMPN 267": (-6.25411, 106.76430, "SMP Negeri 267 Jakarta, Jalan Ulujami Raya No. 267, Ulujami, Pesanggrahan, Jakarta Selatan 12250"),
-            "2574654": (-6.26195, 106.83306, "SMP Negeri 182 Jakarta, Jalan Kalibata Tengah No. 182, Kalibata, Pancoran, Jakarta Selatan 12740"),
-            "JAKSEL SMPN 182": (-6.26195, 106.83306, "SMP Negeri 182 Jakarta, Jalan Kalibata Tengah No. 182, Kalibata, Pancoran, Jakarta Selatan 12740"),
-            "2604251": (-6.21792, 106.85949, "SMA Negeri 8 Jakarta, Jalan Taman Bukit Duri No. 14, Bukit Duri, Tebet, Jakarta Selatan 12840"),
-            "JAKSEL SMAN 8": (-6.21792, 106.85949, "SMA Negeri 8 Jakarta, Jalan Taman Bukit Duri No. 14, Bukit Duri, Tebet, Jakarta Selatan 12840"),
+            # Jakarta Selatan (SMKN 63, SMPN 267, SMPN 182, SMAN 8 - Google Maps verified)
+            "2562591": (-6.35251, 106.79630, "SMK Negeri 63 Jakarta, Jl. Aselih No. 47, Cipedak, Jagakarsa, Jakarta Selatan 12630"),
+            "JAKSEL SMKN 63": (-6.35251, 106.79630, "SMK Negeri 63 Jakarta, Jl. Aselih No. 47, Cipedak, Jagakarsa, Jakarta Selatan 12630"),
+            "2571313": (-6.23199, 106.76443, "SMP Negeri 267 Jakarta, Jl. Swadarma Raya / Mairin No. 3, Ulujami, Pesanggrahan, Jakarta Selatan 12250"),
+            "JAKSEL SMPN 267": (-6.23199, 106.76443, "SMP Negeri 267 Jakarta, Jl. Swadarma Raya / Mairin No. 3, Ulujami, Pesanggrahan, Jakarta Selatan 12250"),
+            "2574654": (-6.25935, 106.84724, "SMP Negeri 182 Jakarta, Jl. Kalibata Timur I No. 1, Kalibata, Pancoran, Jakarta Selatan 12740"),
+            "JAKSEL SMPN 182": (-6.25935, 106.84724, "SMP Negeri 182 Jakarta, Jl. Kalibata Timur I No. 1, Kalibata, Pancoran, Jakarta Selatan 12740"),
+            "2604251": (-6.21811, 106.85954, "SMA Negeri 8 Jakarta, Jl. Taman Bukit Duri No. 14, Bukit Duri, Tebet, Jakarta Selatan 12840"),
+            "JAKSEL SMAN 8": (-6.21811, 106.85954, "SMA Negeri 8 Jakarta, Jl. Taman Bukit Duri No. 14, Bukit Duri, Tebet, Jakarta Selatan 12840"),
         }
         fallback = sma_coordinate_fallbacks.get(component_id) or sma_coordinate_fallbacks.get(plant_name)
         if fallback:
