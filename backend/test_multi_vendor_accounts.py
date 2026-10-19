@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import patch
 
 from scrape_monitoring import (
+    build_normalized_site,
     load_huawei_accounts_from_env,
     load_sma_accounts_from_env,
     load_kehua_accounts_from_env,
@@ -57,6 +58,51 @@ class MultiVendorAccountsTests(unittest.TestCase):
         self.assertFalse(accounts[1]["use_shared_cookies"])
         self.assertEqual(accounts[2]["username"], "third-sma")
         self.assertFalse(accounts[2]["use_shared_cookies"])
+
+    def test_loads_sma_accounts_3_and_4(self):
+        with patch.dict(os.environ, {
+            "SMA_USERNAME": "primary-sma",
+            "SMA_PASSWORD": "primary-password",
+            "SMA_USERNAME_2": "second-sma",
+            "SMA_PASSWORD_2": "second-password",
+            "SMA_USERNAME_3": "jakpus-sma",
+            "SMA_PASSWORD_3": "jakpus-password",
+            "SMA_USERNAME_4": "jaksel-sma",
+            "SMA_PASSWORD_4": "jaksel-password",
+        }, clear=True):
+            accounts = load_sma_accounts_from_env()
+
+        self.assertEqual(len(accounts), 4)
+        self.assertEqual(accounts[2]["username"], "jakpus-sma")
+        self.assertEqual(accounts[2]["name"], "account_3")
+        self.assertEqual(accounts[3]["username"], "jaksel-sma")
+        self.assertEqual(accounts[3]["name"], "account_4")
+
+    def test_build_normalized_site_assigns_jakpus_and_jaksel_to_sma_accounts(self):
+        def make_sma_result(acc_name):
+            return {
+                "site": "sma",
+                "scraped_at": "2026-10-19T10:00:00+00:00",
+                "account": {"name": acc_name},
+                "summary": {"success_count": 1, "failed_count": 0, "auth_error_count": 0},
+                "calls": [{
+                    "name": "navigation",
+                    "response_body": [{
+                        "componentId": "99901",
+                        "name": "PLTS Gedung A",
+                        "status": "OK",
+                    }]
+                }],
+            }
+
+        norm_3 = build_normalized_site(make_sma_result("account_3"))
+        self.assertEqual(norm_3["stations"][0]["region"], "Jakarta Pusat")
+
+        norm_4 = build_normalized_site(make_sma_result("account_4"))
+        self.assertEqual(norm_4["stations"][0]["region"], "Jakarta Selatan")
+
+        norm_2 = build_normalized_site(make_sma_result("account_2"))
+        self.assertEqual(norm_2["stations"][0]["region"], "Jakarta Barat")
 
     def test_merges_huawei_accounts_preserves_platform(self):
         first = {

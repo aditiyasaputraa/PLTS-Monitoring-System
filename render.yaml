@@ -66,6 +66,14 @@ services:
         sync: false
       - key: SMA_PASSWORD_2
         sync: false
+      - key: SMA_USERNAME_3
+        sync: false
+      - key: SMA_PASSWORD_3
+        sync: false
+      - key: SMA_USERNAME_4
+        sync: false
+      - key: SMA_PASSWORD_4
+        sync: false
       - key: HUAWEI_COOKIES_JSON
         sync: false
       - key: KEHUA_COOKIES_JSON

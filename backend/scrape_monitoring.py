@@ -627,12 +627,16 @@ def load_sma_accounts_from_env() -> list[dict[str, Any]]:
         second_username = os.getenv(f"SMA_USERNAME_{index}", "").strip()
         second_password = os.getenv(f"SMA_PASSWORD_{index}", "").strip()
         if second_username and second_password:
-            accounts.append({
+            acc = {
                 "name": f"account_{index}",
                 "username": second_username,
                 "password": second_password,
                 "use_shared_cookies": False,
-            })
+            }
+            custom_region = os.getenv(f"SMA_REGION_{index}", "").strip()
+            if custom_region:
+                acc["region"] = custom_region
+            accounts.append(acc)
 
     raw = os.getenv("SMA_ACCOUNTS_JSON", "").strip()
     if raw:
@@ -649,12 +653,15 @@ def load_sma_accounts_from_env() -> list[dict[str, Any]]:
             password = str(item.get("password") or "").strip()
             if not username or not password:
                 raise RuntimeError(f"SMA_ACCOUNTS_JSON item {index} requires username and password")
-            accounts.append({
+            acc = {
                 "name": str(item.get("name") or f"additional_{index}"),
                 "username": username,
                 "password": password,
                 "use_shared_cookies": False,
-            })
+            }
+            if item.get("region"):
+                acc["region"] = str(item["region"]).strip()
+            accounts.append(acc)
 
     unique: list[dict[str, Any]] = []
     seen_usernames: set[str] = set()
@@ -1333,6 +1340,19 @@ def build_normalized_site(site_result: dict[str, Any]) -> dict[str, Any]:
         devices = normalize_kehua_devices(grouped)
     elif site_name == "sma":
         stations = normalize_sma_stations(grouped)
+        account_region = account.get("region")
+        if account_region:
+            for st in stations:
+                st["region"] = account_region
+        elif account_name in ("account_3", "jakpus") or "jakpus" in account_name:
+            for st in stations:
+                st["region"] = "Jakarta Pusat"
+        elif account_name in ("account_4", "jaksel") or "jaksel" in account_name:
+            for st in stations:
+                st["region"] = "Jakarta Selatan"
+        elif account_name in ("secondary", "account_2", "jakbar") or "jakbar" in account_name:
+            for st in stations:
+                st["region"] = "Jakarta Barat"
         overview = normalize_sma_overview(grouped, stations)
         alarms = normalize_sma_alarms(grouped)
         charts = normalize_sma_charts(grouped)
@@ -2045,6 +2065,7 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
         max_val = to_float(power_body.get("max")) if isinstance(power_body, dict) else None
         # SMA gauge power is in Watts (W), convert to kW
         current_power_kw = round(power_val / 1000.0, 3) if power_val is not None else 0.0
+        capacity_from_max = round(max_val / 1000.0, 2) if max_val else None
         capacity_kwp = capacity_kwp or capacity_from_max or 15.0
         if capacity_kwp and capacity_kwp > 500:
             capacity_kwp = round(capacity_kwp / 1000.0, 2)

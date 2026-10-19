@@ -65,6 +65,8 @@ jobs:
           SMA_PASSWORD_2: ${{ secrets.SMA_PASSWORD_2 }}
           SMA_USERNAME_3: ${{ secrets.SMA_USERNAME_3 }}
           SMA_PASSWORD_3: ${{ secrets.SMA_PASSWORD_3 }}
+          SMA_USERNAME_4: ${{ secrets.SMA_USERNAME_4 }}
+          SMA_PASSWORD_4: ${{ secrets.SMA_PASSWORD_4 }}
           SMA_ACCOUNTS_JSON: ${{ secrets.SMA_ACCOUNTS_JSON }}
           SMA_COOKIES_JSON: ${{ secrets.SMA_COOKIES_JSON }}
           ONESIGNAL_APP_ID: ${{ secrets.ONESIGNAL_APP_ID }}

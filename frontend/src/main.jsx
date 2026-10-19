@@ -79,6 +79,60 @@ function getStationRegion(station) {
     return "jaktim";
   }
 
+  // Jakarta Pusat
+  if (
+    name.includes("jakpus") ||
+    name.includes("jakarta pusat") ||
+    name.includes("gambir") ||
+    name.includes("tanah abang") ||
+    name.includes("menteng") ||
+    name.includes("senen") ||
+    name.includes("cempaka putih") ||
+    name.includes("johar baru") ||
+    name.includes("kemayoran") ||
+    name.includes("sawah besar") ||
+    address.includes("jakarta pusat") ||
+    address.includes("jakpus") ||
+    address.includes("gambir") ||
+    address.includes("tanah abang") ||
+    address.includes("menteng") ||
+    address.includes("senen") ||
+    address.includes("cempaka putih") ||
+    address.includes("johar baru") ||
+    address.includes("kemayoran") ||
+    address.includes("sawah besar")
+  ) {
+    return "jakpus";
+  }
+
+  // Jakarta Selatan
+  if (
+    name.includes("jaksel") ||
+    name.includes("jakarta selatan") ||
+    name.includes("kebayoran") ||
+    name.includes("cilandak") ||
+    name.includes("pasar minggu") ||
+    name.includes("jagakarsa") ||
+    name.includes("mampang") ||
+    name.includes("pancoran") ||
+    name.includes("tebet") ||
+    name.includes("pesanggrahan") ||
+    name.includes("setiabudi") ||
+    address.includes("jakarta selatan") ||
+    address.includes("jaksel") ||
+    address.includes("kebayoran") ||
+    address.includes("cilandak") ||
+    address.includes("pasar minggu") ||
+    address.includes("jagakarsa") ||
+    address.includes("mampang") ||
+    address.includes("pancoran") ||
+    address.includes("tebet") ||
+    address.includes("pesanggrahan") ||
+    address.includes("setiabudi")
+  ) {
+    return "jaksel";
+  }
+
   // Jakarta Utara (Kehua & Huawei: SDN 09, SMPN 282, GOR Sekda, SDN Rawa Badak, SMAN 75, SDN Sukapura 02)
   return "jakut";
 }
