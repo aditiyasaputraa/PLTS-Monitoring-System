@@ -104,6 +104,29 @@ class MultiVendorAccountsTests(unittest.TestCase):
         norm_2 = build_normalized_site(make_sma_result("account_2"))
         self.assertEqual(norm_2["stations"][0]["region"], "Jakarta Barat")
 
+    def test_build_normalized_site_assigns_jakpus_to_huawei_account_4(self):
+        huawei_result = {
+            "site": "huawei",
+            "scraped_at": "2026-10-20T10:00:00+00:00",
+            "account": {"name": "account_4"},
+            "summary": {"success_count": 1, "failed_count": 0, "auth_error_count": 0},
+            "calls": [{
+                "name": "station-list",
+                "response_body": {
+                    "data": {
+                        "list": [{
+                            "dn": "NE=1001",
+                            "name": "SMAN JAKPUS",
+                            "installedCapacity": 20.0,
+                        }]
+                    }
+                }
+            }],
+        }
+        normalized = build_normalized_site(huawei_result)
+        self.assertEqual(len(normalized["stations"]), 1)
+        self.assertEqual(normalized["stations"][0]["region"], "Jakarta Pusat")
+
     def test_merges_huawei_accounts_preserves_platform(self):
         first = {
             "platform": "huawei",

@@ -1324,9 +1324,29 @@ def build_normalized_site(site_result: dict[str, Any]) -> dict[str, Any]:
     grouped = calls_by_name(calls)
     if site_name == "huawei":
         stations = normalize_huawei_stations(grouped)
-        if account_name in ("secondary", "account_2", "account_3", "jakbar") or "jakbar" in account_name:
+        account_region = account.get("region")
+        if account_region:
+            for st in stations:
+                st["region"] = account_region
+        elif account_name in ("account_4", "jakpus") or "jakpus" in account_name:
+            for st in stations:
+                st["region"] = "Jakarta Pusat"
+        elif account_name in ("secondary", "account_2", "account_3", "jakbar") or "jakbar" in account_name:
             for st in stations:
                 st["region"] = "Jakarta Barat"
+
+        for st in stations:
+            s_text = f"{st.get('name', '')} {st.get('address', '')}".lower()
+            if "pusat" in s_text or "jakpus" in s_text:
+                st["region"] = "Jakarta Pusat"
+            elif "selatan" in s_text or "jaksel" in s_text:
+                st["region"] = "Jakarta Selatan"
+            elif "barat" in s_text or "jakbar" in s_text:
+                st["region"] = "Jakarta Barat"
+            elif "timur" in s_text or "jaktim" in s_text:
+                st["region"] = "Jakarta Timur"
+            elif "utara" in s_text or "jakut" in s_text:
+                st["region"] = "Jakarta Utara"
         overview = normalize_huawei_overview(grouped, stations)
         alarms = normalize_huawei_alarms(grouped)
         charts = normalize_huawei_charts(grouped)

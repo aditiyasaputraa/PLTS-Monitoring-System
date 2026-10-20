@@ -46,6 +46,8 @@ jobs:
           HUAWEI_PASSWORD_2: ${{ secrets.HUAWEI_PASSWORD_2 }}
           HUAWEI_USERNAME_3: ${{ secrets.HUAWEI_USERNAME_3 }}
           HUAWEI_PASSWORD_3: ${{ secrets.HUAWEI_PASSWORD_3 }}
+          HUAWEI_USERNAME_4: ${{ secrets.HUAWEI_USERNAME_4 }}
+          HUAWEI_PASSWORD_4: ${{ secrets.HUAWEI_PASSWORD_4 }}
           HUAWEI_ACCOUNTS_JSON: ${{ secrets.HUAWEI_ACCOUNTS_JSON }}
           KEHUA_USERNAME: ${{ secrets.KEHUA_USERNAME }}
           KEHUA_PASSWORD: ${{ secrets.KEHUA_PASSWORD }}
