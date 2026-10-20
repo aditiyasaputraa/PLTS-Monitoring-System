@@ -1859,13 +1859,13 @@ def normalize_kehua_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[d
         "SDN 09 JAKUT": (-6.12775, 106.858751, "Jl. Cemp. 1 No.Rt 09/03, no 69, RT.10/RW.6, Sunter Agung, Kec. Tj. Priok, Kota Jkt Utara, Daerah Khusus Ibukota Jakarta 14350, Indonesia"),
         "17478": (-6.134519, 106.870706, "7, Jl. Nusantara Selatan No.7, RT.7/RW.15, Sunter Agung, Kec. Tj. Priok, Kota Jkt Utara, Daerah Khusus Ibukota Jakarta 14350, Indonesia"),
         "SMPN 282 JAKUT": (-6.134519, 106.870706, "7, Jl. Nusantara Selatan No.7, RT.7/RW.15, Sunter Agung, Kec. Tj. Priok, Kota Jkt Utara, Daerah Khusus Ibukota Jakarta 14350, Indonesia"),
-        # Jakarta Pusat
-        "34142": (-6.168777, 106.816966, "SMP Negeri 72 Jakarta, Jl. Petojo Binatu 2 No. 2, Petojo Selatan, Gambir, Jakarta Pusat 10160"),
-        "SMPN 72 Jakpus": (-6.168777, 106.816966, "SMP Negeri 72 Jakarta, Jl. Petojo Binatu 2 No. 2, Petojo Selatan, Gambir, Jakarta Pusat 10160"),
-        "38722": (-6.17963, 106.814424, "SMP Negeri 94 Jakarta, Jl. Tanah Abang 5 No. 29, Petojo Selatan, Gambir, Jakarta Pusat 10160"),
-        "SMPN 94 Jakarta Pusat": (-6.17963, 106.814424, "SMP Negeri 94 Jakarta, Jl. Tanah Abang 5 No. 29, Petojo Selatan, Gambir, Jakarta Pusat 10160"),
-        "16721": (-6.179586, 106.814524, "SMP Negeri 94 Jakarta, Jl. Tanah Abang 5 No. 29, Petojo Selatan, Gambir, Jakarta Pusat 10160"),
-        "SMPN 94 Jakpus": (-6.179586, 106.814524, "SMP Negeri 94 Jakarta, Jl. Tanah Abang 5 No. 29, Petojo Selatan, Gambir, Jakarta Pusat 10160"),
+        # Jakarta Pusat (Google Maps verified)
+        "34142": (-6.16870, 106.81708, "SMP Negeri 72 Jakarta, Jl. Petojo Binatu 2 No. 2, Petojo Selatan, Gambir, Jakarta Pusat 10160"),
+        "SMPN 72 Jakpus": (-6.16870, 106.81708, "SMP Negeri 72 Jakarta, Jl. Petojo Binatu 2 No. 2, Petojo Selatan, Gambir, Jakarta Pusat 10160"),
+        "38722": (-6.17970, 106.81455, "SMP Negeri 94 Jakarta, Jl. Tanah Abang 5 No. 29, Petojo Selatan, Gambir, Jakarta Pusat 10160"),
+        "SMPN 94 Jakarta Pusat": (-6.17970, 106.81455, "SMP Negeri 94 Jakarta, Jl. Tanah Abang 5 No. 29, Petojo Selatan, Gambir, Jakarta Pusat 10160"),
+        "16721": (-6.17970, 106.81455, "SMP Negeri 94 Jakarta, Jl. Tanah Abang 5 No. 29, Petojo Selatan, Gambir, Jakarta Pusat 10160"),
+        "SMPN 94 Jakpus": (-6.17970, 106.81455, "SMP Negeri 94 Jakarta, Jl. Tanah Abang 5 No. 29, Petojo Selatan, Gambir, Jakarta Pusat 10160"),
     }
     for station in by_id.values():
         sid = str(station.get("station_id") or "")
@@ -1873,12 +1873,9 @@ def normalize_kehua_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[d
         fallback = station_coordinate_fallbacks.get(sid) or station_coordinate_fallbacks.get(sname)
         if fallback:
             lat, lon, addr = fallback
-            if station.get("latitude") is None:
-                station["latitude"] = lat
-            if station.get("longitude") is None:
-                station["longitude"] = lon
-            if not station.get("address") or str(station.get("address")).strip() in ("Indonesia1A", "Indonesia", "null"):
-                station["address"] = addr
+            station["latitude"] = lat
+            station["longitude"] = lon
+            station["address"] = addr
 
         # Calculate Kehua revenue automatically using tariff Rp 900/kWh when not provided by vendor
         daily_kwh = to_float(station.get("daily_energy_kwh"))
