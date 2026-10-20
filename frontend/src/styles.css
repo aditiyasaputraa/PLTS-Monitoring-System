@@ -744,9 +744,64 @@ button {
   flex: 1;
   min-height: 220px;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   position: relative;
-  margin-top: 10px;
+  margin-top: 6px;
+}
+
+.chart-tab-pill {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 20px;
+  border: 1px solid #dbe3dc;
+  background: #f7faf7;
+  color: #586b5e;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  outline: none;
+}
+
+.chart-tab-pill:hover {
+  background: #edf4ee;
+  color: #1b804e;
+  border-color: #b7cebc;
+}
+
+.chart-tab-pill.active {
+  background: #1b804e;
+  color: #ffffff;
+  border-color: #1b804e;
+  box-shadow: 0 1px 3px rgba(27, 128, 78, 0.2);
+}
+
+.today-energy-scrollable {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5cb #f1f5f1;
+}
+
+.today-energy-scrollable::-webkit-scrollbar {
+  height: 6px;
+}
+
+.today-energy-scrollable::-webkit-scrollbar-track {
+  background: #f1f5f1;
+  border-radius: 4px;
+}
+
+.today-energy-scrollable::-webkit-scrollbar-thumb {
+  background: #cbd5cb;
+  border-radius: 4px;
+}
+
+.today-energy-scrollable::-webkit-scrollbar-thumb:hover {
+  background: #9ab39c;
 }
 
 
