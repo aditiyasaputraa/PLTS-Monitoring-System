@@ -510,17 +510,25 @@ def load_kehua_accounts_from_env() -> list[dict[str, Any]]:
             "username": legacy_username,
             "password": legacy_password,
             "use_shared_cookies": True,
+            "region": "Jakarta Utara",
         })
 
     for index in range(2, 10):
         second_username = os.getenv(f"KEHUA_USERNAME_{index}", "").strip()
         second_password = os.getenv(f"KEHUA_PASSWORD_{index}", "").strip()
         if second_username and second_password:
+            default_region = (
+                "Jakarta Utara" if index == 2
+                else ("Jakarta Barat" if index in (3, 4)
+                else ("Jakarta Pusat" if index in (5, 6)
+                else ("Jakarta Selatan" if index in (7, 8) else None)))
+            )
             accounts.append({
                 "name": "secondary" if index == 2 else f"account_{index}",
                 "username": second_username,
                 "password": second_password,
                 "use_shared_cookies": False,
+                "region": default_region,
             })
 
     raw = os.getenv("KEHUA_ACCOUNTS_JSON", "").strip()
@@ -569,17 +577,23 @@ def load_huawei_accounts_from_env() -> list[dict[str, Any]]:
             "username": legacy_username,
             "password": legacy_password,
             "use_shared_cookies": True,
+            "region": "Jakarta Utara",
         })
 
     for index in range(2, 10):
         second_username = os.getenv(f"HUAWEI_USERNAME_{index}", "").strip()
         second_password = os.getenv(f"HUAWEI_PASSWORD_{index}", "").strip()
         if second_username and second_password:
+            default_region = (
+                "Jakarta Barat" if index in (2, 3)
+                else ("Jakarta Pusat" if index == 4 else None)
+            )
             accounts.append({
                 "name": f"account_{index}",
                 "username": second_username,
                 "password": second_password,
                 "use_shared_cookies": False,
+                "region": default_region,
             })
 
     raw = os.getenv("HUAWEI_ACCOUNTS_JSON", "").strip()
@@ -602,6 +616,7 @@ def load_huawei_accounts_from_env() -> list[dict[str, Any]]:
                 "username": username,
                 "password": password,
                 "use_shared_cookies": False,
+                "region": str(item.get("region") or "").strip() or None,
             })
 
     unique: list[dict[str, Any]] = []
@@ -623,21 +638,25 @@ def load_sma_accounts_from_env() -> list[dict[str, Any]]:
             "username": legacy_username,
             "password": legacy_password,
             "use_shared_cookies": True,
+            "region": "Jakarta Timur",
         })
 
     for index in range(2, 10):
         second_username = os.getenv(f"SMA_USERNAME_{index}", "").strip()
         second_password = os.getenv(f"SMA_PASSWORD_{index}", "").strip()
         if second_username and second_password:
+            default_region = (
+                "Jakarta Barat" if index == 2
+                else ("Jakarta Pusat" if index == 3
+                else ("Jakarta Selatan" if index == 4 else None))
+            )
             acc = {
                 "name": f"account_{index}",
                 "username": second_username,
                 "password": second_password,
                 "use_shared_cookies": False,
+                "region": os.getenv(f"SMA_REGION_{index}", "").strip() or default_region,
             }
-            custom_region = os.getenv(f"SMA_REGION_{index}", "").strip()
-            if custom_region:
-                acc["region"] = custom_region
             accounts.append(acc)
 
     raw = os.getenv("SMA_ACCOUNTS_JSON", "").strip()
@@ -1334,19 +1353,23 @@ def build_normalized_site(site_result: dict[str, Any]) -> dict[str, Any]:
         elif account_name in ("secondary", "account_2", "account_3", "jakbar") or "jakbar" in account_name:
             for st in stations:
                 st["region"] = "Jakarta Barat"
+        elif account_name in ("primary", "account_1", "jakut") or "jakut" in account_name:
+            for st in stations:
+                st["region"] = "Jakarta Utara"
 
         for st in stations:
-            s_text = f"{st.get('name', '')} {st.get('address', '')}".lower()
-            if "pusat" in s_text or "jakpus" in s_text:
-                st["region"] = "Jakarta Pusat"
-            elif "selatan" in s_text or "jaksel" in s_text:
-                st["region"] = "Jakarta Selatan"
-            elif "barat" in s_text or "jakbar" in s_text:
-                st["region"] = "Jakarta Barat"
-            elif "timur" in s_text or "jaktim" in s_text:
-                st["region"] = "Jakarta Timur"
-            elif "utara" in s_text or "jakut" in s_text:
-                st["region"] = "Jakarta Utara"
+            if not st.get("region"):
+                s_text = f"{st.get('name', '')} {st.get('address', '')}".lower()
+                if "jakarta pusat" in s_text or "jkt pusat" in s_text or "jakpus" in s_text:
+                    st["region"] = "Jakarta Pusat"
+                elif "jakarta selatan" in s_text or "jkt selatan" in s_text or "jaksel" in s_text:
+                    st["region"] = "Jakarta Selatan"
+                elif "jakarta barat" in s_text or "jkt barat" in s_text or "jakbar" in s_text:
+                    st["region"] = "Jakarta Barat"
+                elif "jakarta timur" in s_text or "jkt timur" in s_text or "jaktim" in s_text:
+                    st["region"] = "Jakarta Timur"
+                elif "jakarta utara" in s_text or "jkt utara" in s_text or "jakut" in s_text:
+                    st["region"] = "Jakarta Utara"
         overview = normalize_huawei_overview(grouped, stations)
         alarms = normalize_huawei_alarms(grouped)
         charts = normalize_huawei_charts(grouped)
@@ -1357,28 +1380,32 @@ def build_normalized_site(site_result: dict[str, Any]) -> dict[str, Any]:
         if account_region:
             for st in stations:
                 st["region"] = account_region
+        elif account_name in ("account_7", "account_8", "jaksel") or "jaksel" in account_name:
+            for st in stations:
+                st["region"] = "Jakarta Selatan"
         elif account_name in ("account_5", "account_6", "jakpus") or "jakpus" in account_name:
             for st in stations:
                 st["region"] = "Jakarta Pusat"
         elif account_name in ("account_3", "account_4", "jakbar") or "jakbar" in account_name:
             for st in stations:
                 st["region"] = "Jakarta Barat"
-        elif account_name in ("account_7", "account_8", "jaksel") or "jaksel" in account_name:
+        elif account_name in ("primary", "secondary", "account_1", "account_2", "jakut") or "jakut" in account_name:
             for st in stations:
-                st["region"] = "Jakarta Selatan"
+                st["region"] = "Jakarta Utara"
 
         for st in stations:
-            s_text = f"{st.get('name', '')} {st.get('address', '')}".lower()
-            if "pusat" in s_text or "jakpus" in s_text:
-                st["region"] = "Jakarta Pusat"
-            elif "selatan" in s_text or "jaksel" in s_text:
-                st["region"] = "Jakarta Selatan"
-            elif "barat" in s_text or "jakbar" in s_text:
-                st["region"] = "Jakarta Barat"
-            elif "timur" in s_text or "jaktim" in s_text:
-                st["region"] = "Jakarta Timur"
-            elif "utara" in s_text or "jakut" in s_text:
-                st["region"] = "Jakarta Utara"
+            if not st.get("region"):
+                s_text = f"{st.get('name', '')} {st.get('address', '')}".lower()
+                if "jakarta pusat" in s_text or "jkt pusat" in s_text or "jakpus" in s_text:
+                    st["region"] = "Jakarta Pusat"
+                elif "jakarta selatan" in s_text or "jkt selatan" in s_text or "jaksel" in s_text:
+                    st["region"] = "Jakarta Selatan"
+                elif "jakarta barat" in s_text or "jkt barat" in s_text or "jakbar" in s_text:
+                    st["region"] = "Jakarta Barat"
+                elif "jakarta timur" in s_text or "jkt timur" in s_text or "jaktim" in s_text:
+                    st["region"] = "Jakarta Timur"
+                elif "jakarta utara" in s_text or "jkt utara" in s_text or "jakut" in s_text:
+                    st["region"] = "Jakarta Utara"
         overview = normalize_kehua_overview(grouped, stations)
         alarms = normalize_kehua_alarms(grouped)
         charts = normalize_kehua_charts(grouped)
@@ -1389,15 +1416,32 @@ def build_normalized_site(site_result: dict[str, Any]) -> dict[str, Any]:
         if account_region:
             for st in stations:
                 st["region"] = account_region
-        elif account_name in ("account_3", "jakpus") or "jakpus" in account_name:
-            for st in stations:
-                st["region"] = "Jakarta Pusat"
         elif account_name in ("account_4", "jaksel") or "jaksel" in account_name:
             for st in stations:
                 st["region"] = "Jakarta Selatan"
+        elif account_name in ("account_3", "jakpus") or "jakpus" in account_name:
+            for st in stations:
+                st["region"] = "Jakarta Pusat"
         elif account_name in ("secondary", "account_2", "jakbar") or "jakbar" in account_name:
             for st in stations:
                 st["region"] = "Jakarta Barat"
+        elif account_name in ("primary", "account_1", "jaktim") or "jaktim" in account_name:
+            for st in stations:
+                st["region"] = "Jakarta Timur"
+
+        for st in stations:
+            if not st.get("region"):
+                s_text = f"{st.get('name', '')} {st.get('address', '')}".lower()
+                if "jakarta pusat" in s_text or "jkt pusat" in s_text or "jakpus" in s_text:
+                    st["region"] = "Jakarta Pusat"
+                elif "jakarta selatan" in s_text or "jkt selatan" in s_text or "jaksel" in s_text:
+                    st["region"] = "Jakarta Selatan"
+                elif "jakarta barat" in s_text or "jkt barat" in s_text or "jakbar" in s_text:
+                    st["region"] = "Jakarta Barat"
+                elif "jakarta timur" in s_text or "jkt timur" in s_text or "jaktim" in s_text:
+                    st["region"] = "Jakarta Timur"
+                elif "jakarta utara" in s_text or "jkt utara" in s_text or "jakut" in s_text:
+                    st["region"] = "Jakarta Utara"
         overview = normalize_sma_overview(grouped, stations)
         alarms = normalize_sma_alarms(grouped)
         charts = normalize_sma_charts(grouped)

@@ -156,6 +156,53 @@ class MultiVendorAccountsTests(unittest.TestCase):
         self.assertEqual(merged["overview"]["daily_energy_kwh"], 70.0)
         self.assertEqual(len(merged["stations"]), 2)
 
+    def test_jakut_stations_not_misclassified_as_jaksel(self):
+        # 1. Huawei primary account with SDN Rawa Badak Selatan 03
+        huawei_primary_result = {
+            "site": "huawei",
+            "scraped_at": "2026-10-20T10:00:00+00:00",
+            "account": {"name": "primary"},
+            "summary": {"success_count": 1, "failed_count": 0, "auth_error_count": 0},
+            "calls": [{
+                "name": "station-list",
+                "response_body": {
+                    "data": {
+                        "list": [{
+                            "dn": "NE=1002",
+                            "name": "SDN Rawa Badak Selatan 03",
+                            "installedCapacity": 24.2,
+                        }]
+                    }
+                }
+            }],
+        }
+        norm_hw = build_normalized_site(huawei_primary_result)
+        self.assertEqual(norm_hw["stations"][0]["region"], "Jakarta Utara")
+
+        # 2. Kehua secondary account with SMPN 282 JAKUT (address containing Jl. Nusantara Selatan)
+        kehua_secondary_result = {
+            "site": "kehua",
+            "scraped_at": "2026-10-20T10:00:00+00:00",
+            "account": {"name": "secondary"},
+            "summary": {"success_count": 1, "failed_count": 0, "auth_error_count": 0},
+            "calls": [{
+                "name": "listStationCardInfoByCondition",
+                "response_body": {
+                    "code": "0",
+                    "data": {
+                        "result": [{
+                            "stationId": "17478",
+                            "stationName": "SMPN 282 JAKUT",
+                            "capacity": 15.0,
+                        }]
+                    }
+                }
+            }],
+        }
+        norm_kehua = build_normalized_site(kehua_secondary_result)
+        self.assertEqual(norm_kehua["stations"][0]["region"], "Jakarta Utara")
+
 
 if __name__ == "__main__":
     unittest.main()
+

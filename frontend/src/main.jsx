@@ -189,6 +189,28 @@ function getStationRegion(station) {
   }
 
   // Jakarta Utara (Kehua & Huawei: SDN 09, SMPN 282, GOR Sekda, SDN Rawa Badak, SMAN 75, SDN Sukapura 02)
+  if (
+    name.includes("jakut") ||
+    name.includes("jakarta utara") ||
+    name.includes("jkt utara") ||
+    name.includes("smpn 282") ||
+    name.includes("rawa badak") ||
+    name.includes("sukapura") ||
+    name.includes("sekda saefullah") ||
+    name.includes("koja") ||
+    name.includes("cilincing") ||
+    name.includes("tanjung priok") ||
+    name.includes("sunter") ||
+    name.includes("kelapa gading") ||
+    name.includes("pademangan") ||
+    name.includes("penjaringan") ||
+    address.includes("jakarta utara") ||
+    address.includes("jkt utara") ||
+    address.includes("jakut")
+  ) {
+    return "jakut";
+  }
+
   return "jakut";
 }
 
@@ -196,6 +218,7 @@ function getRegionBadgeName(loc) {
   if (!loc) return "TIDAK ADA PLTS";
   const reg = loc.region ? String(loc.region).toLowerCase() : getStationRegion(loc);
   if (reg.includes("pusat") || reg.includes("jakpus")) return "CENTRAL JAKARTA";
+  if (reg.includes("utara") || reg.includes("jakut")) return "NORTH JAKARTA";
   if (reg.includes("selatan") || reg.includes("jaksel")) return "SOUTH JAKARTA";
   if (reg.includes("barat") || reg.includes("jakbar")) return "WEST JAKARTA";
   if (reg.includes("timur") || reg.includes("jaktim")) return "EAST JAKARTA";
@@ -207,6 +230,7 @@ function getRegionIndoName(loc) {
   if (!loc) return "DKI Jakarta";
   const reg = loc.region ? String(loc.region).toLowerCase() : getStationRegion(loc);
   if (reg.includes("pusat") || reg.includes("jakpus")) return "Jakarta Pusat";
+  if (reg.includes("utara") || reg.includes("jakut")) return "Jakarta Utara";
   if (reg.includes("selatan") || reg.includes("jaksel")) return "Jakarta Selatan";
   if (reg.includes("barat") || reg.includes("jakbar")) return "Jakarta Barat";
   if (reg.includes("timur") || reg.includes("jaktim")) return "Jakarta Timur";
