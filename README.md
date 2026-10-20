@@ -1,11 +1,11 @@
 # PLTS monitoring deployment bundle
 
-Production-shaped deployment for:
+Production-shaped serverless deployment for:
 
 ```text
-Huawei + Kehua APIs
+Huawei + Kehua + SMA APIs
         ↓
-Render: FastAPI scraper/backend
+GitHub Actions (cron-job.org / 15-minute schedule)
         ↓
 Supabase: current snapshot + retained history
         ↓
@@ -15,10 +15,10 @@ Vercel: Vite/React dashboard
 ## Repository layout
 
 ```text
-backend/     FastAPI, scraper, Render configuration
-frontend/    Vite/React dashboard, Vercel configuration
-supabase/    SQL schema and database setup notes
-render.yaml  Render Blueprint for the monorepo
+backend/                     Multi-vendor scraper logic (Huawei, Kehua, SMA), Supabase adapter
+frontend/                    Vite/React dashboard deployed to Vercel
+supabase/                    SQL schema and database setup notes
+.github/workflows/scraper.yml Automated 15-minute scheduled scraping workflow
 ```
 
 No login credentials, live cookies, raw HAR files, browser profiles, generated scrape output, `node_modules`, or frontend build output are included.
@@ -30,95 +30,43 @@ No login credentials, live cookies, raw HAR files, browser profiles, generated s
 1. Create a Supabase project.
 2. Open **SQL Editor**.
 3. Run [`supabase/schema.sql`](supabase/schema.sql).
-4. Copy the project URL and a server-side secret key.
+4. Copy the project URL, anon key, and server-side secret key.
 
-The frontend does not connect to Supabase directly. Only Render receives the Supabase secret key.
+### 2. Configure GitHub Actions Secrets
 
-### 2. Deploy the backend on Render
-
-Push this folder to a private GitHub repository, then create a Render **Blueprint** from it. The root `render.yaml` selects `backend/` automatically.
-
-Set these Render secret variables:
+Set these repository secrets in **GitHub Settings -> Secrets and variables -> Actions**:
 
 ```text
 SUPABASE_URL
 SUPABASE_SECRET_KEY
-FRONTEND_ORIGIN=*
-HUAWEI_USERNAME
-HUAWEI_PASSWORD
-KEHUA_USERNAME
-KEHUA_PASSWORD
-KEHUA_ACCOUNTS_JSON
-HUAWEI_COOKIES_JSON
-REFRESH_SECRET
+HUAWEI_USERNAME (and HUAWEI_USERNAME_2..7)
+HUAWEI_PASSWORD (and HUAWEI_PASSWORD_2..7)
+KEHUA_USERNAME (and KEHUA_USERNAME_2..8)
+KEHUA_PASSWORD (and KEHUA_PASSWORD_2..8)
+SMA_USERNAME (and SMA_USERNAME_2..4)
+SMA_PASSWORD (and SMA_PASSWORD_2..4)
 ```
 
-For `HUAWEI_COOKIES_JSON`, paste the complete JSON cookie export. Do not wrap
-the whole JSON in an additional pair of quotes. Kehua can log in automatically
-with `KEHUA_USERNAME` and `KEHUA_PASSWORD`, so `KEHUA_COOKIES_JSON` is optional.
-Additional Kehua logins use `KEHUA_ACCOUNTS_JSON`. Each entry includes credentials
-and the non-secret identifiers used to rewrite the captured request template:
-
-```json
-[{
-  "name": "school-09",
-  "username": "replace-me",
-  "password": "replace-me",
-  "company_id": "1831",
-  "station_id": "17483",
-  "area_code": "2054",
-  "company_name": "SDN 09 JAKUT"
-}]
-```
-
-The original `KEHUA_USERNAME`/`KEHUA_PASSWORD` account remains supported. Each
-account receives an isolated session, and their stations are merged into one
-Kehua fleet in the normalized API response.
-
-The non-secret defaults are already declared in `render.yaml`:
-
-```text
-SCRAPE_INTERVAL_SECONDS=300
-HISTORY_INTERVAL_SECONDS=3600
-HISTORY_RETENTION_DAYS=30
-```
-
-Check the deployed backend in this order:
-
-```text
-https://YOUR-RENDER-SERVICE.onrender.com/health
-https://YOUR-RENDER-SERVICE.onrender.com/ready
-https://YOUR-RENDER-SERVICE.onrender.com/api/status
-https://YOUR-RENDER-SERVICE.onrender.com/api/current
-```
-
-`/ready` returns HTTP 503 until the first successful scrape is stored in Supabase.
+The workflow runs every 15 minutes automatically, or can be triggered via `cron-job.org` / workflow dispatch.
 
 ### 3. Deploy the frontend on Vercel
 
-Import the same GitHub repository into Vercel and set:
+Import the GitHub repository into Vercel and set:
 
 ```text
 Root Directory: frontend
 Framework: Vite
 Build Command: npm run build
 Output Directory: dist
+Node.js Version: 22.x
 ```
 
-Add:
+Add Vercel Environment Variables:
 
 ```text
-VITE_API_URL=https://YOUR-RENDER-SERVICE.onrender.com
-VITE_POLL_INTERVAL_MS=60000
+VITE_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
 ```
-
-Deploy, copy the final Vercel origin, then replace Render's temporary CORS value:
-
-```text
-FRONTEND_ORIGIN=https://YOUR-VERCEL-PROJECT.vercel.app
-```
-
-Redeploy the Render backend after changing the origin.
 
 ## Database behavior
 
@@ -148,10 +96,7 @@ retention window.
 
 History responses are capped at 168 rows per request.
 
-For the free Render deployment, an external scheduler calls `POST /api/refresh`
-every 10 minutes with `Authorization: Bearer <REFRESH_SECRET>`. Render runs with
-`AUTO_SCRAPE=false`, so each scheduled request produces exactly one scrape while
-also keeping the web service inside Render's idle window.
+The automated scraping workflow runs every 15 minutes via GitHub Actions (`.github/workflows/scraper.yml`), triggered automatically or via `cron-job.org`. Each execution produces an updated monitoring snapshot directly to Supabase.
 
 ## Local development
 

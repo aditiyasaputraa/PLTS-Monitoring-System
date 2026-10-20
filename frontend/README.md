@@ -1,12 +1,6 @@
 # PLTS monitoring frontend for Vercel
 
-Vite/React dashboard that reads monitoring data from the Render backend:
-
-```text
-GET ${VITE_API_URL}/api/current
-```
-
-The browser does not connect to Supabase and must not receive a Supabase secret key.
+Vite/React dashboard that reads monitoring data from Supabase directly via secure client connection.
 
 ## Requirements
 
@@ -73,10 +67,8 @@ Node.js Version: 22.x
 Environment variables:
 
 ```text
-VITE_API_URL=https://your-render-service.onrender.com
-VITE_POLL_INTERVAL_MS=60000
+VITE_SUPABASE_URL=https://your-supabase-project.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
 ```
-
-Redeploy after changing Vercel environment variables. Then set the final Vercel origin in Render's `FRONTEND_ORIGIN` variable.
 
 Anything prefixed with `VITE_` becomes public browser configuration. Never place passwords, cookies, or Supabase secret keys there.

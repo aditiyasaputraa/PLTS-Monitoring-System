@@ -1,6 +1,6 @@
-# PLTS monitoring backend for Render
+# PLTS Monitoring Backend & Scraper Engine
 
-This FastAPI service runs the existing Huawei/Kehua scraper, normalizes the responses, and stores the result in Supabase.
+This backend runs the multi-vendor scraper (Huawei, Kehua, SMA), normalizes responses, and stores the results in Supabase.
 
 ## Storage model
 
@@ -10,13 +10,13 @@ After each scrape:
 2. A historical row is inserted into `monitoring_snapshots` when the history interval is due.
 3. History older than the configured retention period is deleted.
 
-The local `/tmp` output is only temporary diagnostic output. Supabase is the durable source used by API responses.
+The local `/tmp` output is only temporary diagnostic output. Supabase is the durable source used by API responses and frontend dashboards.
 
 ## Required setup
 
-Run `../supabase/schema.sql` in the Supabase SQL Editor before starting this service.
+Run `../supabase/schema.sql` in the Supabase SQL Editor before running the scraper.
 
-Required Render secrets:
+Required environment variables:
 
 ```text
 SUPABASE_URL
@@ -35,16 +35,12 @@ REFRESH_SECRET
 Publishable (`sb_publishable_...`) and legacy `anon` keys are rejected because
 they cannot write to the private monitoring tables.
 
-## Render deployment
+## Automated Execution
 
-For a monorepo, use the root `render.yaml`. For a backend-only repository, use this directory's `render.yaml`.
+The scraper runs automatically via `.github/workflows/scraper.yml` every 15 minutes, or can be run locally via:
 
-Render commands are already configured:
-
-```text
-Build: pip install -r requirements.txt
-Start: uvicorn api:app --host 0.0.0.0 --port $PORT
-Health check: /health
+```bash
+python run_cron.py
 ```
 
 ## Endpoints
@@ -82,7 +78,7 @@ uvicorn api:app --reload --host 0.0.0.0 --port 8000
 ```
 
 The service loads this local `.env` automatically and supports multiline JSON
-cookie exports. Runtime environment variables supplied by Render take precedence.
+cookie exports. System environment variables take precedence.
 
 Kehua cookies are optional when `KEHUA_USERNAME` and `KEHUA_PASSWORD` are set.
 Before each scrape the backend validates the current authorization token. If it

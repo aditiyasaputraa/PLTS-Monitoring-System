@@ -63,7 +63,7 @@ class StoreConfig:
 
 
 class SupabaseStore:
-    """Small synchronous storage adapter used only by the trusted Render backend."""
+    """Synchronous storage adapter for persisting monitoring snapshots and rollups to Supabase."""
 
     def __init__(self, config: StoreConfig | None, config_error: str | None = None):
         self.config = config

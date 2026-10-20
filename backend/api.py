@@ -350,7 +350,7 @@ def root_head() -> None:
 
 @app.get("/health")
 def health() -> dict[str, Any]:
-    """Render liveness endpoint. Database or scraper failures do not terminate the process."""
+    """Process liveness endpoint. Database or scraper failures do not terminate the process."""
     return {
         "status": "ok",
         "scraper": get_state(),
