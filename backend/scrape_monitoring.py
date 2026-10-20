@@ -1337,12 +1337,28 @@ def build_normalized_site(site_result: dict[str, Any]) -> dict[str, Any]:
         if account_region:
             for st in stations:
                 st["region"] = account_region
-        elif account_name in ("account_5", "account_6", "jaksel") or "jaksel" in account_name:
+        elif account_name in ("account_5", "account_6", "jakpus") or "jakpus" in account_name:
             for st in stations:
-                st["region"] = "Jakarta Selatan"
+                st["region"] = "Jakarta Pusat"
         elif account_name in ("account_3", "account_4", "jakbar") or "jakbar" in account_name:
             for st in stations:
                 st["region"] = "Jakarta Barat"
+        elif account_name in ("account_7", "account_8", "jaksel") or "jaksel" in account_name:
+            for st in stations:
+                st["region"] = "Jakarta Selatan"
+
+        for st in stations:
+            s_text = f"{st.get('name', '')} {st.get('address', '')}".lower()
+            if "pusat" in s_text or "jakpus" in s_text:
+                st["region"] = "Jakarta Pusat"
+            elif "selatan" in s_text or "jaksel" in s_text:
+                st["region"] = "Jakarta Selatan"
+            elif "barat" in s_text or "jakbar" in s_text:
+                st["region"] = "Jakarta Barat"
+            elif "timur" in s_text or "jaktim" in s_text:
+                st["region"] = "Jakarta Timur"
+            elif "utara" in s_text or "jakut" in s_text:
+                st["region"] = "Jakarta Utara"
         overview = normalize_kehua_overview(grouped, stations)
         alarms = normalize_kehua_alarms(grouped)
         charts = normalize_kehua_charts(grouped)
@@ -1843,6 +1859,13 @@ def normalize_kehua_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[d
         "SDN 09 JAKUT": (-6.12775, 106.858751, "Jl. Cemp. 1 No.Rt 09/03, no 69, RT.10/RW.6, Sunter Agung, Kec. Tj. Priok, Kota Jkt Utara, Daerah Khusus Ibukota Jakarta 14350, Indonesia"),
         "17478": (-6.134519, 106.870706, "7, Jl. Nusantara Selatan No.7, RT.7/RW.15, Sunter Agung, Kec. Tj. Priok, Kota Jkt Utara, Daerah Khusus Ibukota Jakarta 14350, Indonesia"),
         "SMPN 282 JAKUT": (-6.134519, 106.870706, "7, Jl. Nusantara Selatan No.7, RT.7/RW.15, Sunter Agung, Kec. Tj. Priok, Kota Jkt Utara, Daerah Khusus Ibukota Jakarta 14350, Indonesia"),
+        # Jakarta Pusat
+        "34142": (-6.168777, 106.816966, "SMP Negeri 72 Jakarta, Jl. Petojo Binatu 2 No. 2, Petojo Selatan, Gambir, Jakarta Pusat 10160"),
+        "SMPN 72 Jakpus": (-6.168777, 106.816966, "SMP Negeri 72 Jakarta, Jl. Petojo Binatu 2 No. 2, Petojo Selatan, Gambir, Jakarta Pusat 10160"),
+        "38722": (-6.17963, 106.814424, "SMP Negeri 94 Jakarta, Jl. Tanah Abang 5 No. 29, Petojo Selatan, Gambir, Jakarta Pusat 10160"),
+        "SMPN 94 Jakarta Pusat": (-6.17963, 106.814424, "SMP Negeri 94 Jakarta, Jl. Tanah Abang 5 No. 29, Petojo Selatan, Gambir, Jakarta Pusat 10160"),
+        "16721": (-6.179586, 106.814524, "SMP Negeri 94 Jakarta, Jl. Tanah Abang 5 No. 29, Petojo Selatan, Gambir, Jakarta Pusat 10160"),
+        "SMPN 94 Jakpus": (-6.179586, 106.814524, "SMP Negeri 94 Jakarta, Jl. Tanah Abang 5 No. 29, Petojo Selatan, Gambir, Jakarta Pusat 10160"),
     }
     for station in by_id.values():
         sid = str(station.get("station_id") or "")
@@ -1854,7 +1877,7 @@ def normalize_kehua_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[d
                 station["latitude"] = lat
             if station.get("longitude") is None:
                 station["longitude"] = lon
-            if not station.get("address"):
+            if not station.get("address") or str(station.get("address")).strip() in ("Indonesia1A", "Indonesia", "null"):
                 station["address"] = addr
 
         # Calculate Kehua revenue automatically using tariff Rp 900/kWh when not provided by vendor

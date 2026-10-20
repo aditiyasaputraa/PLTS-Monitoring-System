@@ -116,8 +116,8 @@ class KehuaAccountsTests(unittest.TestCase):
         normalized_jakut = build_normalized_site(site_result_jakut)
         self.assertNotEqual(normalized_jakut["stations"][0].get("region"), "Jakarta Barat")
 
-        # Verify account 5 (Jakarta Selatan) is assigned to Jakarta Selatan
-        site_result_jaksel = {
+        # Verify account 5 (Jakarta Pusat) is assigned to Jakarta Pusat
+        site_result_jakpus = {
             "site": "kehua",
             "scraped_at": "2026-10-16T10:00:00+00:00",
             "account": {"name": "account_5"},
@@ -128,22 +128,22 @@ class KehuaAccountsTests(unittest.TestCase):
                     "code": "0",
                     "data": {
                         "result": [{
-                            "stationId": "88888",
-                            "stationName": "SMPN JAKSEL",
+                            "stationId": "34142",
+                            "stationName": "SMPN 72 Jakpus",
                             "capacity": 15.0,
                         }]
                     }
                 }
             }],
         }
-        normalized_jaksel_5 = build_normalized_site(site_result_jaksel)
-        self.assertEqual(len(normalized_jaksel_5["stations"]), 1)
-        self.assertEqual(normalized_jaksel_5["stations"][0]["region"], "Jakarta Selatan")
+        normalized_jakpus_5 = build_normalized_site(site_result_jakpus)
+        self.assertEqual(len(normalized_jakpus_5["stations"]), 1)
+        self.assertEqual(normalized_jakpus_5["stations"][0]["region"], "Jakarta Pusat")
 
-        # Verify account 6 is also assigned to Jakarta Selatan
-        site_result_jaksel["account"] = {"name": "account_6"}
-        normalized_jaksel_6 = build_normalized_site(site_result_jaksel)
-        self.assertEqual(normalized_jaksel_6["stations"][0]["region"], "Jakarta Selatan")
+        # Verify account 6 is also assigned to Jakarta Pusat
+        site_result_jakpus["account"] = {"name": "account_6"}
+        normalized_jakpus_6 = build_normalized_site(site_result_jakpus)
+        self.assertEqual(normalized_jakpus_6["stations"][0]["region"], "Jakarta Pusat")
 
     def test_loads_fifth_and_sixth_accounts_from_simple_env(self):
         with patch.dict(os.environ, {
