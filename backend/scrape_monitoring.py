@@ -589,9 +589,7 @@ def load_huawei_accounts_from_env() -> list[dict[str, Any]]:
         if second_username and second_password:
             default_region = (
                 "Jakarta Barat" if index in (2, 3)
-                else ("Jakarta Pusat" if index == 4
-                else ("Jakarta Selatan" if index in (5, 6)
-                else ("Jakarta Timur" if index == 7 else None)))
+                else ("Jakarta Pusat" if index == 4 else None)
             )
             explicit_region = os.getenv(f"HUAWEI_REGION_{index}", "").strip()
             accounts.append({
@@ -1366,30 +1364,35 @@ def build_normalized_site(site_result: dict[str, Any]) -> dict[str, Any]:
                 st["region"] = "Jakarta Utara"
 
         for st in stations:
-            if not st.get("region"):
-                st_name_l = str(st.get("name") or "").lower()
-                addr_l = str(st.get("address") or "").lower()
-                s_text = f"{st_name_l} {addr_l}"
-                if any(k in st_name_l for k in ["cengkareng", "tambora", "smpn 205", "sman 85", "smpn 204", "sukabumi utara", "kalideres"]):
-                    st["region"] = "Jakarta Barat"
-                elif any(k in st_name_l for k in ["sawah besar", "gambir", "cempaka baru", "smpn 39", "kampung rawa", "smpn 08", "smpn 8 ", "perpustakaan arsip", "dppap", "paseban"]):
-                    st["region"] = "Jakarta Pusat"
-                elif any(k in st_name_l for k in ["pmptsp", "ragunan", "setiabudi", "jagakarsa", "pasar minggu", "smpn 175", "pejaten timur", "petukangan", "smkn 29", "grogol utara", "kalibata", "cilandak", "kebayoran"]):
-                    st["region"] = "Jakarta Selatan"
-                elif any(k in st_name_l for k in ["makassar", "pasar rebo", "ciracas", "rawamangun", "klender", "duren sawit", "pulogadung", "pulo gadung", "matraman", "knpi", "smpn 172", "cakung"]):
-                    st["region"] = "Jakarta Timur"
-                elif any(k in st_name_l for k in ["koja", "tanjung priok", "cilincing", "penjaringan", "islamic center", "tugu utara", "smpn 112", "bahtera jaya", "rawa badak", "pademangan", "smpn 244", "semper barat", "sekda saefullah", "sman 75", "sukapura"]):
-                    st["region"] = "Jakarta Utara"
-                elif "jakarta pusat" in s_text or "jkt pusat" in s_text or "jakpus" in s_text or "central jakarta" in s_text:
-                    st["region"] = "Jakarta Pusat"
-                elif "jakarta selatan" in s_text or "jkt selatan" in s_text or "jaksel" in s_text or "south jakarta" in s_text:
-                    st["region"] = "Jakarta Selatan"
-                elif "jakarta barat" in s_text or "jkt barat" in s_text or "jakbar" in s_text or "west jakarta" in s_text:
-                    st["region"] = "Jakarta Barat"
-                elif "jakarta timur" in s_text or "jkt timur" in s_text or "jaktim" in s_text or "east jakarta" in s_text:
-                    st["region"] = "Jakarta Timur"
-                elif "jakarta utara" in s_text or "jkt utara" in s_text or "jakut" in s_text or "north jakarta" in s_text:
-                    st["region"] = "Jakarta Utara"
+            st_name_l = str(st.get("name") or "").lower()
+            addr_l = str(st.get("address") or "").lower()
+            s_text = f"{st_name_l} {addr_l}"
+            matched_region = None
+            if any(k in st_name_l for k in ["cengkareng", "tambora", "smpn 205", "sman 85", "smpn 204", "sukabumi utara", "kalideres"]):
+                matched_region = "Jakarta Barat"
+            elif any(k in st_name_l for k in ["sawah besar", "gambir", "cempaka baru", "smpn 39", "kampung rawa", "smpn 08", "smpn 8 ", "perpustakaan arsip", "dppap", "paseban"]):
+                matched_region = "Jakarta Pusat"
+            elif any(k in st_name_l for k in ["pmptsp", "ragunan", "setiabudi", "jagakarsa", "pasar minggu", "smpn 175", "pejaten timur", "petukangan", "smkn 29", "grogol utara", "kalibata", "cilandak", "kebayoran"]):
+                matched_region = "Jakarta Selatan"
+            elif any(k in st_name_l for k in ["makassar", "pasar rebo", "ciracas", "rawamangun", "klender", "duren sawit", "pulogadung", "pulo gadung", "matraman", "knpi", "smpn 172", "cakung"]):
+                matched_region = "Jakarta Timur"
+            elif any(k in st_name_l for k in ["koja", "tanjung priok", "cilincing", "penjaringan", "islamic center", "tugu utara", "smpn 112", "bahtera jaya", "rawa badak", "pademangan", "smpn 244", "semper barat", "sekda saefullah", "sman 75", "sukapura"]):
+                matched_region = "Jakarta Utara"
+            elif "jakarta pusat" in s_text or "jkt pusat" in s_text or "jakpus" in s_text or "central jakarta" in s_text:
+                matched_region = "Jakarta Pusat"
+            elif "jakarta selatan" in s_text or "jkt selatan" in s_text or "jaksel" in s_text or "south jakarta" in s_text:
+                matched_region = "Jakarta Selatan"
+            elif "jakarta barat" in s_text or "jkt barat" in s_text or "jakbar" in s_text or "west jakarta" in s_text:
+                matched_region = "Jakarta Barat"
+            elif "jakarta timur" in s_text or "jkt timur" in s_text or "jaktim" in s_text or "east jakarta" in s_text:
+                matched_region = "Jakarta Timur"
+            elif "jakarta utara" in s_text or "jkt utara" in s_text or "jakut" in s_text or "north jakarta" in s_text:
+                matched_region = "Jakarta Utara"
+
+            if matched_region:
+                st["region"] = matched_region
+            elif not st.get("region") and account_region:
+                st["region"] = account_region
         overview = normalize_huawei_overview(grouped, stations)
         alarms = normalize_huawei_alarms(grouped)
         charts = normalize_huawei_charts(grouped)
