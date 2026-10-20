@@ -794,6 +794,34 @@ function Dashboard({ session, onSignOut }) {
         longitude = 106.85954;
         address = "SMA Negeri 8 Jakarta, Jl. Taman Bukit Duri No. 14, Bukit Duri, Tebet, Jakarta Selatan 12840";
       }
+      // Jakarta Pusat (Huawei: SDN Paseban 01 & 07 - Google Maps verified)
+      else if (nameLower.includes("paseban 01")) {
+        latitude = -6.18915;
+        longitude = 106.85259;
+        address = "SD Negeri Paseban 01 Pagi, Jl. Salemba Tengah No. 28, Paseban, Senen, Jakarta Pusat 10440";
+      } else if (nameLower.includes("paseban 07")) {
+        latitude = -6.19336;
+        longitude = 106.85542;
+        address = "SD Negeri Paseban 07 Pagi, Jl. Paseban Raya No. 4, Paseban, Senen, Jakarta Pusat 10440";
+      }
+      // Jakarta Utara (Huawei: GOR Sekda Saefullah, SDN Rawa Badak Selatan 03, SMAN 75, SDN Sukapura 02 - Google Maps verified)
+      else if (nameLower.includes("sekda saefullah") || nameLower.includes("saefullah")) {
+        latitude = -6.136909;
+        longitude = 106.965655;
+        address = "GOR Sekda Saefullah, Jl. Sungai Kendal No. 17, Rorotan, Cilincing, Jakarta Utara 14140";
+      } else if (nameLower.includes("rawa badak")) {
+        latitude = -6.124710;
+        longitude = 106.902798;
+        address = "SDN Rawa Badak Selatan 03 Pagi, Jl. Mayangsari I No. 58, Rawa Badak Selatan, Koja, Jakarta Utara 14230";
+      } else if (nameLower.includes("sman 75") || (nameLower.includes("75") && nameLower.includes("utara"))) {
+        latitude = -6.134575;
+        longitude = 106.924123;
+        address = "SMA Negeri 75 Jakarta, Jl. Sungai Kampar X No. 20, Semper Barat, Cilincing, Jakarta Utara 14130";
+      } else if (nameLower.includes("sukapura")) {
+        latitude = -6.146032;
+        longitude = 106.921632;
+        address = "SDN Sukapura 02 Pagi, Jl. Komp. KBN No. 2, Sukapura, Cilincing, Jakarta Utara 14140";
+      }
 
       return {
         ...station,
