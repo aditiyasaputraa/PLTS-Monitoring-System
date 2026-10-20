@@ -2006,11 +2006,17 @@ function TodayEnergyBySiteChart({
     );
   }
 
-  // View modes: "top10", "top20", "region", "all"
-  const defaultMode = locations.length > 10 ? "top10" : "all";
-  const [viewMode, setViewMode] = useState(defaultMode);
+  // View mode: "all" (paginated by 10) or "region" (aggregate 5 cities)
+  const [viewMode, setViewMode] = useState("all");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
 
-  // Normalize site data
+  // Reset page whenever region, locations, or viewMode changes
+  useEffect(() => {
+    setPage(1);
+  }, [selectedRegion, locations, viewMode]);
+
+  // Normalize site data and sort descending by today energy
   const allSitesData = useMemo(() => {
     const fallbacks = [1.7, 1.5, 3.1, 0.08, 0.08, 4.1];
     return locations.map((loc, idx) => {
@@ -2020,7 +2026,7 @@ function TodayEnergyBySiteChart({
         ...loc,
         val,
       };
-    });
+    }).sort((a, b) => b.val - a.val);
   }, [locations]);
 
   // Aggregate by region (for "region" mode)
@@ -2051,20 +2057,17 @@ function TodayEnergyBySiteChart({
     }));
   }, [locations, allLocations, selectedRegion]);
 
+  const totalPages = Math.max(1, Math.ceil(allSitesData.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+
   // Filter display data based on active viewMode
   const displayData = useMemo(() => {
     if (viewMode === "region") {
       return regionAggregateData;
     }
-    const sorted = [...allSitesData].sort((a, b) => b.val - a.val);
-    if (viewMode === "top10") {
-      return sorted.slice(0, 10);
-    }
-    if (viewMode === "top20") {
-      return sorted.slice(0, 20);
-    }
-    return sorted;
-  }, [viewMode, allSitesData, regionAggregateData]);
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return allSitesData.slice(start, start + PAGE_SIZE);
+  }, [viewMode, currentPage, allSitesData, regionAggregateData]);
 
   const rawMax = Math.max(...displayData.map((s) => s.val), 4);
   let yMax = 4;
@@ -2079,36 +2082,39 @@ function TodayEnergyBySiteChart({
 
   const yTicks = [yMax, yMax * 0.75, yMax * 0.5, yMax * 0.25, 0];
   const count = displayData.length;
-  const isScrollable = count > 10;
-  const plotTop = 16;
+  const svgWidth = 680;
+  const svgHeight = 205;
+  const plotTop = 18;
   const plotBottom = 145;
   const plotHeight = plotBottom - plotTop;
-  const yAxisWidth = 36;
-  const slotWidth = isScrollable ? 54 : (count > 0 ? (680 / count) : 68);
-  const contentWidth = isScrollable ? (count * slotWidth + 20) : 680;
-  const barWidth = Math.min(36, Math.max(16, slotWidth * 0.48));
+  const yAxisWidth = 38;
+  const plotWidth = svgWidth - yAxisWidth - 10;
+  const slotWidth = count > 0 ? (plotWidth / count) : 64;
+  const barWidth = Math.min(34, Math.max(18, slotWidth * 0.46));
+
+  const startIdx = (currentPage - 1) * PAGE_SIZE + 1;
+  const endIdx = Math.min(currentPage * PAGE_SIZE, allSitesData.length);
 
   return (
     <div className="today-energy-chart-wrap">
-      {/* View Mode Switcher Pills */}
-      {locations.length > 8 && (
-        <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", marginBottom: "8px" }}>
+      {/* Controls Header: Tabs on Left + Pagination Controls on Right */}
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: "10px",
+        flexWrap: "wrap",
+        marginBottom: "10px",
+      }}>
+        {/* Left: View Mode Tabs */}
+        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
           <button
             type="button"
-            className={`chart-tab-pill ${viewMode === "top10" ? "active" : ""}`}
-            onClick={() => setViewMode("top10")}
+            className={`chart-tab-pill ${viewMode === "all" ? "active" : ""}`}
+            onClick={() => setViewMode("all")}
           >
-            🏆 Top 10
+            📊 {selectedRegion === "all" ? `Semua PLTS (${allSitesData.length})` : `PLTS (${allSitesData.length})`}
           </button>
-          {locations.length > 15 && (
-            <button
-              type="button"
-              className={`chart-tab-pill ${viewMode === "top20" ? "active" : ""}`}
-              onClick={() => setViewMode("top20")}
-            >
-              📊 Top 20
-            </button>
-          )}
           {selectedRegion === "all" && (
             <button
               type="button"
@@ -2118,32 +2124,59 @@ function TodayEnergyBySiteChart({
               🏢 Per Wilayah (5 Kota)
             </button>
           )}
-          <button
-            type="button"
-            className={`chart-tab-pill ${viewMode === "all" ? "active" : ""}`}
-            onClick={() => setViewMode("all")}
-          >
-            📋 Semua ({locations.length})
-          </button>
-          {isScrollable && (
-            <span style={{ fontSize: "11px", color: "#7d8f82", marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-              <span>↔ Geser untuk melihat semua</span>
-            </span>
-          )}
         </div>
-      )}
 
-      {/* Chart Layout: Pinned Left Y-Axis + Flexible/Scrollable Bars Area */}
-      <div style={{ display: "flex", width: "100%", height: "205px", position: "relative" }}>
-        {/* Pinned Y-Axis column (Sticky on the left) */}
-        <div style={{ width: `${yAxisWidth}px`, height: "100%", flexShrink: 0, position: "relative" }}>
-          <svg width={yAxisWidth} height="205" style={{ display: "block", overflow: "visible" }}>
-            {yTicks.map((tickVal) => {
-              const y = plotBottom - (tickVal / yMax) * plotHeight;
-              return (
+        {/* Right: Pagination Controls for 10-per-page */}
+        {viewMode === "all" && totalPages > 1 && (
+          <div style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ fontSize: "11px", fontWeight: 600, color: "#586b5e" }}>
+              Halaman {currentPage} / {totalPages} <span style={{ color: "#8a9d90", fontWeight: 500 }}>({startIdx}–{endIdx})</span>
+            </span>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+              <button
+                type="button"
+                className="chart-page-btn"
+                disabled={currentPage <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                title="Halaman Sebelumnya"
+              >
+                ‹
+              </button>
+              <button
+                type="button"
+                className="chart-page-btn"
+                disabled={currentPage >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                title="Halaman Berikutnya"
+              >
+                ›
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* SVG Chart: Fixed ViewBox for 100% Responsive Fit Without Blowouts */}
+      <div style={{ width: "100%", height: "205px", position: "relative" }}>
+        <svg
+          viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+          style={{ width: "100%", height: "100%", display: "block" }}
+        >
+          {/* Horizontal Grid lines and Y-axis text */}
+          {yTicks.map((tickVal) => {
+            const y = plotBottom - (tickVal / yMax) * plotHeight;
+            return (
+              <g key={tickVal}>
+                <line
+                  x1={yAxisWidth}
+                  y1={y}
+                  x2={svgWidth - 6}
+                  y2={y}
+                  stroke="#edf2ec"
+                  strokeWidth="1"
+                />
                 <text
-                  key={tickVal}
-                  x={yAxisWidth - 6}
+                  x={yAxisWidth - 8}
                   y={y + 3.5}
                   fill="#7d8f82"
                   fontSize="9.5"
@@ -2152,130 +2185,94 @@ function TodayEnergyBySiteChart({
                 >
                   {tickVal}
                 </text>
-              );
-            })}
-          </svg>
-        </div>
+              </g>
+            );
+          })}
 
-        {/* Scrollable / Flexible Bars Content */}
-        <div
-          className="today-energy-scrollable"
-          style={{
-            flex: 1,
-            height: "100%",
-            overflowX: isScrollable ? "auto" : "hidden",
-            overflowY: "hidden",
-          }}
-        >
-          <svg
-            width={isScrollable ? contentWidth : "100%"}
-            height="205"
-            viewBox={`0 0 ${contentWidth} 205`}
-            style={{ display: "block", minWidth: isScrollable ? `${contentWidth}px` : "100%" }}
-          >
-            {/* Grid lines */}
-            {yTicks.map((tickVal) => {
-              const y = plotBottom - (tickVal / yMax) * plotHeight;
-              return (
-                <line
-                  key={tickVal}
-                  x1="0"
-                  y1={y}
-                  x2={contentWidth}
-                  y2={y}
-                  stroke="#edf2ec"
-                  strokeWidth="1"
-                />
-              );
-            })}
+          {/* Bars and Labels */}
+          {displayData.map((item, idx) => {
+            const slotCenter = yAxisWidth + idx * slotWidth + slotWidth / 2;
+            const barX = slotCenter - barWidth / 2;
+            const barHeight = Math.max((item.val / yMax) * plotHeight, 3);
+            const barY = plotBottom - barHeight;
+            const isSelected = item.uid === selectedId;
+            const isRegion = item.isRegionBar;
+            const labelText = isRegion
+              ? item.name
+              : formatStationLabel(item.name, true);
 
-            {/* Bars and Labels */}
-            {displayData.map((item, idx) => {
-              const slotCenter = idx * slotWidth + slotWidth / 2;
-              const barX = slotCenter - barWidth / 2;
-              const barHeight = Math.max((item.val / yMax) * plotHeight, 3);
-              const barY = plotBottom - barHeight;
-              const isSelected = item.uid === selectedId;
-              const isRegion = item.isRegionBar;
-              const labelText = isRegion
-                ? item.name
-                : formatStationLabel(item.name, isScrollable || count > 6);
+            return (
+              <g
+                key={item.uid || item.name || idx}
+                style={{ cursor: "pointer" }}
+                onClick={() => {
+                  if (isRegion && onSelectRegion) {
+                    onSelectRegion(item.name);
+                  } else if (onSelect && item.uid) {
+                    onSelect(item.uid);
+                  }
+                }}
+              >
+                <title>
+                  {isRegion
+                    ? `${item.name}: ${item.val} kWh (${item.count} PLTS)`
+                    : `${item.name}: ${item.val} kWh (${item.region || "DKI Jakarta"})`}
+                </title>
 
-              return (
-                <g
-                  key={item.uid || item.name || idx}
-                  style={{ cursor: "pointer" }}
-                  onClick={() => {
-                    if (isRegion && onSelectRegion) {
-                      onSelectRegion(item.name);
-                    } else if (onSelect && item.uid) {
-                      onSelect(item.uid);
-                    }
-                  }}
+                {/* Value label on top of bar */}
+                <text
+                  x={slotCenter}
+                  y={barY - 5}
+                  fill={isSelected ? "#1b804e" : "#586b5e"}
+                  fontSize={isRegion ? "9.5" : "8.5"}
+                  fontWeight="700"
+                  textAnchor="middle"
                 >
-                  <title>
-                    {isRegion
-                      ? `${item.name}: ${item.val} kWh (${item.count} PLTS)`
-                      : `${item.name}: ${item.val} kWh (${item.region || "DKI Jakarta"})`}
-                  </title>
+                  {item.val}
+                </text>
 
-                  {/* Value label on top of bar */}
-                  {(count <= 10 || isRegion) && (
-                    <text
-                      x={slotCenter}
-                      y={barY - 5}
-                      fill={isSelected ? "#1b804e" : "#586b5e"}
-                      fontSize={isRegion ? "9.5" : "8"}
-                      fontWeight="700"
-                      textAnchor="middle"
-                    >
-                      {item.val}
-                    </text>
-                  )}
+                {/* The Bar */}
+                <rect
+                  x={barX}
+                  y={barY}
+                  width={barWidth}
+                  height={barHeight}
+                  rx={isRegion ? "6" : "4"}
+                  ry={isRegion ? "6" : "4"}
+                  fill={isSelected ? "#10b981" : "#1b804e"}
+                  opacity={isSelected ? 1 : 0.92}
+                  style={{ transition: "all 0.2s ease" }}
+                />
 
-                  {/* The Bar */}
-                  <rect
-                    x={barX}
-                    y={barY}
-                    width={barWidth}
-                    height={barHeight}
-                    rx={isRegion ? "6" : "4"}
-                    ry={isRegion ? "6" : "4"}
-                    fill={isSelected ? "#10b981" : "#1b804e"}
-                    opacity={isSelected ? 1 : 0.92}
-                    style={{ transition: "all 0.2s ease" }}
-                  />
+                {/* Angled or Straight Label */}
+                <text
+                  x={slotCenter}
+                  y={plotBottom + 12}
+                  fill={isSelected ? "#1b804e" : "#44554a"}
+                  fontSize={isRegion ? "9.5" : "8"}
+                  fontWeight={isSelected || isRegion ? "700" : "600"}
+                  textAnchor={isRegion ? "middle" : "end"}
+                  transform={isRegion ? undefined : `rotate(-32, ${slotCenter}, ${plotBottom + 12})`}
+                >
+                  {labelText}
+                </text>
 
-                  {/* Angled or Straight Label */}
+                {isRegion && (
                   <text
                     x={slotCenter}
-                    y={plotBottom + 12}
-                    fill={isSelected ? "#1b804e" : "#44554a"}
-                    fontSize={isRegion ? "9.5" : "8"}
-                    fontWeight={isSelected || isRegion ? "700" : "600"}
-                    textAnchor={isRegion ? "middle" : "end"}
-                    transform={isRegion ? undefined : `rotate(-38, ${slotCenter}, ${plotBottom + 12})`}
+                    y={plotBottom + 26}
+                    fill="#7d8f82"
+                    fontSize="8.5"
+                    fontWeight="500"
+                    textAnchor="middle"
                   >
-                    {labelText}
+                    {item.count} PLTS
                   </text>
-
-                  {isRegion && (
-                    <text
-                      x={slotCenter}
-                      y={plotBottom + 26}
-                      fill="#7d8f82"
-                      fontSize="8.5"
-                      fontWeight="500"
-                      textAnchor="middle"
-                    >
-                      {item.count} PLTS
-                    </text>
-                  )}
-                </g>
-              );
-            })}
-          </svg>
-        </div>
+                )}
+              </g>
+            );
+          })}
+        </svg>
       </div>
     </div>
   );
