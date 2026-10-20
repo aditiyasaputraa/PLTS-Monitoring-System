@@ -699,9 +699,9 @@ function Dashboard({ session, onSignOut }) {
       const isAutoTariff = ["kehua", "sma"].includes((site.platform || "").toLowerCase()) || !hasVendorIncome;
 
       const dailyKwh = Number(station.today_energy_kwh ?? station.daily_energy_kwh ?? 0);
-      const monthlyKwh = Number(station.monthly_energy_kwh ?? 0);
-      const yearlyKwh = Number(station.yearly_energy_kwh ?? 0);
-      const cumulativeKwh = Number(station.cumulative_energy_kwh ?? 0);
+      const monthlyKwh = Number(station.monthly_energy_kwh ?? station.month_energy_kwh ?? 0);
+      const yearlyKwh = Number(station.yearly_energy_kwh ?? station.year_energy_kwh ?? 0);
+      const cumulativeKwh = Number(station.cumulative_energy_kwh ?? station.total_energy_kwh ?? 0);
 
       const dailyIncome = isAutoTariff
         ? (Number(station.daily_income) || Math.round(dailyKwh * 900))
@@ -4091,10 +4091,10 @@ function buildFleet(sites, locations) {
   const overview = sites.map((s) => s.overview || {});
   const capacity = locations.reduce((sum, l) => sum + (Number(l.capacity_kwp || l.installed_capacity) || 0), 0);
   const current = locations.reduce((sum, l) => sum + (Number(l.current_power_kw ?? l.output_power_kw ?? l.inverter_power_kw) || 0), 0);
-  const daily = locations.reduce((sum, l) => sum + (Number(l.today_energy_kwh || l.daily_energy_kwh) || 0), 0);
-  const monthly = locations.reduce((sum, l) => sum + (Number(l.monthly_energy_kwh) || 0), 0);
-  const yearly = locations.reduce((sum, l) => sum + (Number(l.yearly_energy_kwh) || 0), 0);
-  const cumulative = locations.reduce((sum, l) => sum + (Number(l.cumulative_energy_kwh) || 0), 0);
+  const daily = locations.reduce((sum, l) => sum + (Number(l.today_energy_kwh ?? l.daily_energy_kwh) || 0), 0);
+  const monthly = locations.reduce((sum, l) => sum + (Number(l.monthly_energy_kwh ?? l.month_energy_kwh) || 0), 0);
+  const yearly = locations.reduce((sum, l) => sum + (Number(l.yearly_energy_kwh ?? l.year_energy_kwh) || 0), 0);
+  const cumulative = locations.reduce((sum, l) => sum + (Number(l.cumulative_energy_kwh ?? l.total_energy_kwh) || 0), 0);
   const totalIncome = locations.reduce((sum, l) => sum + (Number(l.cumulative_income) || 0), 0);
   const monthlyIncome = locations.reduce((sum, l) => sum + (Number(l.monthly_income) || 0), 0);
   const yearlyIncome = locations.reduce((sum, l) => sum + (Number(l.yearly_income) || 0), 0);
