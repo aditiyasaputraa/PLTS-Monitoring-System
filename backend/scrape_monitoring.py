@@ -1554,7 +1554,7 @@ def normalize_huawei_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[
             station["longitude"] = 106.902798
             station["address"] = "SDN Rawa Badak Selatan 03 Pagi, Jl. Mayangsari I No. 58, Rawa Badak Selatan, Koja, Jakarta Utara 14230"
             station["region"] = "Jakarta Utara"
-        elif "75" in st_name_l:
+        elif "sman 75" in st_name_l or "sma 75" in st_name_l or "sma negeri 75" in st_name_l:
             station["latitude"] = -6.134575
             station["longitude"] = 106.924123
             station["address"] = "SMA Negeri 75 Jakarta, Jl. Sungai Kampar X No. 20, Semper Barat, Cilincing, Jakarta Utara 14130"
