@@ -471,7 +471,16 @@ function validCoordinate(value) {
 }
 
 function useMonitoringData(session, onUnauthorized) {
-  const [data, setData] = useState(null);
+  const [data, setData] = useState(() => {
+    try {
+      const cached = localStorage.getItem("plts_last_snapshot");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.by_site) return parsed;
+      }
+    } catch (_) {}
+    return null;
+  });
   const [error, setError] = useState(null);
   const loadRef = useRef(null);
 
@@ -490,13 +499,16 @@ function useMonitoringData(session, onUnauthorized) {
               Accept: "application/json",
             },
           },
-          4_000
+          8_000
         );
 
         if (sbResponse.ok) {
           const rows = await sbResponse.json();
           if (!cancelled && Array.isArray(rows) && rows.length > 0 && rows[0]?.payload?.by_site) {
             setData(rows[0].payload);
+            try {
+              localStorage.setItem("plts_last_snapshot", JSON.stringify(rows[0].payload));
+            } catch (_) {}
             setError(null);
             return;
           }
@@ -514,6 +526,9 @@ function useMonitoringData(session, onUnauthorized) {
             const json = await res.json();
             if (!cancelled && json?.by_site) {
               setData(json);
+              try {
+                localStorage.setItem("plts_last_snapshot", JSON.stringify(json));
+              } catch (_) {}
               setError(null);
               return;
             }
@@ -904,7 +919,9 @@ function Dashboard({ session, onSignOut }) {
   }, [isSyncing, refresh]);
 
   const formattedUpdatedDate = useMemo(() => {
-    const date = data?.updated_at ? new Date(data.updated_at) : new Date();
+    if (!data?.updated_at) return "-";
+    const date = new Date(data.updated_at);
+    if (isNaN(date.getTime())) return "-";
     const d = String(date.getDate()).padStart(2, "0");
     const m = String(date.getMonth() + 1).padStart(2, "0");
     const y = date.getFullYear();
@@ -913,7 +930,9 @@ function Dashboard({ session, onSignOut }) {
   }, [data?.updated_at]);
 
   const streamTimeWib = useMemo(() => {
-    const date = data?.updated_at ? new Date(data.updated_at) : new Date();
+    if (!data?.updated_at) return "--:-- WIB";
+    const date = new Date(data.updated_at);
+    if (isNaN(date.getTime())) return "--:-- WIB";
     return `${date.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })} WIB`;
   }, [data?.updated_at]);
 
