@@ -1896,6 +1896,11 @@ def normalize_kehua_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[d
         "SMPN 94 Jakarta Pusat": (-6.17970, 106.81455, "SMP Negeri 94 Jakarta, Jl. Tanah Abang 5 No. 29, Petojo Selatan, Gambir, Jakarta Pusat 10160"),
         "16721": (-6.17970, 106.81455, "SMP Negeri 94 Jakarta, Jl. Tanah Abang 5 No. 29, Petojo Selatan, Gambir, Jakarta Pusat 10160"),
         "SMPN 94 Jakpus": (-6.17970, 106.81455, "SMP Negeri 94 Jakarta, Jl. Tanah Abang 5 No. 29, Petojo Selatan, Gambir, Jakarta Pusat 10160"),
+        # Jakarta Selatan
+        "17409": (-6.24459, 106.768813, "SMP Negeri 31 Jakarta, Jl. Peninggaran Barat III No. 85, Kebayoran Lama Utara, Jakarta Selatan 12240"),
+        "SMPN 31 Jaksel": (-6.24459, 106.768813, "SMP Negeri 31 Jakarta, Jl. Peninggaran Barat III No. 85, Kebayoran Lama Utara, Jakarta Selatan 12240"),
+        "17420": (-6.290358, 106.790662, "GOR Cilandak, Jl. KH. Muhasyim VII No. 8, Cilandak Barat, Jakarta Selatan 12430"),
+        "GOR Cilandak": (-6.290358, 106.790662, "GOR Cilandak, Jl. KH. Muhasyim VII No. 8, Cilandak Barat, Jakarta Selatan 12430"),
     }
     for station in by_id.values():
         sid = str(station.get("station_id") or "")
