@@ -2031,31 +2031,47 @@ function TodayEnergyBySiteChart({
 
   // Aggregate by region (for "region" mode)
   const regionAggregateData = useMemo(() => {
-    const sourceList = (selectedRegion === "all" && allLocations && allLocations.length > 0)
+    const sourceList = (allLocations && allLocations.length > 0)
       ? allLocations
       : locations;
-    const regionNames = ["Jakarta Pusat", "Jakarta Utara", "Jakarta Barat", "Jakarta Selatan", "Jakarta Timur"];
+    const targetRegions = [
+      { id: "jakpus", name: "Jakarta Pusat" },
+      { id: "jakut", name: "Jakarta Utara" },
+      { id: "jakbar", name: "Jakarta Barat" },
+      { id: "jaksel", name: "Jakarta Selatan" },
+      { id: "jaktim", name: "Jakarta Timur" },
+    ];
+
     const groups = {};
-    regionNames.forEach((r) => {
-      groups[r] = { name: r, val: 0, count: 0, capacity: 0 };
+    targetRegions.forEach((reg) => {
+      groups[reg.id] = { id: reg.id, name: reg.name, val: 0, count: 0, capacity: 0 };
     });
 
     sourceList.forEach((loc) => {
-      const r = loc.region;
-      if (groups[r]) {
+      let rId = loc.region;
+      if (!rId || !groups[rId]) {
+        const indo = getRegionIndoName(loc).toLowerCase();
+        if (indo.includes("pusat") || indo.includes("jakpus")) rId = "jakpus";
+        else if (indo.includes("utara") || indo.includes("jakut")) rId = "jakut";
+        else if (indo.includes("barat") || indo.includes("jakbar")) rId = "jakbar";
+        else if (indo.includes("selatan") || indo.includes("jaksel")) rId = "jaksel";
+        else if (indo.includes("timur") || indo.includes("jaktim")) rId = "jaktim";
+      }
+
+      if (groups[rId]) {
         const realVal = Number(loc.today_energy_kwh ?? loc.daily_energy_kwh ?? 0);
-        groups[r].val += realVal;
-        groups[r].count += 1;
-        groups[r].capacity += Number(loc.installed_capacity_kwp ?? loc.capacity ?? 0);
+        groups[rId].val += realVal;
+        groups[rId].count += 1;
+        groups[rId].capacity += Number(loc.installed_capacity_kwp ?? loc.capacity ?? 0);
       }
     });
 
-    return regionNames.map((r) => ({
-      ...groups[r],
-      val: Math.round(groups[r].val * 10) / 10,
+    return targetRegions.map((reg) => ({
+      ...groups[reg.id],
+      val: Math.round(groups[reg.id].val * 10) / 10,
       isRegionBar: true,
     }));
-  }, [locations, allLocations, selectedRegion]);
+  }, [locations, allLocations]);
 
   const totalPages = Math.max(1, Math.ceil(allSitesData.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -2078,19 +2094,21 @@ function TodayEnergyBySiteChart({
   else if (rawMax <= 20) yMax = 20;
   else if (rawMax <= 50) yMax = Math.ceil(rawMax / 10) * 10;
   else if (rawMax <= 150) yMax = Math.ceil(rawMax / 25) * 25;
-  else yMax = Math.ceil(rawMax / 50) * 50;
+  else if (rawMax <= 500) yMax = Math.ceil(rawMax / 50) * 50;
+  else if (rawMax <= 1500) yMax = Math.ceil(rawMax / 100) * 100;
+  else yMax = Math.ceil(rawMax / 250) * 250;
 
-  const yTicks = [yMax, yMax * 0.75, yMax * 0.5, yMax * 0.25, 0];
+  const yTicks = [yMax, Math.round(yMax * 0.75), Math.round(yMax * 0.5), Math.round(yMax * 0.25), 0];
   const count = displayData.length;
   const svgWidth = 680;
   const svgHeight = 205;
   const plotTop = 18;
   const plotBottom = 145;
   const plotHeight = plotBottom - plotTop;
-  const yAxisWidth = 38;
+  const yAxisWidth = rawMax >= 1000 ? 46 : 38;
   const plotWidth = svgWidth - yAxisWidth - 10;
   const slotWidth = count > 0 ? (plotWidth / count) : 64;
-  const barWidth = Math.min(34, Math.max(18, slotWidth * 0.46));
+  const barWidth = viewMode === "region" ? 44 : Math.min(34, Math.max(18, slotWidth * 0.46));
 
   const startIdx = (currentPage - 1) * PAGE_SIZE + 1;
   const endIdx = Math.min(currentPage * PAGE_SIZE, allSitesData.length);
@@ -2207,7 +2225,7 @@ function TodayEnergyBySiteChart({
                 style={{ cursor: "pointer" }}
                 onClick={() => {
                   if (isRegion && onSelectRegion) {
-                    onSelectRegion(item.name);
+                    onSelectRegion(item.id);
                   } else if (onSelect && item.uid) {
                     onSelect(item.uid);
                   }
@@ -2215,8 +2233,8 @@ function TodayEnergyBySiteChart({
               >
                 <title>
                   {isRegion
-                    ? `${item.name}: ${item.val} kWh (${item.count} PLTS)`
-                    : `${item.name}: ${item.val} kWh (${item.region || "DKI Jakarta"})`}
+                    ? `${item.name}: ${item.val} kWh (${item.count} PLTS) - Klik untuk lihat wilayah ini`
+                    : `${item.name}: ${item.val} kWh (${getRegionIndoName(item)})`}
                 </title>
 
                 {/* Value label on top of bar */}
@@ -2224,11 +2242,11 @@ function TodayEnergyBySiteChart({
                   x={slotCenter}
                   y={barY - 5}
                   fill={isSelected ? "#1b804e" : "#586b5e"}
-                  fontSize={isRegion ? "9.5" : "8.5"}
+                  fontSize={isRegion ? "10" : "8.5"}
                   fontWeight="700"
                   textAnchor="middle"
                 >
-                  {item.val}
+                  {new Intl.NumberFormat("id-ID").format(item.val)}
                 </text>
 
                 {/* The Bar */}
@@ -2249,7 +2267,7 @@ function TodayEnergyBySiteChart({
                   x={slotCenter}
                   y={plotBottom + 12}
                   fill={isSelected ? "#1b804e" : "#44554a"}
-                  fontSize={isRegion ? "9.5" : "8"}
+                  fontSize={isRegion ? "10" : "8"}
                   fontWeight={isSelected || isRegion ? "700" : "600"}
                   textAnchor={isRegion ? "middle" : "end"}
                   transform={isRegion ? undefined : `rotate(-32, ${slotCenter}, ${plotBottom + 12})`}
