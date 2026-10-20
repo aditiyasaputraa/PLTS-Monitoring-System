@@ -48,6 +48,12 @@ jobs:
           HUAWEI_PASSWORD_3: ${{ secrets.HUAWEI_PASSWORD_3 }}
           HUAWEI_USERNAME_4: ${{ secrets.HUAWEI_USERNAME_4 }}
           HUAWEI_PASSWORD_4: ${{ secrets.HUAWEI_PASSWORD_4 }}
+          HUAWEI_USERNAME_5: ${{ secrets.HUAWEI_USERNAME_5 }}
+          HUAWEI_PASSWORD_5: ${{ secrets.HUAWEI_PASSWORD_5 }}
+          HUAWEI_USERNAME_6: ${{ secrets.HUAWEI_USERNAME_6 }}
+          HUAWEI_PASSWORD_6: ${{ secrets.HUAWEI_PASSWORD_6 }}
+          HUAWEI_USERNAME_7: ${{ secrets.HUAWEI_USERNAME_7 }}
+          HUAWEI_PASSWORD_7: ${{ secrets.HUAWEI_PASSWORD_7 }}
           HUAWEI_ACCOUNTS_JSON: ${{ secrets.HUAWEI_ACCOUNTS_JSON }}
           KEHUA_USERNAME: ${{ secrets.KEHUA_USERNAME }}
           KEHUA_PASSWORD: ${{ secrets.KEHUA_PASSWORD }}

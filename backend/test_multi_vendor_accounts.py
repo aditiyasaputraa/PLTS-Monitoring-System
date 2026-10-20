@@ -203,6 +203,37 @@ class MultiVendorAccountsTests(unittest.TestCase):
         self.assertEqual(norm_kehua["stations"][0]["region"], "Jakarta Utara")
 
 
+    def test_huawei_mixed_accounts_region_resolution(self):
+        huawei_mixed_result = {
+            "site": "huawei",
+            "scraped_at": "2026-10-20T10:00:00+00:00",
+            "account": {"name": "account_5", "username": "mixed_user"},
+            "summary": {"success_count": 1, "failed_count": 0, "auth_error_count": 0},
+            "calls": [{
+                "name": "station-list",
+                "response_body": {
+                    "data": {
+                        "list": [
+                            {"dn": "NE=5001", "name": "PUSKESMAS CENGKARENG", "plantAddress": "Jakarta Barat"},
+                            {"dn": "NE=5002", "name": "Puskesmas Sawah Besar", "plantAddress": "Jakara Pusat"},
+                            {"dn": "NE=5003", "name": "PPOP RAGUNAN", "plantAddress": "Pasar Minggu Jakarta Selatan"},
+                            {"dn": "NE=5004", "name": "Puskesmas Makassar", "plantAddress": "Jakarta Timur"},
+                            {"dn": "NE=5005", "name": "Puskesmas Koja", "plantAddress": "Jakarta Utara"},
+                        ]
+                    }
+                }
+            }],
+        }
+        norm = build_normalized_site(huawei_mixed_result)
+        regions = {st["name"]: st["region"] for st in norm["stations"]}
+        self.assertEqual(regions["PUSKESMAS CENGKARENG"], "Jakarta Barat")
+        self.assertEqual(regions["Puskesmas Sawah Besar"], "Jakarta Pusat")
+        self.assertEqual(regions["PPOP RAGUNAN"], "Jakarta Selatan")
+        self.assertEqual(regions["Puskesmas Makassar"], "Jakarta Timur")
+        self.assertEqual(regions["Puskesmas Koja"], "Jakarta Utara")
+
+
 if __name__ == "__main__":
     unittest.main()
+
 

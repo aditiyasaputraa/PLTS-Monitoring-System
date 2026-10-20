@@ -1359,16 +1359,28 @@ def build_normalized_site(site_result: dict[str, Any]) -> dict[str, Any]:
 
         for st in stations:
             if not st.get("region"):
-                s_text = f"{st.get('name', '')} {st.get('address', '')}".lower()
-                if "jakarta pusat" in s_text or "jkt pusat" in s_text or "jakpus" in s_text:
-                    st["region"] = "Jakarta Pusat"
-                elif "jakarta selatan" in s_text or "jkt selatan" in s_text or "jaksel" in s_text:
-                    st["region"] = "Jakarta Selatan"
-                elif "jakarta barat" in s_text or "jkt barat" in s_text or "jakbar" in s_text:
+                st_name_l = str(st.get("name") or "").lower()
+                addr_l = str(st.get("address") or "").lower()
+                s_text = f"{st_name_l} {addr_l}"
+                if any(k in st_name_l for k in ["cengkareng", "tambora", "smpn 205", "sman 85", "smpn 204", "sukabumi utara", "kalideres"]):
                     st["region"] = "Jakarta Barat"
-                elif "jakarta timur" in s_text or "jkt timur" in s_text or "jaktim" in s_text:
+                elif any(k in st_name_l for k in ["sawah besar", "gambir", "cempaka baru", "smpn 39", "kampung rawa", "smpn 08", "smpn 8 ", "perpustakaan arsip", "dppap", "paseban"]):
+                    st["region"] = "Jakarta Pusat"
+                elif any(k in st_name_l for k in ["pmptsp", "ragunan", "setiabudi", "jagakarsa", "pasar minggu", "smpn 175", "pejaten timur", "petukangan", "smkn 29", "grogol utara", "kalibata", "cilandak", "kebayoran"]):
+                    st["region"] = "Jakarta Selatan"
+                elif any(k in st_name_l for k in ["makassar", "pasar rebo", "ciracas", "rawamangun", "klender", "duren sawit", "pulogadung", "pulo gadung", "matraman", "knpi", "smpn 172", "cakung"]):
                     st["region"] = "Jakarta Timur"
-                elif "jakarta utara" in s_text or "jkt utara" in s_text or "jakut" in s_text:
+                elif any(k in st_name_l for k in ["koja", "tanjung priok", "cilincing", "penjaringan", "islamic center", "tugu utara", "smpn 112", "bahtera jaya", "rawa badak", "pademangan", "smpn 244", "semper barat", "sekda saefullah", "sman 75", "sukapura"]):
+                    st["region"] = "Jakarta Utara"
+                elif "jakarta pusat" in s_text or "jkt pusat" in s_text or "jakpus" in s_text or "central jakarta" in s_text:
+                    st["region"] = "Jakarta Pusat"
+                elif "jakarta selatan" in s_text or "jkt selatan" in s_text or "jaksel" in s_text or "south jakarta" in s_text:
+                    st["region"] = "Jakarta Selatan"
+                elif "jakarta barat" in s_text or "jkt barat" in s_text or "jakbar" in s_text or "west jakarta" in s_text:
+                    st["region"] = "Jakarta Barat"
+                elif "jakarta timur" in s_text or "jkt timur" in s_text or "jaktim" in s_text or "east jakarta" in s_text:
+                    st["region"] = "Jakarta Timur"
+                elif "jakarta utara" in s_text or "jkt utara" in s_text or "jakut" in s_text or "north jakarta" in s_text:
                     st["region"] = "Jakarta Utara"
         overview = normalize_huawei_overview(grouped, stations)
         alarms = normalize_huawei_alarms(grouped)
@@ -1537,7 +1549,7 @@ def normalize_huawei_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[
             station["longitude"] = 106.965655
             station["address"] = "GOR Sekda Saefullah, Jl. Sungai Kendal No. 17, Rorotan, Cilincing, Jakarta Utara 14140"
             station["region"] = "Jakarta Utara"
-        elif "rawa badak" in st_name_l:
+        elif "rawa badak" in st_name_l and ("03" in st_name_l or "selatan 03" in st_name_l):
             station["latitude"] = -6.124710
             station["longitude"] = 106.902798
             station["address"] = "SDN Rawa Badak Selatan 03 Pagi, Jl. Mayangsari I No. 58, Rawa Badak Selatan, Koja, Jakarta Utara 14230"
