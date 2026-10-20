@@ -513,7 +513,7 @@ def load_kehua_accounts_from_env() -> list[dict[str, Any]]:
             "region": "Jakarta Utara",
         })
 
-    for index in range(2, 10):
+    for index in range(2, 30):
         second_username = os.getenv(f"KEHUA_USERNAME_{index}", "").strip()
         second_password = os.getenv(f"KEHUA_PASSWORD_{index}", "").strip()
         if second_username and second_password:
@@ -580,7 +580,7 @@ def load_huawei_accounts_from_env() -> list[dict[str, Any]]:
             "region": "Jakarta Utara",
         })
 
-    for index in range(2, 10):
+    for index in range(2, 30):
         second_username = os.getenv(f"HUAWEI_USERNAME_{index}", "").strip()
         second_password = os.getenv(f"HUAWEI_PASSWORD_{index}", "").strip()
         if second_username and second_password:
@@ -641,7 +641,7 @@ def load_sma_accounts_from_env() -> list[dict[str, Any]]:
             "region": "Jakarta Timur",
         })
 
-    for index in range(2, 10):
+    for index in range(2, 30):
         second_username = os.getenv(f"SMA_USERNAME_{index}", "").strip()
         second_password = os.getenv(f"SMA_PASSWORD_{index}", "").strip()
         if second_username and second_password:
