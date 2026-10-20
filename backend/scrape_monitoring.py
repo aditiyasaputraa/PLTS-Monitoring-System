@@ -505,23 +505,31 @@ def load_kehua_accounts_from_env() -> list[dict[str, Any]]:
     legacy_username = os.getenv("KEHUA_USERNAME", "").strip()
     legacy_password = os.getenv("KEHUA_PASSWORD", "").strip()
     if legacy_username and legacy_password:
-        accounts.append({
+        acc = {
             "name": "primary",
             "username": legacy_username,
             "password": legacy_password,
             "use_shared_cookies": True,
-        })
+        }
+        custom_region = os.getenv("KEHUA_REGION", "").strip()
+        if custom_region:
+            acc["region"] = custom_region
+        accounts.append(acc)
 
     for index in range(2, 10):
         second_username = os.getenv(f"KEHUA_USERNAME_{index}", "").strip()
         second_password = os.getenv(f"KEHUA_PASSWORD_{index}", "").strip()
         if second_username and second_password:
-            accounts.append({
+            acc = {
                 "name": "secondary" if index == 2 else f"account_{index}",
                 "username": second_username,
                 "password": second_password,
                 "use_shared_cookies": False,
-            })
+            }
+            custom_region = os.getenv(f"KEHUA_REGION_{index}", "").strip()
+            if custom_region:
+                acc["region"] = custom_region
+            accounts.append(acc)
 
     raw = os.getenv("KEHUA_ACCOUNTS_JSON", "").strip()
     if raw:
@@ -543,6 +551,8 @@ def load_kehua_accounts_from_env() -> list[dict[str, Any]]:
                 "username": username,
                 "password": password,
             }
+            if item.get("region"):
+                account["region"] = str(item["region"]).strip()
             for key in ("company_id", "station_id", "area_code", "company_name"):
                 if item.get(key) not in (None, ""):
                     account[key] = str(item[key])
@@ -1331,7 +1341,14 @@ def build_normalized_site(site_result: dict[str, Any]) -> dict[str, Any]:
         devices = normalize_huawei_devices(grouped, stations)
     elif site_name == "kehua":
         stations = normalize_kehua_stations(grouped)
-        if account_name in ("account_3", "account_4", "account_5", "jakbar") or "jakbar" in account_name:
+        account_region = account.get("region")
+        if account_region:
+            for st in stations:
+                st["region"] = account_region
+        elif account_name in ("account_5", "jaksel") or "jaksel" in account_name:
+            for st in stations:
+                st["region"] = "Jakarta Selatan"
+        elif account_name in ("account_3", "account_4", "jakbar") or "jakbar" in account_name:
             for st in stations:
                 st["region"] = "Jakarta Barat"
         overview = normalize_kehua_overview(grouped, stations)

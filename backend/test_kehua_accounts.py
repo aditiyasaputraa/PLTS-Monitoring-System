@@ -116,6 +116,45 @@ class KehuaAccountsTests(unittest.TestCase):
         normalized_jakut = build_normalized_site(site_result_jakut)
         self.assertNotEqual(normalized_jakut["stations"][0].get("region"), "Jakarta Barat")
 
+        # Verify account 5 (Jakarta Selatan) is assigned to Jakarta Selatan
+        site_result_jaksel = {
+            "site": "kehua",
+            "scraped_at": "2026-10-16T10:00:00+00:00",
+            "account": {"name": "account_5"},
+            "summary": {"success_count": 1, "failed_count": 0, "auth_error_count": 0},
+            "calls": [{
+                "name": "listStationCardInfoByCondition",
+                "response_body": {
+                    "code": "0",
+                    "data": {
+                        "result": [{
+                            "stationId": "88888",
+                            "stationName": "SMPN JAKSEL",
+                            "capacity": 15.0,
+                        }]
+                    }
+                }
+            }],
+        }
+        normalized_jaksel = build_normalized_site(site_result_jaksel)
+        self.assertEqual(len(normalized_jaksel["stations"]), 1)
+        self.assertEqual(normalized_jaksel["stations"][0]["region"], "Jakarta Selatan")
+
+    def test_loads_fifth_account_with_region_from_env(self):
+        with patch.dict(os.environ, {
+            "KEHUA_USERNAME": "primary-user",
+            "KEHUA_PASSWORD": "primary-password",
+            "KEHUA_USERNAME_5": "fifth-user",
+            "KEHUA_PASSWORD_5": "fifth-password",
+            "KEHUA_REGION_5": "Jakarta Selatan",
+        }, clear=True):
+            accounts = load_kehua_accounts_from_env()
+
+        self.assertEqual(len(accounts), 2)
+        self.assertEqual(accounts[1]["username"], "fifth-user")
+        self.assertEqual(accounts[1]["name"], "account_5")
+        self.assertEqual(accounts[1]["region"], "Jakarta Selatan")
+
     def test_rewrites_account_identifiers_and_resigns_the_request(self):
         call = {
             "site": "kehua",
