@@ -136,24 +136,31 @@ class KehuaAccountsTests(unittest.TestCase):
                 }
             }],
         }
-        normalized_jaksel = build_normalized_site(site_result_jaksel)
-        self.assertEqual(len(normalized_jaksel["stations"]), 1)
-        self.assertEqual(normalized_jaksel["stations"][0]["region"], "Jakarta Selatan")
+        normalized_jaksel_5 = build_normalized_site(site_result_jaksel)
+        self.assertEqual(len(normalized_jaksel_5["stations"]), 1)
+        self.assertEqual(normalized_jaksel_5["stations"][0]["region"], "Jakarta Selatan")
 
-    def test_loads_fifth_account_with_region_from_env(self):
+        # Verify account 6 is also assigned to Jakarta Selatan
+        site_result_jaksel["account"] = {"name": "account_6"}
+        normalized_jaksel_6 = build_normalized_site(site_result_jaksel)
+        self.assertEqual(normalized_jaksel_6["stations"][0]["region"], "Jakarta Selatan")
+
+    def test_loads_fifth_and_sixth_accounts_from_simple_env(self):
         with patch.dict(os.environ, {
             "KEHUA_USERNAME": "primary-user",
             "KEHUA_PASSWORD": "primary-password",
             "KEHUA_USERNAME_5": "fifth-user",
             "KEHUA_PASSWORD_5": "fifth-password",
-            "KEHUA_REGION_5": "Jakarta Selatan",
+            "KEHUA_USERNAME_6": "sixth-user",
+            "KEHUA_PASSWORD_6": "sixth-password",
         }, clear=True):
             accounts = load_kehua_accounts_from_env()
 
-        self.assertEqual(len(accounts), 2)
+        self.assertEqual(len(accounts), 3)
         self.assertEqual(accounts[1]["username"], "fifth-user")
         self.assertEqual(accounts[1]["name"], "account_5")
-        self.assertEqual(accounts[1]["region"], "Jakarta Selatan")
+        self.assertEqual(accounts[2]["username"], "sixth-user")
+        self.assertEqual(accounts[2]["name"], "account_6")
 
     def test_rewrites_account_identifiers_and_resigns_the_request(self):
         call = {
