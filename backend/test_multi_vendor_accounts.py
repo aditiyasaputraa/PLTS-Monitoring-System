@@ -232,6 +232,49 @@ class MultiVendorAccountsTests(unittest.TestCase):
         self.assertEqual(regions["Puskesmas Makassar"], "Jakarta Timur")
         self.assertEqual(regions["Puskesmas Koja"], "Jakarta Utara")
 
+    def test_loads_dynamic_high_index_accounts_and_regions(self):
+        with patch.dict(os.environ, {
+            "HUAWEI_USERNAME": "hw-primary",
+            "HUAWEI_PASSWORD": "password",
+            "HUAWEI_REGION": "Jakarta Utara",
+            "HUAWEI_USERNAME_15": "hw-fifteen",
+            "HUAWEI_PASSWORD_15": "password",
+            "HUAWEI_REGION_15": "Jakarta Timur",
+
+            "KEHUA_USERNAME": "kehua-primary",
+            "KEHUA_PASSWORD": "password",
+            "KEHUA_USERNAME_12": "kehua-twelve",
+            "KEHUA_PASSWORD_12": "password",
+            "KEHUA_REGION_12": "Jakarta Selatan",
+
+            "SMA_USERNAME": "sma-primary",
+            "SMA_PASSWORD": "password",
+            "SMA_USERNAME_9": "sma-nine",
+            "SMA_PASSWORD_9": "password",
+            "SMA_REGION_9": "Jakarta Barat",
+        }, clear=True):
+            hw_accs = load_huawei_accounts_from_env()
+            kehua_accs = load_kehua_accounts_from_env()
+            sma_accs = load_sma_accounts_from_env()
+
+        # Huawei checks
+        self.assertEqual(len(hw_accs), 2)
+        self.assertEqual(hw_accs[1]["name"], "account_15")
+        self.assertEqual(hw_accs[1]["username"], "hw-fifteen")
+        self.assertEqual(hw_accs[1]["region"], "Jakarta Timur")
+
+        # Kehua checks
+        self.assertEqual(len(kehua_accs), 2)
+        self.assertEqual(kehua_accs[1]["name"], "account_12")
+        self.assertEqual(kehua_accs[1]["username"], "kehua-twelve")
+        self.assertEqual(kehua_accs[1]["region"], "Jakarta Selatan")
+
+        # SMA checks
+        self.assertEqual(len(sma_accs), 2)
+        self.assertEqual(sma_accs[1]["name"], "account_9")
+        self.assertEqual(sma_accs[1]["username"], "sma-nine")
+        self.assertEqual(sma_accs[1]["region"], "Jakarta Barat")
+
 
 if __name__ == "__main__":
     unittest.main()

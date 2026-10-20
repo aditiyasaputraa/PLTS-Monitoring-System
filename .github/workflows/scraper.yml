@@ -40,51 +40,200 @@ jobs:
           PYTHONPATH: backend
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          # Huawei Accounts (1-20)
           HUAWEI_USERNAME: ${{ secrets.HUAWEI_USERNAME }}
           HUAWEI_PASSWORD: ${{ secrets.HUAWEI_PASSWORD }}
+          HUAWEI_REGION: ${{ secrets.HUAWEI_REGION }}
           HUAWEI_USERNAME_2: ${{ secrets.HUAWEI_USERNAME_2 }}
           HUAWEI_PASSWORD_2: ${{ secrets.HUAWEI_PASSWORD_2 }}
+          HUAWEI_REGION_2: ${{ secrets.HUAWEI_REGION_2 }}
           HUAWEI_USERNAME_3: ${{ secrets.HUAWEI_USERNAME_3 }}
           HUAWEI_PASSWORD_3: ${{ secrets.HUAWEI_PASSWORD_3 }}
+          HUAWEI_REGION_3: ${{ secrets.HUAWEI_REGION_3 }}
           HUAWEI_USERNAME_4: ${{ secrets.HUAWEI_USERNAME_4 }}
           HUAWEI_PASSWORD_4: ${{ secrets.HUAWEI_PASSWORD_4 }}
+          HUAWEI_REGION_4: ${{ secrets.HUAWEI_REGION_4 }}
           HUAWEI_USERNAME_5: ${{ secrets.HUAWEI_USERNAME_5 }}
           HUAWEI_PASSWORD_5: ${{ secrets.HUAWEI_PASSWORD_5 }}
+          HUAWEI_REGION_5: ${{ secrets.HUAWEI_REGION_5 }}
           HUAWEI_USERNAME_6: ${{ secrets.HUAWEI_USERNAME_6 }}
           HUAWEI_PASSWORD_6: ${{ secrets.HUAWEI_PASSWORD_6 }}
+          HUAWEI_REGION_6: ${{ secrets.HUAWEI_REGION_6 }}
           HUAWEI_USERNAME_7: ${{ secrets.HUAWEI_USERNAME_7 }}
           HUAWEI_PASSWORD_7: ${{ secrets.HUAWEI_PASSWORD_7 }}
+          HUAWEI_REGION_7: ${{ secrets.HUAWEI_REGION_7 }}
+          HUAWEI_USERNAME_8: ${{ secrets.HUAWEI_USERNAME_8 }}
+          HUAWEI_PASSWORD_8: ${{ secrets.HUAWEI_PASSWORD_8 }}
+          HUAWEI_REGION_8: ${{ secrets.HUAWEI_REGION_8 }}
+          HUAWEI_USERNAME_9: ${{ secrets.HUAWEI_USERNAME_9 }}
+          HUAWEI_PASSWORD_9: ${{ secrets.HUAWEI_PASSWORD_9 }}
+          HUAWEI_REGION_9: ${{ secrets.HUAWEI_REGION_9 }}
+          HUAWEI_USERNAME_10: ${{ secrets.HUAWEI_USERNAME_10 }}
+          HUAWEI_PASSWORD_10: ${{ secrets.HUAWEI_PASSWORD_10 }}
+          HUAWEI_REGION_10: ${{ secrets.HUAWEI_REGION_10 }}
+          HUAWEI_USERNAME_11: ${{ secrets.HUAWEI_USERNAME_11 }}
+          HUAWEI_PASSWORD_11: ${{ secrets.HUAWEI_PASSWORD_11 }}
+          HUAWEI_REGION_11: ${{ secrets.HUAWEI_REGION_11 }}
+          HUAWEI_USERNAME_12: ${{ secrets.HUAWEI_USERNAME_12 }}
+          HUAWEI_PASSWORD_12: ${{ secrets.HUAWEI_PASSWORD_12 }}
+          HUAWEI_REGION_12: ${{ secrets.HUAWEI_REGION_12 }}
+          HUAWEI_USERNAME_13: ${{ secrets.HUAWEI_USERNAME_13 }}
+          HUAWEI_PASSWORD_13: ${{ secrets.HUAWEI_PASSWORD_13 }}
+          HUAWEI_REGION_13: ${{ secrets.HUAWEI_REGION_13 }}
+          HUAWEI_USERNAME_14: ${{ secrets.HUAWEI_USERNAME_14 }}
+          HUAWEI_PASSWORD_14: ${{ secrets.HUAWEI_PASSWORD_14 }}
+          HUAWEI_REGION_14: ${{ secrets.HUAWEI_REGION_14 }}
+          HUAWEI_USERNAME_15: ${{ secrets.HUAWEI_USERNAME_15 }}
+          HUAWEI_PASSWORD_15: ${{ secrets.HUAWEI_PASSWORD_15 }}
+          HUAWEI_REGION_15: ${{ secrets.HUAWEI_REGION_15 }}
+          HUAWEI_USERNAME_16: ${{ secrets.HUAWEI_USERNAME_16 }}
+          HUAWEI_PASSWORD_16: ${{ secrets.HUAWEI_PASSWORD_16 }}
+          HUAWEI_REGION_16: ${{ secrets.HUAWEI_REGION_16 }}
+          HUAWEI_USERNAME_17: ${{ secrets.HUAWEI_USERNAME_17 }}
+          HUAWEI_PASSWORD_17: ${{ secrets.HUAWEI_PASSWORD_17 }}
+          HUAWEI_REGION_17: ${{ secrets.HUAWEI_REGION_17 }}
+          HUAWEI_USERNAME_18: ${{ secrets.HUAWEI_USERNAME_18 }}
+          HUAWEI_PASSWORD_18: ${{ secrets.HUAWEI_PASSWORD_18 }}
+          HUAWEI_REGION_18: ${{ secrets.HUAWEI_REGION_18 }}
+          HUAWEI_USERNAME_19: ${{ secrets.HUAWEI_USERNAME_19 }}
+          HUAWEI_PASSWORD_19: ${{ secrets.HUAWEI_PASSWORD_19 }}
+          HUAWEI_REGION_19: ${{ secrets.HUAWEI_REGION_19 }}
+          HUAWEI_USERNAME_20: ${{ secrets.HUAWEI_USERNAME_20 }}
+          HUAWEI_PASSWORD_20: ${{ secrets.HUAWEI_PASSWORD_20 }}
+          HUAWEI_REGION_20: ${{ secrets.HUAWEI_REGION_20 }}
           HUAWEI_ACCOUNTS_JSON: ${{ secrets.HUAWEI_ACCOUNTS_JSON }}
+          HUAWEI_COOKIES_JSON: ${{ secrets.HUAWEI_COOKIES_JSON }}
+
+          # Kehua Accounts (1-20)
           KEHUA_USERNAME: ${{ secrets.KEHUA_USERNAME }}
           KEHUA_PASSWORD: ${{ secrets.KEHUA_PASSWORD }}
+          KEHUA_REGION: ${{ secrets.KEHUA_REGION }}
           KEHUA_USERNAME_2: ${{ secrets.KEHUA_USERNAME_2 }}
           KEHUA_PASSWORD_2: ${{ secrets.KEHUA_PASSWORD_2 }}
+          KEHUA_REGION_2: ${{ secrets.KEHUA_REGION_2 }}
           KEHUA_USERNAME_3: ${{ secrets.KEHUA_USERNAME_3 }}
           KEHUA_PASSWORD_3: ${{ secrets.KEHUA_PASSWORD_3 }}
+          KEHUA_REGION_3: ${{ secrets.KEHUA_REGION_3 }}
           KEHUA_USERNAME_4: ${{ secrets.KEHUA_USERNAME_4 }}
           KEHUA_PASSWORD_4: ${{ secrets.KEHUA_PASSWORD_4 }}
+          KEHUA_REGION_4: ${{ secrets.KEHUA_REGION_4 }}
           KEHUA_USERNAME_5: ${{ secrets.KEHUA_USERNAME_5 }}
           KEHUA_PASSWORD_5: ${{ secrets.KEHUA_PASSWORD_5 }}
+          KEHUA_REGION_5: ${{ secrets.KEHUA_REGION_5 }}
           KEHUA_USERNAME_6: ${{ secrets.KEHUA_USERNAME_6 }}
           KEHUA_PASSWORD_6: ${{ secrets.KEHUA_PASSWORD_6 }}
+          KEHUA_REGION_6: ${{ secrets.KEHUA_REGION_6 }}
           KEHUA_USERNAME_7: ${{ secrets.KEHUA_USERNAME_7 }}
           KEHUA_PASSWORD_7: ${{ secrets.KEHUA_PASSWORD_7 }}
+          KEHUA_REGION_7: ${{ secrets.KEHUA_REGION_7 }}
           KEHUA_USERNAME_8: ${{ secrets.KEHUA_USERNAME_8 }}
           KEHUA_PASSWORD_8: ${{ secrets.KEHUA_PASSWORD_8 }}
+          KEHUA_REGION_8: ${{ secrets.KEHUA_REGION_8 }}
+          KEHUA_USERNAME_9: ${{ secrets.KEHUA_USERNAME_9 }}
+          KEHUA_PASSWORD_9: ${{ secrets.KEHUA_PASSWORD_9 }}
+          KEHUA_REGION_9: ${{ secrets.KEHUA_REGION_9 }}
+          KEHUA_USERNAME_10: ${{ secrets.KEHUA_USERNAME_10 }}
+          KEHUA_PASSWORD_10: ${{ secrets.KEHUA_PASSWORD_10 }}
+          KEHUA_REGION_10: ${{ secrets.KEHUA_REGION_10 }}
+          KEHUA_USERNAME_11: ${{ secrets.KEHUA_USERNAME_11 }}
+          KEHUA_PASSWORD_11: ${{ secrets.KEHUA_PASSWORD_11 }}
+          KEHUA_REGION_11: ${{ secrets.KEHUA_REGION_11 }}
+          KEHUA_USERNAME_12: ${{ secrets.KEHUA_USERNAME_12 }}
+          KEHUA_PASSWORD_12: ${{ secrets.KEHUA_PASSWORD_12 }}
+          KEHUA_REGION_12: ${{ secrets.KEHUA_REGION_12 }}
+          KEHUA_USERNAME_13: ${{ secrets.KEHUA_USERNAME_13 }}
+          KEHUA_PASSWORD_13: ${{ secrets.KEHUA_PASSWORD_13 }}
+          KEHUA_REGION_13: ${{ secrets.KEHUA_REGION_13 }}
+          KEHUA_USERNAME_14: ${{ secrets.KEHUA_USERNAME_14 }}
+          KEHUA_PASSWORD_14: ${{ secrets.KEHUA_PASSWORD_14 }}
+          KEHUA_REGION_14: ${{ secrets.KEHUA_REGION_14 }}
+          KEHUA_USERNAME_15: ${{ secrets.KEHUA_USERNAME_15 }}
+          KEHUA_PASSWORD_15: ${{ secrets.KEHUA_PASSWORD_15 }}
+          KEHUA_REGION_15: ${{ secrets.KEHUA_REGION_15 }}
+          KEHUA_USERNAME_16: ${{ secrets.KEHUA_USERNAME_16 }}
+          KEHUA_PASSWORD_16: ${{ secrets.KEHUA_PASSWORD_16 }}
+          KEHUA_REGION_16: ${{ secrets.KEHUA_REGION_16 }}
+          KEHUA_USERNAME_17: ${{ secrets.KEHUA_USERNAME_17 }}
+          KEHUA_PASSWORD_17: ${{ secrets.KEHUA_PASSWORD_17 }}
+          KEHUA_REGION_17: ${{ secrets.KEHUA_REGION_17 }}
+          KEHUA_USERNAME_18: ${{ secrets.KEHUA_USERNAME_18 }}
+          KEHUA_PASSWORD_18: ${{ secrets.KEHUA_PASSWORD_18 }}
+          KEHUA_REGION_18: ${{ secrets.KEHUA_REGION_18 }}
+          KEHUA_USERNAME_19: ${{ secrets.KEHUA_USERNAME_19 }}
+          KEHUA_PASSWORD_19: ${{ secrets.KEHUA_PASSWORD_19 }}
+          KEHUA_REGION_19: ${{ secrets.KEHUA_REGION_19 }}
+          KEHUA_USERNAME_20: ${{ secrets.KEHUA_USERNAME_20 }}
+          KEHUA_PASSWORD_20: ${{ secrets.KEHUA_PASSWORD_20 }}
+          KEHUA_REGION_20: ${{ secrets.KEHUA_REGION_20 }}
           KEHUA_ACCOUNTS_JSON: ${{ secrets.KEHUA_ACCOUNTS_JSON }}
-          HUAWEI_COOKIES_JSON: ${{ secrets.HUAWEI_COOKIES_JSON }}
           KEHUA_COOKIES_JSON: ${{ secrets.KEHUA_COOKIES_JSON }}
+
+          # SMA Sunny Portal Accounts (1-20)
           ENABLE_SMA: ${{ secrets.ENABLE_SMA || 'true' }}
           SMA_USERNAME: ${{ secrets.SMA_USERNAME }}
           SMA_PASSWORD: ${{ secrets.SMA_PASSWORD }}
+          SMA_REGION: ${{ secrets.SMA_REGION }}
           SMA_USERNAME_2: ${{ secrets.SMA_USERNAME_2 }}
           SMA_PASSWORD_2: ${{ secrets.SMA_PASSWORD_2 }}
+          SMA_REGION_2: ${{ secrets.SMA_REGION_2 }}
           SMA_USERNAME_3: ${{ secrets.SMA_USERNAME_3 }}
           SMA_PASSWORD_3: ${{ secrets.SMA_PASSWORD_3 }}
+          SMA_REGION_3: ${{ secrets.SMA_REGION_3 }}
           SMA_USERNAME_4: ${{ secrets.SMA_USERNAME_4 }}
           SMA_PASSWORD_4: ${{ secrets.SMA_PASSWORD_4 }}
+          SMA_REGION_4: ${{ secrets.SMA_REGION_4 }}
+          SMA_USERNAME_5: ${{ secrets.SMA_USERNAME_5 }}
+          SMA_PASSWORD_5: ${{ secrets.SMA_PASSWORD_5 }}
+          SMA_REGION_5: ${{ secrets.SMA_REGION_5 }}
+          SMA_USERNAME_6: ${{ secrets.SMA_USERNAME_6 }}
+          SMA_PASSWORD_6: ${{ secrets.SMA_PASSWORD_6 }}
+          SMA_REGION_6: ${{ secrets.SMA_REGION_6 }}
+          SMA_USERNAME_7: ${{ secrets.SMA_USERNAME_7 }}
+          SMA_PASSWORD_7: ${{ secrets.SMA_PASSWORD_7 }}
+          SMA_REGION_7: ${{ secrets.SMA_REGION_7 }}
+          SMA_USERNAME_8: ${{ secrets.SMA_USERNAME_8 }}
+          SMA_PASSWORD_8: ${{ secrets.SMA_PASSWORD_8 }}
+          SMA_REGION_8: ${{ secrets.SMA_REGION_8 }}
+          SMA_USERNAME_9: ${{ secrets.SMA_USERNAME_9 }}
+          SMA_PASSWORD_9: ${{ secrets.SMA_PASSWORD_9 }}
+          SMA_REGION_9: ${{ secrets.SMA_REGION_9 }}
+          SMA_USERNAME_10: ${{ secrets.SMA_USERNAME_10 }}
+          SMA_PASSWORD_10: ${{ secrets.SMA_PASSWORD_10 }}
+          SMA_REGION_10: ${{ secrets.SMA_REGION_10 }}
+          SMA_USERNAME_11: ${{ secrets.SMA_USERNAME_11 }}
+          SMA_PASSWORD_11: ${{ secrets.SMA_PASSWORD_11 }}
+          SMA_REGION_11: ${{ secrets.SMA_REGION_11 }}
+          SMA_USERNAME_12: ${{ secrets.SMA_USERNAME_12 }}
+          SMA_PASSWORD_12: ${{ secrets.SMA_PASSWORD_12 }}
+          SMA_REGION_12: ${{ secrets.SMA_REGION_12 }}
+          SMA_USERNAME_13: ${{ secrets.SMA_USERNAME_13 }}
+          SMA_PASSWORD_13: ${{ secrets.SMA_PASSWORD_13 }}
+          SMA_REGION_13: ${{ secrets.SMA_REGION_13 }}
+          SMA_USERNAME_14: ${{ secrets.SMA_USERNAME_14 }}
+          SMA_PASSWORD_14: ${{ secrets.SMA_PASSWORD_14 }}
+          SMA_REGION_14: ${{ secrets.SMA_REGION_14 }}
+          SMA_USERNAME_15: ${{ secrets.SMA_USERNAME_15 }}
+          SMA_PASSWORD_15: ${{ secrets.SMA_PASSWORD_15 }}
+          SMA_REGION_15: ${{ secrets.SMA_REGION_15 }}
+          SMA_USERNAME_16: ${{ secrets.SMA_USERNAME_16 }}
+          SMA_PASSWORD_16: ${{ secrets.SMA_PASSWORD_16 }}
+          SMA_REGION_16: ${{ secrets.SMA_REGION_16 }}
+          SMA_USERNAME_17: ${{ secrets.SMA_USERNAME_17 }}
+          SMA_PASSWORD_17: ${{ secrets.SMA_PASSWORD_17 }}
+          SMA_REGION_17: ${{ secrets.SMA_REGION_17 }}
+          SMA_USERNAME_18: ${{ secrets.SMA_USERNAME_18 }}
+          SMA_PASSWORD_18: ${{ secrets.SMA_PASSWORD_18 }}
+          SMA_REGION_18: ${{ secrets.SMA_REGION_18 }}
+          SMA_USERNAME_19: ${{ secrets.SMA_USERNAME_19 }}
+          SMA_PASSWORD_19: ${{ secrets.SMA_PASSWORD_19 }}
+          SMA_REGION_19: ${{ secrets.SMA_REGION_19 }}
+          SMA_USERNAME_20: ${{ secrets.SMA_USERNAME_20 }}
+          SMA_PASSWORD_20: ${{ secrets.SMA_PASSWORD_20 }}
+          SMA_REGION_20: ${{ secrets.SMA_REGION_20 }}
           SMA_ACCOUNTS_JSON: ${{ secrets.SMA_ACCOUNTS_JSON }}
           SMA_COOKIES_JSON: ${{ secrets.SMA_COOKIES_JSON }}
+
+          # Push Notifications
           ONESIGNAL_APP_ID: ${{ secrets.ONESIGNAL_APP_ID }}
           ONESIGNAL_REST_API_KEY: ${{ secrets.ONESIGNAL_REST_API_KEY }}
         run: |

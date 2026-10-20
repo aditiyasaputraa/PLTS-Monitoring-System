@@ -504,16 +504,17 @@ def load_kehua_accounts_from_env() -> list[dict[str, Any]]:
     accounts: list[dict[str, Any]] = []
     legacy_username = os.getenv("KEHUA_USERNAME", "").strip()
     legacy_password = os.getenv("KEHUA_PASSWORD", "").strip()
+    legacy_region = os.getenv("KEHUA_REGION", "").strip() or "Jakarta Utara"
     if legacy_username and legacy_password:
         accounts.append({
             "name": "primary",
             "username": legacy_username,
             "password": legacy_password,
             "use_shared_cookies": True,
-            "region": "Jakarta Utara",
+            "region": legacy_region,
         })
 
-    for index in range(2, 30):
+    for index in range(2, 50):
         second_username = os.getenv(f"KEHUA_USERNAME_{index}", "").strip()
         second_password = os.getenv(f"KEHUA_PASSWORD_{index}", "").strip()
         if second_username and second_password:
@@ -523,12 +524,13 @@ def load_kehua_accounts_from_env() -> list[dict[str, Any]]:
                 else ("Jakarta Pusat" if index in (5, 6)
                 else ("Jakarta Selatan" if index in (7, 8) else None)))
             )
+            explicit_region = os.getenv(f"KEHUA_REGION_{index}", "").strip()
             accounts.append({
                 "name": "secondary" if index == 2 else f"account_{index}",
                 "username": second_username,
                 "password": second_password,
                 "use_shared_cookies": False,
-                "region": default_region,
+                "region": explicit_region or default_region,
             })
 
     raw = os.getenv("KEHUA_ACCOUNTS_JSON", "").strip()
@@ -571,29 +573,33 @@ def load_huawei_accounts_from_env() -> list[dict[str, Any]]:
     accounts: list[dict[str, Any]] = []
     legacy_username = os.getenv("HUAWEI_USERNAME", "").strip()
     legacy_password = os.getenv("HUAWEI_PASSWORD", "").strip()
+    legacy_region = os.getenv("HUAWEI_REGION", "").strip() or "Jakarta Utara"
     if legacy_username and legacy_password:
         accounts.append({
             "name": "primary",
             "username": legacy_username,
             "password": legacy_password,
             "use_shared_cookies": True,
-            "region": "Jakarta Utara",
+            "region": legacy_region,
         })
 
-    for index in range(2, 30):
+    for index in range(2, 50):
         second_username = os.getenv(f"HUAWEI_USERNAME_{index}", "").strip()
         second_password = os.getenv(f"HUAWEI_PASSWORD_{index}", "").strip()
         if second_username and second_password:
             default_region = (
                 "Jakarta Barat" if index in (2, 3)
-                else ("Jakarta Pusat" if index == 4 else None)
+                else ("Jakarta Pusat" if index == 4
+                else ("Jakarta Selatan" if index in (5, 6)
+                else ("Jakarta Timur" if index == 7 else None)))
             )
+            explicit_region = os.getenv(f"HUAWEI_REGION_{index}", "").strip()
             accounts.append({
                 "name": f"account_{index}",
                 "username": second_username,
                 "password": second_password,
                 "use_shared_cookies": False,
-                "region": default_region,
+                "region": explicit_region or default_region,
             })
 
     raw = os.getenv("HUAWEI_ACCOUNTS_JSON", "").strip()
@@ -632,16 +638,17 @@ def load_sma_accounts_from_env() -> list[dict[str, Any]]:
     accounts: list[dict[str, Any]] = []
     legacy_username = os.getenv("SMA_USERNAME", "").strip()
     legacy_password = os.getenv("SMA_PASSWORD", "").strip()
+    legacy_region = os.getenv("SMA_REGION", "").strip() or "Jakarta Timur"
     if legacy_username and legacy_password:
         accounts.append({
             "name": "primary",
             "username": legacy_username,
             "password": legacy_password,
             "use_shared_cookies": True,
-            "region": "Jakarta Timur",
+            "region": legacy_region,
         })
 
-    for index in range(2, 30):
+    for index in range(2, 50):
         second_username = os.getenv(f"SMA_USERNAME_{index}", "").strip()
         second_password = os.getenv(f"SMA_PASSWORD_{index}", "").strip()
         if second_username and second_password:
@@ -650,12 +657,13 @@ def load_sma_accounts_from_env() -> list[dict[str, Any]]:
                 else ("Jakarta Pusat" if index == 3
                 else ("Jakarta Selatan" if index == 4 else None))
             )
+            explicit_region = os.getenv(f"SMA_REGION_{index}", "").strip()
             acc = {
                 "name": f"account_{index}",
                 "username": second_username,
                 "password": second_password,
                 "use_shared_cookies": False,
-                "region": os.getenv(f"SMA_REGION_{index}", "").strip() or default_region,
+                "region": explicit_region or default_region,
             }
             accounts.append(acc)
 
