@@ -1410,7 +1410,9 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt, selecte
                 <SolarIcon style={{ width: "12px", height: "12px", color: "#637768" }} />
               </div>
               <div className="kpi-tile-val">
-                {formatNumber(fleet.capacity, 1)} <small>kWp</small>
+                {fleet.capacity >= 1000
+                  ? <>{formatNumber(fleet.capacity / 1000, 2)} <small>MWp</small></>
+                  : <>{formatNumber(fleet.capacity, 1)} <small>kWp</small></>}
               </div>
             </div>
 
