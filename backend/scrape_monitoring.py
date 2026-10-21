@@ -995,6 +995,21 @@ def kehua_extra_station_calls(
             },
             "payload_raw": f"companyId={company_id or ''}&areaCode={area_code or ''}&stationId={station_id}",
         })
+        if company_id:
+            calls.append({
+                "id": f"get_key_data_{station_id}",
+                "site": "kehua",
+                "name": "getKeyData",
+                "method": "POST",
+                "url": f"{base_url}/necp/server-monitor/monitor/getKeyData",
+                "headers": {
+                    "Accept": "application/json, text/plain, */*",
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "clientType": "web",
+                    "web_version": "3.0.4",
+                },
+                "payload_raw": f"displayRank=0&companyId={company_id}&stationId={station_id}",
+            })
     return calls
 
 
@@ -1954,33 +1969,49 @@ def normalize_kehua_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[d
                 "device_status_raw": device_status,
             })
 
-    station_key_data = station_key_data_map(grouped.get("getKeyData") or [])
-    if station_key_data:
-        merge(only_station_key(by_id), {
-            "daily_energy_kwh": energy_to_kwh(get_value_unit(station_key_data, "Daily Generation", "value"), get_value_unit(station_key_data, "Daily Generation", "unit")),
-            "cumulative_energy_kwh": energy_to_kwh(get_value_unit(station_key_data, "Cumulative Generation", "value"), get_value_unit(station_key_data, "Cumulative Generation", "unit")),
-            "daily_income": to_float(get_value_unit(station_key_data, "Daily Revenue", "value")),
-            "cumulative_income": to_float(get_value_unit(station_key_data, "Cumulative Revenue", "value")),
-            "full_power_hours": to_float(get_value_unit(station_key_data, "Full-Load Hours (Today)", "value")),
-            "capacity_kwp": power_to_kw(get_value_unit(station_key_data, "Installed capacity", "value"), get_value_unit(station_key_data, "Installed capacity", "unit")),
-        })
+    for call in grouped.get("getKeyData", []):
+        kd_items = response_data(call)
+        if not isinstance(kd_items, list):
+            continue
+        call_payload = parse_form_payload(str(call.get("payload_raw") or ""))
+        sid = str(call_payload.get("stationId") or "")
+        cid = str(call_payload.get("companyId") or "")
+        target_id = None
+        if sid and sid in by_id:
+            target_id = sid
+        elif cid:
+            for s_id, s_data in by_id.items():
+                if str(s_data.get("company_id") or "") == cid:
+                    target_id = s_id
+                    break
+        target_id = target_id or only_station_key(by_id)
+        if target_id and target_id in by_id:
+            kd_map = {item["name"]: item["val"] for item in kd_items if isinstance(item, dict) and item.get("name") and isinstance(item.get("val"), dict)}
+            annual = kd_map.get("Annual Gen.")
+            cumulative = kd_map.get("Cumulative Generation")
+            monthly = kd_map.get("Monthly Gen.")
+            daily = kd_map.get("Daily Generation")
+            capacity = kd_map.get("Installed capacity")
+            full_load = kd_map.get("Full-Load Hours (Today)")
+
+            updates = {}
+            if annual:
+                updates["yearly_energy_kwh"] = energy_to_kwh(annual.get("value"), annual.get("unit"))
+            if cumulative:
+                updates["cumulative_energy_kwh"] = energy_to_kwh(cumulative.get("value"), cumulative.get("unit"))
+            if monthly and by_id[target_id].get("monthly_energy_kwh") is None:
+                updates["monthly_energy_kwh"] = energy_to_kwh(monthly.get("value"), monthly.get("unit"))
+            if daily and by_id[target_id].get("daily_energy_kwh") is None:
+                updates["daily_energy_kwh"] = energy_to_kwh(daily.get("value"), daily.get("unit"))
+            if capacity and by_id[target_id].get("capacity_kwp") is None:
+                updates["capacity_kwp"] = power_to_kw(capacity.get("value"), capacity.get("unit"))
+            if full_load and by_id[target_id].get("full_power_hours") is None:
+                updates["full_power_hours"] = to_float(full_load.get("value"))
+            merge(target_id, updates)
 
     weather = first_data(grouped, "getWeatherForecast")
     if isinstance(weather, list):
         merge(only_station_key(by_id), {"weather_forecast": [normalize_weather_item(item) for item in weather if isinstance(item, dict)]})
-
-    company_key_data = key_data_map(first_data(grouped, "getKeyData"))
-    overview_power = first_data(grouped, "overviewOfPowerGeneration")
-    only_key = only_station_key(by_id)
-    if only_key:
-        merge(only_key, {
-            "monthly_energy_kwh": energy_to_kwh(get_value_unit(company_key_data, "Monthly Gen.", "value"), get_value_unit(company_key_data, "Monthly Gen.", "unit")),
-            "yearly_energy_kwh": energy_to_kwh(get_value_unit(company_key_data, "Annual Gen.", "value"), get_value_unit(company_key_data, "Annual Gen.", "unit")),
-            "cumulative_energy_kwh": energy_to_kwh(get_value_unit(company_key_data, "Cumulative Generation", "value"), get_value_unit(company_key_data, "Cumulative Generation", "unit")),
-            "monthly_income": to_float(nested_value(overview_power, ["income", "monthElectricity", "value"])),
-            "cumulative_income": to_float(nested_value(overview_power, ["income", "totalElectricity", "value"])),
-            "income_currency": nested_value(overview_power, ["income", "monthElectricity", "unit"]) or nested_value(overview_power, ["income", "totalElectricity", "unit"]),
-        })
 
     # Filter out dummy/unbound stations without active devices or foreign demo stations
     by_id.pop("38722", None)
