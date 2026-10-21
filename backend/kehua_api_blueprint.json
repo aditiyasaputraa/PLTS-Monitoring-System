@@ -34,7 +34,7 @@
         "sign": "7mvh+m4leqZ6MrERy3F8eqgm5K8Jl+DVibR9EhWWZYHiCIok+uC8BxCi8cCQF4WM",
         "web_version": "3.0.4"
       },
-      "payload_raw": "companyId=1832&areaCode=&stationName="
+      "payload_raw": "companyId=&areaCode=&stationName="
     },
     {
       "id": "002_ListStationStatusCount",
@@ -65,7 +65,7 @@
         "sign": "7mvh+m4leqZ6MrERy3F8eqgm5K8Jl+DVibR9EhWWZYG2SzqiAbQXNQIh8DZ3pUgq",
         "web_version": "3.0.4"
       },
-      "payload_raw": "companyId=1832"
+      "payload_raw": "companyId="
     },
     {
       "id": "003_getStatisticsData",
@@ -96,7 +96,7 @@
         "sign": "YbF1jyqthqBn3Xvelmc30yXeH3R6X05l018vnX3TuqJGDHbGyBiK+BDlWbrTwyDP",
         "web_version": "3.0.4"
       },
-      "payload_raw": "displayRank=0&companyId=1832"
+      "payload_raw": "displayRank=0&companyId="
     },
     {
       "id": "004_getKeyData",
@@ -127,7 +127,7 @@
         "sign": "YbF1jyqthqBn3Xvelmc30yXeH3R6X05l018vnX3TuqK+qxqzO6LXcqpxSW65ZRnV",
         "web_version": "3.0.4"
       },
-      "payload_raw": "displayRank=0&companyId=1832"
+      "payload_raw": "displayRank=0&companyId="
     },
     {
       "id": "005_getCompanyPowerChartData",
@@ -158,7 +158,7 @@
         "sign": "RK2o7otFuqXiRa2UJ8U4rY3+7JiO26o4V3j/wfDPnIxc6OjuDi+tNi/TSYXw2oK+",
         "web_version": "3.0.4"
       },
-      "payload_raw": "companyId=1832&dimension=5&targetTime=2026-06-27"
+      "payload_raw": "companyId=&dimension=5&targetTime=2026-06-27"
     },
     {
       "id": "006_listAlarmEventLevel",
@@ -220,7 +220,7 @@
         "sign": "E+DBMMQe3oboYw6/M/GGxHDIwbIShhQCJBwLF29DjraHL88fqvqrjInVvECn9jp2",
         "web_version": "3.0.4"
       },
-      "payload_raw": "companyId=1832&stationName=&stationStatus=&pageNumber=1&pageSize=12"
+      "payload_raw": "companyId=&stationName=&stationStatus=&pageNumber=1&pageSize=100"
     },
     {
       "id": "008_getBreadInfo",
@@ -251,7 +251,7 @@
         "sign": "XYJ9b6z3JxGzrVCoioHsMxHpI+2gTm/H07JCzB43eZiU6HBNefXXVK/gmPcxvL3i",
         "web_version": "3.0.4"
       },
-      "payload_raw": "companyId=1832&havePv=0&haveMeter=0"
+      "payload_raw": "companyId="
     },
     {
       "id": "009_listUnsolvedEventLogAutomatic",
@@ -344,7 +344,7 @@
         "sign": "IWeqe6QXYcED9aKzZp9t8HbvzUGNxNnTBsu5qJsp9DocJml9IAcjt+U+Jro82Mwx",
         "web_version": "3.0.4"
       },
-      "payload_raw": "companyId=1832&dimension=2&targetTime=2026-06"
+      "payload_raw": "companyId=&dimension=2&targetTime=2026-06"
     },
     {
       "id": "012_getCompanyPowerChartData",
@@ -375,7 +375,7 @@
         "sign": "sW8xgwYJYX4R0geqk5uxTOw39wXLISQCmXM93r8ptzSyZTT+3A9F7UwVYafBW+Nc",
         "web_version": "3.0.4"
       },
-      "payload_raw": "companyId=1832&dimension=3&targetTime=2026"
+      "payload_raw": "companyId=&dimension=3&targetTime=2026"
     },
     {
       "id": "013_getCompanyPowerChartData",
@@ -406,7 +406,7 @@
         "sign": "0yaAYOt4i7u4ygSuNcRLQYFiGkdqbpzxUWUVSIJPJB5t9Aw/NO/9Ab/KghRh5AC/",
         "web_version": "3.0.4"
       },
-      "payload_raw": "companyId=1832&dimension=4&targetTime="
+      "payload_raw": "companyId=&dimension=4&targetTime="
     },
     {
       "id": "014_listStationByName",
@@ -1150,7 +1150,7 @@
         "sign": "7mvh+m4leqZ6MrERy3F8eqgm5K8Jl+DVibR9EhWWZYGbbXuXurx2UDCEaa2ZQKps",
         "web_version": "3.0.4"
       },
-      "payload_raw": "companyId=1832"
+      "payload_raw": "companyId="
     },
     {
       "id": "038_getBreadInfo",
@@ -1181,7 +1181,7 @@
         "sign": "Q5/qbWyaujN/UM4UQuX6fxp+Z/Ui8CXjAyE65uHIusy8kEjY3DcOiwrVcVUYsJoS",
         "web_version": "3.0.4"
       },
-      "payload_raw": "companyId=1832&havePv=0&haveMeter=0&areaCode=2055&stationId=17478"
+      "payload_raw": "companyId="
     },
     {
       "id": "039_listCollectorIconInfoByCondition",

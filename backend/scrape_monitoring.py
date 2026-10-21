@@ -37,6 +37,12 @@ def _safe_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
 
 socket.getaddrinfo = _safe_getaddrinfo
 
+try:
+    from env_loader import load_env_file
+    load_env_file(Path(__file__).resolve().parent / ".env")
+except Exception:
+    pass
+
 
 DROP_REQUEST_HEADERS = {
     "content-length",
@@ -700,6 +706,8 @@ def load_sma_accounts_from_env() -> list[dict[str, Any]]:
 
 
 def discover_kehua_account_identifiers(session: requests.Session, account: dict[str, Any], timeout: int = 15) -> dict[str, Any]:
+    if account.get("name") in ("primary", "master"):
+        return account
     if account.get("company_id") and account.get("station_id") and account.get("area_code"):
         return account
 
@@ -971,7 +979,7 @@ def kehua_extra_station_calls(
         station_id = item.get("stationId")
         company_id = item.get("companyId")
         area_code = item.get("areaCode")
-        if not station_id:
+        if not station_id or str(station_id) in ("38722", "50483"):
             continue
         calls.append({
             "id": f"get_station_info_{station_id}",
@@ -1400,7 +1408,7 @@ def build_normalized_site(site_result: dict[str, Any]) -> dict[str, Any]:
     elif site_name == "kehua":
         stations = normalize_kehua_stations(grouped)
         account_region = account.get("region")
-        if account_region:
+        if account_region and account_name not in ("primary", "master"):
             for st in stations:
                 st["region"] = account_region
         elif account_name in ("account_7", "account_8", "jaksel") or "jaksel" in account_name:
@@ -1412,23 +1420,29 @@ def build_normalized_site(site_result: dict[str, Any]) -> dict[str, Any]:
         elif account_name in ("account_3", "account_4", "jakbar") or "jakbar" in account_name:
             for st in stations:
                 st["region"] = "Jakarta Barat"
-        elif account_name in ("primary", "secondary", "account_1", "account_2", "jakut") or "jakut" in account_name:
+        elif "jakut" in account_name:
             for st in stations:
                 st["region"] = "Jakarta Utara"
 
         for st in stations:
-            if not st.get("region"):
-                s_text = f"{st.get('name', '')} {st.get('address', '')}".lower()
-                if "jakarta pusat" in s_text or "jkt pusat" in s_text or "jakpus" in s_text:
-                    st["region"] = "Jakarta Pusat"
-                elif "jakarta selatan" in s_text or "jkt selatan" in s_text or "jaksel" in s_text:
-                    st["region"] = "Jakarta Selatan"
-                elif "jakarta barat" in s_text or "jkt barat" in s_text or "jakbar" in s_text:
-                    st["region"] = "Jakarta Barat"
-                elif "jakarta timur" in s_text or "jkt timur" in s_text or "jaktim" in s_text:
-                    st["region"] = "Jakarta Timur"
-                elif "jakarta utara" in s_text or "jkt utara" in s_text or "jakut" in s_text:
-                    st["region"] = "Jakarta Utara"
+            s_text = f"{st.get('name', '')} {st.get('address', '')}".lower()
+            sid = str(st.get("station_id") or "")
+            if sid == "50639":
+                st["region"] = "Jakarta Pusat"
+            elif any(k in s_text for k in ["tidung", "seribu", "pramuka"]):
+                st["region"] = "Kepulauan Seribu"
+            elif any(k in s_text for k in ["jakbar", "jakarta barat", "kalideres", "kembangan", "cengkareng", "taman sari", "pinangsia", "ppkd"]):
+                st["region"] = "Jakarta Barat"
+            elif any(k in s_text for k in ["jakpus", "jakarta pusat", "gambir", "kemayoran", "petojo", "petamburan", "cempaka putih", "tanah abang", "disnakertrans"]):
+                st["region"] = "Jakarta Pusat"
+            elif any(k in s_text for k in ["jaksel", "jakarta selatan", "cilandak", "pesanggrahan", "kebayoran"]):
+                st["region"] = "Jakarta Selatan"
+            elif any(k in s_text for k in ["jaktim", "jakarta timur", "duren sawit", "kramat jati", "pulo gadung", "rawamangun", "jatinegara", "klender"]):
+                st["region"] = "Jakarta Timur"
+            elif any(k in s_text for k in ["jakut", "jakarta utara", "koja", "tanjung priok", "priok", "sunter", "cilincing", "semper"]):
+                st["region"] = "Jakarta Utara"
+            elif not st.get("region"):
+                st["region"] = "Jakarta Pusat"
         overview = normalize_kehua_overview(grouped, stations)
         alarms = normalize_kehua_alarms(grouped)
         charts = normalize_kehua_charts(grouped)
@@ -1971,7 +1985,13 @@ def normalize_kehua_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[d
             "income_currency": nested_value(overview_power, ["income", "monthElectricity", "unit"]) or nested_value(overview_power, ["income", "totalElectricity", "unit"]),
         })
 
+    # Filter out dummy/unbound stations without active devices
+    by_id.pop("38722", None)
+    by_id.pop("50483", None)
+
     station_coordinate_fallbacks = {
+        "50639": (-6.17983, 106.83789, "Dinas Tenaga Kerja, Transmigrasi dan Energi DKI Jakarta, Jl. Prajurit KKO Usman dan Harun No. 52, Gambir, Jakarta Pusat 10110"),
+        "PLTS Disnakertrans DKI Jakarta": (-6.17983, 106.83789, "Dinas Tenaga Kerja, Transmigrasi dan Energi DKI Jakarta, Jl. Prajurit KKO Usman dan Harun No. 52, Gambir, Jakarta Pusat 10110"),
         "17483": (-6.12775, 106.858751, "Jl. Cemp. 1 No.Rt 09/03, no 69, RT.10/RW.6, Sunter Agung, Kec. Tj. Priok, Kota Jkt Utara, Daerah Khusus Ibukota Jakarta 14350, Indonesia"),
         "SDN 09 JAKUT": (-6.12775, 106.858751, "Jl. Cemp. 1 No.Rt 09/03, no 69, RT.10/RW.6, Sunter Agung, Kec. Tj. Priok, Kota Jkt Utara, Daerah Khusus Ibukota Jakarta 14350, Indonesia"),
         "17478": (-6.134519, 106.870706, "7, Jl. Nusantara Selatan No.7, RT.7/RW.15, Sunter Agung, Kec. Tj. Priok, Kota Jkt Utara, Daerah Khusus Ibukota Jakarta 14350, Indonesia"),
@@ -1979,8 +1999,6 @@ def normalize_kehua_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[d
         # Jakarta Pusat (Google Maps verified)
         "34142": (-6.16870, 106.81708, "SMP Negeri 72 Jakarta, Jl. Petojo Binatu 2 No. 2, Petojo Selatan, Gambir, Jakarta Pusat 10160"),
         "SMPN 72 Jakpus": (-6.16870, 106.81708, "SMP Negeri 72 Jakarta, Jl. Petojo Binatu 2 No. 2, Petojo Selatan, Gambir, Jakarta Pusat 10160"),
-        "38722": (-6.17970, 106.81455, "SMP Negeri 94 Jakarta, Jl. Tanah Abang 5 No. 29, Petojo Selatan, Gambir, Jakarta Pusat 10160"),
-        "SMPN 94 Jakarta Pusat": (-6.17970, 106.81455, "SMP Negeri 94 Jakarta, Jl. Tanah Abang 5 No. 29, Petojo Selatan, Gambir, Jakarta Pusat 10160"),
         "16721": (-6.17970, 106.81455, "SMP Negeri 94 Jakarta, Jl. Tanah Abang 5 No. 29, Petojo Selatan, Gambir, Jakarta Pusat 10160"),
         "SMPN 94 Jakpus": (-6.17970, 106.81455, "SMP Negeri 94 Jakarta, Jl. Tanah Abang 5 No. 29, Petojo Selatan, Gambir, Jakarta Pusat 10160"),
         # Jakarta Selatan
@@ -1991,6 +2009,8 @@ def normalize_kehua_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[d
     }
     for station in by_id.values():
         sid = str(station.get("station_id") or "")
+        if sid == "50639":
+            station["name"] = "PLTS Disnakertrans DKI Jakarta"
         sname = str(station.get("name") or "")
         fallback = station_coordinate_fallbacks.get(sid) or station_coordinate_fallbacks.get(sname)
         if fallback:
