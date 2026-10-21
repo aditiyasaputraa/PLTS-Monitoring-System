@@ -1732,6 +1732,10 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt, selecte
               <span className="kpi-tile-val">{fleet.platforms}</span>
             </div>
             <div className="kpi-tile">
+              <span className="kpi-tile-header">Online</span>
+              <span className="kpi-tile-val" style={{ color: "#10b981" }}>{fleet.online ?? Math.max(0, fleet.stations - (fleet.offline || 0))}</span>
+            </div>
+            <div className="kpi-tile">
               <span className="kpi-tile-header">Offline</span>
               <span className="kpi-tile-val" style={{ color: fleet.offline > 0 ? "#ef4444" : "#10b981" }}>{fleet.offline}</span>
             </div>
@@ -4074,6 +4078,7 @@ function buildFleet(sites, locations) {
     return {
       stations: 0,
       platforms: 0,
+      online: 0,
       offline: 0,
       capacity: 0,
       current: 0,
@@ -4099,10 +4104,14 @@ function buildFleet(sites, locations) {
   const monthlyIncome = locations.reduce((sum, l) => sum + (Number(l.monthly_income) || 0), 0);
   const yearlyIncome = locations.reduce((sum, l) => sum + (Number(l.yearly_income) || 0), 0);
 
+  const offline = locations.filter((l) => l.status === "offline" || l.status === "disconnected").length;
+  const online = Math.max(0, locations.length - offline);
+
   return {
     stations: locations.length,
     platforms: new Set(locations.map((l) => l.source).filter(Boolean)).size,
-    offline: locations.filter((l) => l.status === "offline" || l.status === "disconnected").length,
+    online,
+    offline,
     capacity,
     current,
     daily,
