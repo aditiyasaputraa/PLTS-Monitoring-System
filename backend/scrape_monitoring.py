@@ -979,7 +979,7 @@ def kehua_extra_station_calls(
         station_id = item.get("stationId")
         company_id = item.get("companyId")
         area_code = item.get("areaCode")
-        if not station_id or str(station_id) in ("38722", "50483"):
+        if not station_id or str(station_id) in ("38722", "50483", "50639"):
             continue
         calls.append({
             "id": f"get_station_info_{station_id}",
@@ -1426,14 +1426,11 @@ def build_normalized_site(site_result: dict[str, Any]) -> dict[str, Any]:
 
         for st in stations:
             s_text = f"{st.get('name', '')} {st.get('address', '')}".lower()
-            sid = str(st.get("station_id") or "")
-            if sid == "50639":
-                st["region"] = "Jakarta Pusat"
-            elif any(k in s_text for k in ["tidung", "seribu", "pramuka"]):
+            if any(k in s_text for k in ["tidung", "seribu", "pramuka"]):
                 st["region"] = "Kepulauan Seribu"
             elif any(k in s_text for k in ["jakbar", "jakarta barat", "kalideres", "kembangan", "cengkareng", "taman sari", "pinangsia", "ppkd"]):
                 st["region"] = "Jakarta Barat"
-            elif any(k in s_text for k in ["jakpus", "jakarta pusat", "gambir", "kemayoran", "petojo", "petamburan", "cempaka putih", "tanah abang", "disnakertrans"]):
+            elif any(k in s_text for k in ["jakpus", "jakarta pusat", "gambir", "kemayoran", "petojo", "petamburan", "cempaka putih", "tanah abang"]):
                 st["region"] = "Jakarta Pusat"
             elif any(k in s_text for k in ["jaksel", "jakarta selatan", "cilandak", "pesanggrahan", "kebayoran"]):
                 st["region"] = "Jakarta Selatan"
@@ -1985,13 +1982,12 @@ def normalize_kehua_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[d
             "income_currency": nested_value(overview_power, ["income", "monthElectricity", "unit"]) or nested_value(overview_power, ["income", "totalElectricity", "unit"]),
         })
 
-    # Filter out dummy/unbound stations without active devices
+    # Filter out dummy/unbound stations without active devices or foreign demo stations
     by_id.pop("38722", None)
     by_id.pop("50483", None)
+    by_id.pop("50639", None)
 
     station_coordinate_fallbacks = {
-        "50639": (-6.17983, 106.83789, "Dinas Tenaga Kerja, Transmigrasi dan Energi DKI Jakarta, Jl. Prajurit KKO Usman dan Harun No. 52, Gambir, Jakarta Pusat 10110"),
-        "PLTS Disnakertrans DKI Jakarta": (-6.17983, 106.83789, "Dinas Tenaga Kerja, Transmigrasi dan Energi DKI Jakarta, Jl. Prajurit KKO Usman dan Harun No. 52, Gambir, Jakarta Pusat 10110"),
         "17483": (-6.12775, 106.858751, "Jl. Cemp. 1 No.Rt 09/03, no 69, RT.10/RW.6, Sunter Agung, Kec. Tj. Priok, Kota Jkt Utara, Daerah Khusus Ibukota Jakarta 14350, Indonesia"),
         "SDN 09 JAKUT": (-6.12775, 106.858751, "Jl. Cemp. 1 No.Rt 09/03, no 69, RT.10/RW.6, Sunter Agung, Kec. Tj. Priok, Kota Jkt Utara, Daerah Khusus Ibukota Jakarta 14350, Indonesia"),
         "17478": (-6.134519, 106.870706, "7, Jl. Nusantara Selatan No.7, RT.7/RW.15, Sunter Agung, Kec. Tj. Priok, Kota Jkt Utara, Daerah Khusus Ibukota Jakarta 14350, Indonesia"),
@@ -2009,8 +2005,6 @@ def normalize_kehua_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[d
     }
     for station in by_id.values():
         sid = str(station.get("station_id") or "")
-        if sid == "50639":
-            station["name"] = "PLTS Disnakertrans DKI Jakarta"
         sname = str(station.get("name") or "")
         fallback = station_coordinate_fallbacks.get(sid) or station_coordinate_fallbacks.get(sname)
         if fallback:
