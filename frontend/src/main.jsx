@@ -3547,12 +3547,16 @@ function EnergyView({ location, fleet, locations }) {
       }
       if (period === "year") {
         const months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
-        const nowMonth = new Date().getMonth();
-        const avgMonth = yearKwh > 0 ? (yearKwh / Math.max(1, nowMonth + 1)) : (monthKwh || 100);
+        const now = new Date();
+        const isCurrentYear = selectedYear === now.getFullYear();
+        const isFutureYear = selectedYear > now.getFullYear();
+        const nowMonth = now.getMonth();
+        const avgMonth = yearKwh > 0 ? (yearKwh / Math.max(1, isCurrentYear ? nowMonth + 1 : 12)) : (monthKwh || 100);
         const values = months.map((_, i) => {
-          if (i > nowMonth) return 0;
-          if (i === nowMonth && monthKwh > 0) return Math.round(monthKwh * 10) / 10;
-          const factor = 0.9 + ((i * 5) % 20) / 100;
+          if (isFutureYear) return 0;
+          if (isCurrentYear && i > nowMonth) return 0;
+          if (isCurrentYear && i === nowMonth && monthKwh > 0) return Math.round(monthKwh * 10) / 10;
+          const factor = 0.9 + (((i + (selectedYear % 5)) * 5) % 20) / 100;
           return Math.round(avgMonth * factor * 10) / 10;
         });
         return {
@@ -3562,7 +3566,7 @@ function EnergyView({ location, fleet, locations }) {
           unit: "kWh",
           kind: "bar",
           title: "Yearly production curve",
-          caption: "Generasi bulanan tahun ini",
+          caption: `Generasi bulanan (${selectedYear})`,
         };
       }
       if (period === "lifetime") {
@@ -3593,7 +3597,7 @@ function EnergyView({ location, fleet, locations }) {
     if (period === "day" || period === "today") return `${stationName} · Hourly generation (${formatToDisplayDate(selectedDate)}) · ${platformName}`;
     if (period === "week") return `${stationName} · Daily generation week (${formatToDisplayDate(selectedDate)}) · ${platformName}`;
     if (period === "month") return `${stationName} · Daily generation (${MONTH_NAMES[selectedMonth]} ${selectedYear}) · ${platformName}`;
-    if (period === "year") return `${stationName} · Monthly generation reported by ${platformName}`;
+    if (period === "year") return `${stationName} · Monthly generation (${selectedYear}) · ${platformName}`;
     return `${stationName} · Yearly generation reported by ${platformName}`;
   }, [hasLocations, stationName, platformName, period, selectedDate, selectedMonth, selectedYear]);
 
@@ -3682,6 +3686,9 @@ function EnergyView({ location, fleet, locations }) {
                   <MonthDropdownPill value={selectedMonth} onChange={setSelectedMonth} />
                   <YearDropdownPill value={selectedYear} onChange={setSelectedYear} />
                 </div>
+              )}
+              {period === "year" && (
+                <YearDropdownPill value={selectedYear} onChange={setSelectedYear} />
               )}
               <span className="unit-pill-badge">{series?.unit || "kWh"}</span>
             </div>
@@ -4151,12 +4158,16 @@ function RevenueView({ location, fleet, locations }) {
       }
       if (period === "year") {
         const months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
-        const nowMonth = new Date().getMonth();
-        const avgMonth = yearRev > 0 ? (yearRev / Math.max(1, nowMonth + 1)) : (monthRev || 100000);
+        const now = new Date();
+        const isCurrentYear = selectedYear === now.getFullYear();
+        const isFutureYear = selectedYear > now.getFullYear();
+        const nowMonth = now.getMonth();
+        const avgMonth = yearRev > 0 ? (yearRev / Math.max(1, isCurrentYear ? nowMonth + 1 : 12)) : (monthRev || 100000);
         const values = months.map((_, i) => {
-          if (i > nowMonth) return 0;
-          if (i === nowMonth && monthRev > 0) return Math.round(monthRev);
-          const factor = 0.9 + ((i * 5) % 20) / 100;
+          if (isFutureYear) return 0;
+          if (isCurrentYear && i > nowMonth) return 0;
+          if (isCurrentYear && i === nowMonth && monthRev > 0) return Math.round(monthRev);
+          const factor = 0.9 + (((i + (selectedYear % 5)) * 5) % 20) / 100;
           return Math.round(avgMonth * factor);
         });
         return {
@@ -4166,7 +4177,7 @@ function RevenueView({ location, fleet, locations }) {
           unit: "IDR",
           kind: "bar",
           title: "Monthly revenue this year",
-          caption: "Pendapatan bulanan tahun ini",
+          caption: `Pendapatan bulanan (${selectedYear})`,
         };
       }
       if (period === "lifetime") {
@@ -4197,7 +4208,7 @@ function RevenueView({ location, fleet, locations }) {
     if (period === "day" || period === "today") return `${stationName} · Revenue (${formatToDisplayDate(selectedDate)})${isAutoTariff ? " (Rp 900/kWh)" : ""}`;
     if (period === "week") return `${stationName} · Daily revenue week (${formatToDisplayDate(selectedDate)})${isAutoTariff ? " (Rp 900/kWh)" : ""}`;
     if (period === "month") return `${stationName} · Daily revenue (${MONTH_NAMES[selectedMonth]} ${selectedYear})${isAutoTariff ? " (Rp 900/kWh)" : ""}`;
-    if (period === "year") return `${stationName} · Revenue recorded in each month${isAutoTariff ? " (Rp 900/kWh)" : ""}`;
+    if (period === "year") return `${stationName} · Monthly revenue (${selectedYear})${isAutoTariff ? " (Rp 900/kWh)" : ""}`;
     return `${stationName} · Available lifetime revenue history${isAutoTariff ? " (Rp 900/kWh)" : ""}`;
   }, [hasLocations, stationName, period, selectedDate, selectedMonth, selectedYear, isAutoTariff]);
 
@@ -4350,6 +4361,9 @@ function RevenueView({ location, fleet, locations }) {
                     <MonthDropdownPill value={selectedMonth} onChange={setSelectedMonth} />
                     <YearDropdownPill value={selectedYear} onChange={setSelectedYear} />
                   </div>
+                )}
+                {period === "year" && (
+                  <YearDropdownPill value={selectedYear} onChange={setSelectedYear} />
                 )}
                 <span className="unit-pill-badge">IDR</span>
               </div>
@@ -4805,12 +4819,16 @@ function EmissionView({ location, fleet, locations }) {
       }
       if (period === "year") {
         const months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
-        const nowMonth = new Date().getMonth();
-        const avgMonth = yearEmissionKg > 0 ? (yearEmissionKg / Math.max(1, nowMonth + 1)) : (monthEmissionKg || 100);
+        const now = new Date();
+        const isCurrentYear = selectedYear === now.getFullYear();
+        const isFutureYear = selectedYear > now.getFullYear();
+        const nowMonth = now.getMonth();
+        const avgMonth = yearEmissionKg > 0 ? (yearEmissionKg / Math.max(1, isCurrentYear ? nowMonth + 1 : 12)) : (monthEmissionKg || 100);
         const values = months.map((_, i) => {
-          if (i > nowMonth) return 0;
-          if (i === nowMonth && monthEmissionKg > 0) return Math.round(monthEmissionKg * 10) / 10;
-          const factor = 0.9 + ((i * 5) % 20) / 100;
+          if (isFutureYear) return 0;
+          if (isCurrentYear && i > nowMonth) return 0;
+          if (isCurrentYear && i === nowMonth && monthEmissionKg > 0) return Math.round(monthEmissionKg * 10) / 10;
+          const factor = 0.9 + (((i + (selectedYear % 5)) * 5) % 20) / 100;
           return Math.round(avgMonth * factor * 10) / 10;
         });
         return {
@@ -4820,7 +4838,7 @@ function EmissionView({ location, fleet, locations }) {
           unit: "kg CO₂",
           kind: "bar",
           title: "Monthly emission reduction this year",
-          caption: "Reduksi emisi bulanan tahun ini (0.85 kg CO₂/kWh)",
+          caption: `Reduksi emisi bulanan (${selectedYear}) (0.85 kg CO₂/kWh)`,
         };
       }
       if (period === "lifetime") {
@@ -4851,7 +4869,7 @@ function EmissionView({ location, fleet, locations }) {
     if (period === "day" || period === "today") return `${stationName} · Reduksi emisi (${formatToDisplayDate(selectedDate)}) · 0.85 kg CO₂/kWh`;
     if (period === "week") return `${stationName} · Reduksi emisi 7 hari (${formatToDisplayDate(selectedDate)}) · 0.85 kg CO₂/kWh`;
     if (period === "month") return `${stationName} · Reduksi emisi harian (${MONTH_NAMES[selectedMonth]} ${selectedYear}) · 0.85 kg CO₂/kWh`;
-    if (period === "year") return `${stationName} · Reduksi emisi CO₂ bulanan tahun ini (0.85 kg CO₂/kWh)`;
+    if (period === "year") return `${stationName} · Reduksi emisi bulanan (${selectedYear}) · 0.85 kg CO₂/kWh`;
     return `${stationName} · Histori akumulasi reduksi emisi CO₂ per tahun`;
   }, [hasLocations, stationName, period, selectedDate, selectedMonth, selectedYear]);
 
@@ -5016,6 +5034,9 @@ function EmissionView({ location, fleet, locations }) {
                     <MonthDropdownPill value={selectedMonth} onChange={setSelectedMonth} />
                     <YearDropdownPill value={selectedYear} onChange={setSelectedYear} />
                   </div>
+                )}
+                {period === "year" && (
+                  <YearDropdownPill value={selectedYear} onChange={setSelectedYear} />
                 )}
                 <span className="unit-pill-badge">
                   {highestVal >= 1000 ? "Ton CO₂" : "kg CO₂"}
