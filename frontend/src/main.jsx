@@ -2053,14 +2053,8 @@ function formatYTick(val, metric) {
 function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, onSelect }) {
   const [metric, setMetric] = useState("energy"); // "energy" | "revenue"
   const [hoveredIdx, setHoveredIdx] = useState(null);
-  const [selectedStationUid, setSelectedStationUid] = useState("all");
 
-  const activeStation = useMemo(() => {
-    if (selectedStationUid === "all") return null;
-    return (locations || []).find((l) => l.uid === selectedStationUid) || null;
-  }, [selectedStationUid, locations]);
-
-  const availableYears = useMemo(() => getAvailableProductionYears(locations, activeStation), [locations, activeStation]);
+  const availableYears = useMemo(() => getAvailableProductionYears(locations, null), [locations]);
   const [selectedYear, setSelectedYear] = useState(() => availableYears[0] || new Date().getFullYear());
 
   useEffect(() => {
@@ -2070,8 +2064,8 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
   }, [availableYears, selectedYear]);
 
   const monthlyValues = useMemo(() => {
-    return getAggregateMonthlyValues(locations, activeStation, selectedYear, metric, fleet);
-  }, [locations, activeStation, selectedYear, metric, fleet]);
+    return getAggregateMonthlyValues(locations, null, selectedYear, metric, fleet);
+  }, [locations, selectedYear, metric, fleet]);
 
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const now = new Date();
@@ -2107,78 +2101,14 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
       <div className="card-header-row" style={{ flexWrap: "wrap", gap: "10px" }}>
         <div>
           <span className="card-eyebrow">
-            {selectedStationUid === "all"
-              ? (metric === "revenue" ? `REVENUE TREND · SEMUA PLTS · ${selectedYear}` : `ENERGY TREND · SEMUA PLTS · ${selectedYear}`)
-              : (metric === "revenue" ? `REVENUE TREND · ${activeStation?.name || "PLTS"} · ${selectedYear}` : `ENERGY TREND · ${activeStation?.name || "PLTS"} · ${selectedYear}`)}
+            {metric === "revenue" ? `REVENUE TREND · ${selectedYear}` : `ENERGY TREND · ${selectedYear}`}
           </span>
           <h3 className="card-title">
             {metric === "revenue" ? "Monthly revenue" : "Monthly production"}
-            {selectedStationUid === "all" ? (
-              <span style={{ fontSize: "11px", fontWeight: 700, color: "#10b981", marginLeft: "8px", background: "rgba(16,185,129,0.15)", padding: "2px 8px", borderRadius: "10px", display: "inline-block" }}>
-                ⚡ Semua {locations.length} PLTS
-              </span>
-            ) : (
-              <span style={{ fontSize: "11px", fontWeight: 700, color: "#4b5e51", marginLeft: "8px", background: "#e8efe9", padding: "2px 8px", borderRadius: "10px", display: "inline-block" }}>
-                🏢 {activeStation?.name}
-              </span>
-            )}
           </h3>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-          {/* Dropdown Pemilihan PLTS: Semua PLTS vs Stasiun Spesifik */}
-          <div style={{ position: "relative", display: "inline-block" }}>
-            <select
-              aria-label="Pilih cakupan PLTS"
-              value={selectedStationUid}
-              onChange={(e) => {
-                const val = e.target.value;
-                setSelectedStationUid(val);
-                if (val !== "all" && onSelect) {
-                  onSelect(val);
-                }
-              }}
-              style={{
-                appearance: "none",
-                WebkitAppearance: "none",
-                MozAppearance: "none",
-                background: selectedStationUid === "all" ? "rgba(16, 185, 129, 0.14)" : "#f3f6f3",
-                border: selectedStationUid === "all" ? "1px solid rgba(16, 185, 129, 0.45)" : "1px solid #d4ded5",
-                borderRadius: "8px",
-                padding: "5px 24px 5px 10px",
-                fontSize: "11px",
-                fontWeight: 700,
-                color: selectedStationUid === "all" ? "#065f46" : "#1f2f24",
-                cursor: "pointer",
-                outline: "none",
-                transition: "all 0.15s ease",
-                maxWidth: "210px",
-              }}
-            >
-              <option value="all">⚡ Semua PLTS ({locations.length} Lokasi)</option>
-              <optgroup label="Stasiun PLTS">
-                {locations.map((loc) => (
-                  <option key={loc.uid} value={loc.uid}>
-                    {loc.name}
-                  </option>
-                ))}
-              </optgroup>
-            </select>
-            <span
-              style={{
-                position: "absolute",
-                right: "8px",
-                top: "50%",
-                transform: "translateY(-50%)",
-                pointerEvents: "none",
-                fontSize: "8px",
-                color: selectedStationUid === "all" ? "#065f46" : "#6b7d70",
-              }}
-            >
-              ▼
-            </span>
-          </div>
-
           {/* Dropdown Tahun */}
           <div style={{ position: "relative", display: "inline-block" }}>
             <select
