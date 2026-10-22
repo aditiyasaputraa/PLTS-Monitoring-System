@@ -222,5 +222,80 @@ test("supports day and week periods across energy, revenue, and emission", () =>
   assert.equal(emWeek.available, true);
   assert.deepEqual(emWeek.values, [10.2, 11.9, 13.6, 15.3, 17, 18.7, 20.4]);
 });
+test("safely handles Kehua array units and generates complete curves from KPIs", () => {
+  const realKehuaFromSupabase = {
+    source: "kehua",
+    name: "IT Del - Gedung 9",
+    daily_energy_kwh: 17.2,
+    monthly_energy_kwh: 1302.9,
+    yearly_energy_kwh: 17140.0,
+    cumulative_energy_kwh: 50720.0,
+    charts: {
+      daily_generation: {
+        unit: ["kWh"],
+        x: ["00:00", "01:00", "02:00"],
+        y: [0, 0, 0],
+      },
+      monthly_generation: {
+        unit: ["kWh"],
+        x: ["1", "2", "3"],
+        y: [20, 25, 30],
+      },
+    },
+  };
 
+  // 1. Energy
+  const energyDay = getEnergySeries(realKehuaFromSupabase, "day");
+  assert.equal(energyDay.available, true);
+  assert.equal(energyDay.unit, "kWh");
 
+  const energyMonth = getEnergySeries(realKehuaFromSupabase, "month");
+  assert.equal(energyMonth.available, true);
+  assert.equal(energyMonth.unit, "kWh");
+
+  const energyYear = getEnergySeries(realKehuaFromSupabase, "year");
+  assert.equal(energyYear.available, true);
+  assert.equal(energyYear.values.length, 12);
+
+  const energyLifetime = getEnergySeries(realKehuaFromSupabase, "lifetime");
+  assert.equal(energyLifetime.available, true);
+  assert.equal(energyLifetime.values.length, 5);
+
+  // 2. Revenue
+  const revDay = getRevenueSeries(realKehuaFromSupabase, "day");
+  assert.equal(revDay.available, true);
+  assert.equal(revDay.unit, "IDR");
+
+  const revMonth = getRevenueSeries(realKehuaFromSupabase, "month");
+  assert.equal(revMonth.available, true);
+  assert.equal(revMonth.unit, "IDR");
+  assert.deepEqual(revMonth.values, [18000, 22500, 27000]);
+
+  const revYear = getRevenueSeries(realKehuaFromSupabase, "year");
+  assert.equal(revYear.available, true);
+  assert.equal(revYear.unit, "IDR");
+  assert.equal(revYear.values.length, 12);
+
+  const revLifetime = getRevenueSeries(realKehuaFromSupabase, "lifetime");
+  assert.equal(revLifetime.available, true);
+  assert.equal(revLifetime.unit, "IDR");
+  assert.equal(revLifetime.values.length, 5);
+
+  // 3. Emission
+  const emDay = getEmissionSeries(realKehuaFromSupabase, "day");
+  assert.equal(emDay.available, true);
+  assert.equal(emDay.unit, "kg CO₂");
+
+  const emMonth = getEmissionSeries(realKehuaFromSupabase, "month");
+  assert.equal(emMonth.available, true);
+  assert.equal(emMonth.unit, "kg CO₂");
+  assert.deepEqual(emMonth.values, [17, 21.3, 25.5]);
+
+  const emYear = getEmissionSeries(realKehuaFromSupabase, "year");
+  assert.equal(emYear.available, true);
+  assert.equal(emYear.unit, "kg CO₂");
+
+  const emLifetime = getEmissionSeries(realKehuaFromSupabase, "lifetime");
+  assert.equal(emLifetime.available, true);
+  assert.equal(emLifetime.unit, "kg CO₂");
+});

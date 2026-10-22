@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createRoot } from "react-dom/client";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { getEnergySeries, getRevenueSeries, getEmissionSeries } from "./chart_data.js";
+import { getEnergySeries, getRevenueSeries, getEmissionSeries, normalizeUnitString } from "./chart_data.js";
 import { MOCK_MONITORING_DATA } from "./mock_data.js";
 import "./styles.css";
 
@@ -1907,7 +1907,7 @@ function getStationMonthlyValues(station, targetYear, metric = "energy") {
     const trends = station.charts?.company_power_trends || station.site?.charts?.company_power_trends;
     const seriesGroup = trends?.year_monthly;
     const yearSeries = seriesGroup?.series?.[String(targetYear)];
-    const unit = (seriesGroup?.unit || "MWh").toUpperCase();
+    const unit = normalizeUnitString(seriesGroup?.unit, "MWh").toUpperCase();
     const multiplier = unit === "MWH" ? 1000 : 1;
 
     if (yearSeries) {
@@ -3336,7 +3336,7 @@ function EnergyView({ location, fleet, locations }) {
   const fleetLifetimeKwh = formatNumber(fleet?.cumulative ?? fleet?.lifetime ?? 0, 1);
 
   const series = useMemo(() => {
-    if (!activeStation || !activeStation.id) {
+    if (!activeStation || !(activeStation.id || activeStation.station_id || activeStation.uid || activeStation.name)) {
       const count = (period === "day" || period === "today") ? 24 : (period === "week" ? 7 : (period === "month" ? 31 : (period === "year" ? 12 : 5)));
       const labels = (period === "day" || period === "today")
         ? Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`)
@@ -3884,7 +3884,15 @@ function RevenueProductionChart({ series, period, isKehua }) {
           zIndex: 10,
         }}>
           <span style={{ color: "#a3b8aa" }}>
-            {period === "year" ? `Bulan ${effectiveLabels[hoveredIndex]}` : (period === "month" ? `Tgl ${effectiveLabels[hoveredIndex]}` : `Tahun ${effectiveLabels[hoveredIndex]}`)}
+            {period === "day" || period === "today"
+              ? `Jam ${effectiveLabels[hoveredIndex]}`
+              : (period === "week"
+                ? `Hari ${effectiveLabels[hoveredIndex]}`
+                : (period === "year"
+                  ? `Bulan ${effectiveLabels[hoveredIndex]}`
+                  : (period === "month"
+                    ? `Tgl ${effectiveLabels[hoveredIndex]}`
+                    : `Tahun ${effectiveLabels[hoveredIndex]}`)))}
           </span>
           <span style={{ color: "#34d399" }}>
             Rp {new Intl.NumberFormat("id-ID").format(Math.round(effectiveValues[hoveredIndex] || 0))} IDR
@@ -3915,7 +3923,7 @@ function RevenueView({ location, fleet, locations }) {
   const fleetTotalRev = Number(fleet?.totalIncome || 0);
 
   const series = useMemo(() => {
-    if (!activeStation || !activeStation.id) {
+    if (!activeStation || !(activeStation.id || activeStation.station_id || activeStation.uid || activeStation.name)) {
       const count = (period === "day" || period === "today") ? 24 : (period === "week" ? 7 : (period === "month" ? 31 : (period === "year" ? 12 : 5)));
       const labels = (period === "day" || period === "today")
         ? Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`)
@@ -4004,7 +4012,7 @@ function RevenueView({ location, fleet, locations }) {
         });
         return {
           available: true,
-          labels,
+          labels: months,
           values,
           unit: "IDR",
           kind: "bar",
@@ -4023,7 +4031,7 @@ function RevenueView({ location, fleet, locations }) {
         ];
         return {
           available: true,
-          labels,
+          labels: years,
           values,
           unit: "IDR",
           kind: "bar",
@@ -4552,7 +4560,7 @@ function EmissionView({ location, fleet, locations }) {
   const fleetTotalEmissionKg = fleetCumulativeKwh * EMISSION_FACTOR;
 
   const series = useMemo(() => {
-    if (!activeStation || !activeStation.id) {
+    if (!activeStation || !(activeStation.id || activeStation.station_id || activeStation.uid || activeStation.name)) {
       const count = (period === "day" || period === "today") ? 24 : (period === "week" ? 7 : (period === "month" ? 31 : (period === "year" ? 12 : 5)));
       const labels = (period === "day" || period === "today")
         ? Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`)
