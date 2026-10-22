@@ -1494,6 +1494,7 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt, selecte
           locations={locations}
           fleet={fleet}
           currentMonthKwh={currentMonthKwh}
+          onSelect={onSelect}
         />
 
         {/* Right: Site Totals (Plant Overview) */}
@@ -1970,30 +1971,48 @@ function getStationMonthlyValues(station, targetYear, metric = "energy") {
   return monthly;
 }
 
-function getAggregateMonthlyValues(locations, selected, targetYear, metric = "energy", fleet = null) {
+function getAggregateMonthlyValues(locations, activeStation, targetYear, metric = "energy", fleet = null) {
   const currentYear = new Date().getFullYear();
   const isCurrentYear = targetYear === currentYear;
   const currentMonthIdx = new Date().getMonth();
 
-  if (selected) {
-    return getStationMonthlyValues(selected, targetYear, metric);
+  if (activeStation) {
+    return getStationMonthlyValues(activeStation, targetYear, metric);
   }
 
   const aggregate = Array(12).fill(0);
   const pool = locations && locations.length > 0 ? locations : [];
+  const seenKehuaTrendKeys = new Set();
 
   for (const st of pool) {
+    const source = (st.source || st.site?.platform || "").toLowerCase();
+    if (source === "kehua") {
+      const trends = st.charts?.company_power_trends || st.site?.charts?.company_power_trends;
+      const seriesGroup = trends?.year_monthly;
+      const yearSeries = seriesGroup?.series?.[String(targetYear)];
+      if (yearSeries) {
+        const key = `${st.site?.account || "kehua"}-${JSON.stringify(yearSeries.x || [])}-${JSON.stringify(yearSeries.y || [])}`;
+        if (seenKehuaTrendKeys.has(key)) {
+          continue;
+        }
+        seenKehuaTrendKeys.add(key);
+      }
+    }
+
     const stValues = getStationMonthlyValues(st, targetYear, metric);
     for (let m = 0; m < 12; m++) {
       aggregate[m] += stValues[m] || 0;
     }
   }
 
-  if (isCurrentYear && aggregate[currentMonthIdx] === 0 && fleet) {
-    if (metric === "energy" && fleet.monthly > 0) {
+  if (isCurrentYear && fleet) {
+    if (metric === "energy" && fleet.monthly > 0 && aggregate[currentMonthIdx] < fleet.monthly) {
       aggregate[currentMonthIdx] = Math.round(fleet.monthly * 10) / 10;
-    } else if (metric === "revenue" && (fleet.monthlyIncome > 0 || fleet.monthly > 0)) {
-      aggregate[currentMonthIdx] = Math.round(fleet.monthlyIncome || (fleet.monthly * 900));
+    } else if (metric === "revenue") {
+      const expectedRev = fleet.monthlyIncome > 0 ? fleet.monthlyIncome : (fleet.monthly > 0 ? Math.round(fleet.monthly * 900) : 0);
+      if (expectedRev > 0 && aggregate[currentMonthIdx] < expectedRev) {
+        aggregate[currentMonthIdx] = expectedRev;
+      }
     }
   }
 
@@ -2031,11 +2050,17 @@ function formatYTick(val, metric) {
   return String(Math.round(val));
 }
 
-function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh }) {
+function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, onSelect }) {
   const [metric, setMetric] = useState("energy"); // "energy" | "revenue"
   const [hoveredIdx, setHoveredIdx] = useState(null);
+  const [selectedStationUid, setSelectedStationUid] = useState("all");
 
-  const availableYears = useMemo(() => getAvailableProductionYears(locations, selected), [locations, selected]);
+  const activeStation = useMemo(() => {
+    if (selectedStationUid === "all") return null;
+    return (locations || []).find((l) => l.uid === selectedStationUid) || null;
+  }, [selectedStationUid, locations]);
+
+  const availableYears = useMemo(() => getAvailableProductionYears(locations, activeStation), [locations, activeStation]);
   const [selectedYear, setSelectedYear] = useState(() => availableYears[0] || new Date().getFullYear());
 
   useEffect(() => {
@@ -2045,8 +2070,8 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh }) 
   }, [availableYears, selectedYear]);
 
   const monthlyValues = useMemo(() => {
-    return getAggregateMonthlyValues(locations, selected, selectedYear, metric, fleet);
-  }, [locations, selected, selectedYear, metric, fleet]);
+    return getAggregateMonthlyValues(locations, activeStation, selectedYear, metric, fleet);
+  }, [locations, activeStation, selectedYear, metric, fleet]);
 
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const now = new Date();
@@ -2079,17 +2104,81 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh }) 
 
   return (
     <div className="dashboard-card" style={{ position: "relative" }}>
-      <div className="card-header-row" style={{ flexWrap: "wrap", gap: "8px" }}>
+      <div className="card-header-row" style={{ flexWrap: "wrap", gap: "10px" }}>
         <div>
           <span className="card-eyebrow">
-            {metric === "revenue" ? `REVENUE TREND · ${selectedYear}` : `ENERGY TREND · ${selectedYear}`}
+            {selectedStationUid === "all"
+              ? (metric === "revenue" ? `REVENUE TREND · SEMUA PLTS · ${selectedYear}` : `ENERGY TREND · SEMUA PLTS · ${selectedYear}`)
+              : (metric === "revenue" ? `REVENUE TREND · ${activeStation?.name || "PLTS"} · ${selectedYear}` : `ENERGY TREND · ${activeStation?.name || "PLTS"} · ${selectedYear}`)}
           </span>
           <h3 className="card-title">
             {metric === "revenue" ? "Monthly revenue" : "Monthly production"}
+            {selectedStationUid === "all" ? (
+              <span style={{ fontSize: "11px", fontWeight: 700, color: "#10b981", marginLeft: "8px", background: "rgba(16,185,129,0.15)", padding: "2px 8px", borderRadius: "10px", display: "inline-block" }}>
+                ⚡ Semua {locations.length} PLTS
+              </span>
+            ) : (
+              <span style={{ fontSize: "11px", fontWeight: 700, color: "#4b5e51", marginLeft: "8px", background: "#e8efe9", padding: "2px 8px", borderRadius: "10px", display: "inline-block" }}>
+                🏢 {activeStation?.name}
+              </span>
+            )}
           </h3>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+          {/* Dropdown Pemilihan PLTS: Semua PLTS vs Stasiun Spesifik */}
+          <div style={{ position: "relative", display: "inline-block" }}>
+            <select
+              aria-label="Pilih cakupan PLTS"
+              value={selectedStationUid}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSelectedStationUid(val);
+                if (val !== "all" && onSelect) {
+                  onSelect(val);
+                }
+              }}
+              style={{
+                appearance: "none",
+                WebkitAppearance: "none",
+                MozAppearance: "none",
+                background: selectedStationUid === "all" ? "rgba(16, 185, 129, 0.14)" : "#f3f6f3",
+                border: selectedStationUid === "all" ? "1px solid rgba(16, 185, 129, 0.45)" : "1px solid #d4ded5",
+                borderRadius: "8px",
+                padding: "5px 24px 5px 10px",
+                fontSize: "11px",
+                fontWeight: 700,
+                color: selectedStationUid === "all" ? "#065f46" : "#1f2f24",
+                cursor: "pointer",
+                outline: "none",
+                transition: "all 0.15s ease",
+                maxWidth: "210px",
+              }}
+            >
+              <option value="all">⚡ Semua PLTS ({locations.length} Lokasi)</option>
+              <optgroup label="Stasiun PLTS">
+                {locations.map((loc) => (
+                  <option key={loc.uid} value={loc.uid}>
+                    {loc.name}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+            <span
+              style={{
+                position: "absolute",
+                right: "8px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                pointerEvents: "none",
+                fontSize: "8px",
+                color: selectedStationUid === "all" ? "#065f46" : "#6b7d70",
+              }}
+            >
+              ▼
+            </span>
+          </div>
+
           {/* Dropdown Tahun */}
           <div style={{ position: "relative", display: "inline-block" }}>
             <select
@@ -2209,6 +2298,7 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh }) 
           </div>
         </div>
       </div>
+
 
       {/* Floating Hover Tooltip */}
       {hoveredIdx !== null && (
