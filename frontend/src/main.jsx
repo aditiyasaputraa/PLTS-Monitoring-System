@@ -1318,7 +1318,7 @@ function Dashboard({ session, onSignOut }) {
         )}
 
         {activeTab === "Emission" && (
-          <EmissionView location={selected} fleet={fleet} locations={locations} />
+          <EmissionView location={selected} fleet={fleet} locations={locations} allLocations={allLocations} />
         )}
       </main>
 
@@ -3434,6 +3434,29 @@ function YearDropdownPill({ value, onChange, years = AVAILABLE_YEARS }) {
   );
 }
 
+function RegionDropdownPill({ value, onChange, regions = REGIONS }) {
+  const currentRegion = regions.find((r) => r.id === value) || regions[0];
+
+  return (
+    <div className="select-pill-wrapper" title="Pilih Wilayah" style={{ minWidth: "128px" }}>
+      <span style={{ fontSize: "11px", marginRight: "3px" }}>📍</span>
+      <span className="select-pill-text">{currentRegion.name}</span>
+      <svg className="select-pill-arrow" width="10" height="10" viewBox="0 0 12 12" fill="currentColor">
+        <path d="M2.5 4.5L6 8L9.5 4.5H2.5Z" />
+      </svg>
+      <select
+        className="select-pill-native"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        {regions.map((r) => (
+          <option key={r.id} value={r.id}>{r.name}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function EnergyView({ location, fleet, locations }) {
   const [period, setPeriod] = useState("day");
   const [selectedDate, setSelectedDate] = useState(getTodayDateStr);
@@ -4702,7 +4725,7 @@ function EmissionProductionChart({ series, period }) {
   );
 }
 
-function EmissionView({ location, fleet, locations }) {
+function EmissionView({ location, fleet, locations, allLocations }) {
   const [period, setPeriod] = useState("day");
   const [selectedDate, setSelectedDate] = useState(getTodayDateStr);
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth());
@@ -4901,16 +4924,64 @@ function EmissionView({ location, fleet, locations }) {
     return nonZero !== undefined ? nonZero : 0;
   }, [series]);
 
+  // Pool of all locations across regions
+  const pool = (allLocations && allLocations.length > 0) ? allLocations : (locations || []);
+
   // Fleet series states
+  const [fleetRegion, setFleetRegion] = useState("all");
   const [fleetPeriod, setFleetPeriod] = useState("day");
   const [fleetSelectedDate, setFleetSelectedDate] = useState(getTodayDateStr);
   const [fleetSelectedMonth, setFleetSelectedMonth] = useState(() => new Date().getMonth());
   const [fleetSelectedYear, setFleetSelectedYear] = useState(() => new Date().getFullYear());
 
-  const fleetTotalTodayEmissionKg = Number(fleet?.daily || 0) * EMISSION_FACTOR;
+  const targetLocations = useMemo(() => {
+    if (fleetRegion === "all") return pool;
+    return pool.filter((loc) => {
+      const reg = loc.region ? String(loc.region).toLowerCase() : getStationRegion(loc);
+      return reg === fleetRegion;
+    });
+  }, [pool, fleetRegion]);
+
+  const currentRegObj = useMemo(() => {
+    return REGIONS.find((r) => r.id === fleetRegion) || REGIONS[0];
+  }, [fleetRegion]);
+
+  const regionLabel = fleetRegion === "all" ? "Semua PLTS" : currentRegObj.name;
+
+  const targetTodayEmissionKg = useMemo(() => {
+    return targetLocations.reduce((sum, loc) => sum + (Number(loc?.daily_energy_kwh ?? loc?.today_energy_kwh) || 0), 0) * EMISSION_FACTOR;
+  }, [targetLocations]);
+
+  const targetMonthEmissionKg = useMemo(() => {
+    return targetLocations.reduce((sum, loc) => sum + (Number(loc?.monthly_energy_kwh ?? loc?.month_energy_kwh) || 0), 0) * EMISSION_FACTOR;
+  }, [targetLocations]);
+
+  const targetYearEmissionKg = useMemo(() => {
+    return targetLocations.reduce((sum, loc) => sum + (Number(loc?.yearly_energy_kwh ?? loc?.year_energy_kwh) || 0), 0) * EMISSION_FACTOR;
+  }, [targetLocations]);
+
+  const targetLifetimeEmissionKg = useMemo(() => {
+    return targetLocations.reduce((sum, loc) => sum + (Number(loc?.cumulative_energy_kwh ?? loc?.total_energy_kwh) || 0), 0) * EMISSION_FACTOR;
+  }, [targetLocations]);
+
+  const fleetTotalTodayEmissionKg = fleetRegion === "all"
+    ? (Number(fleet?.daily || 0) * EMISSION_FACTOR || targetTodayEmissionKg)
+    : targetTodayEmissionKg;
+  const fleetMonthEmissionKgCalc = fleetRegion === "all"
+    ? (Number(fleet?.monthly || 0) * EMISSION_FACTOR || targetMonthEmissionKg)
+    : targetMonthEmissionKg;
+  const fleetYearEmissionKgCalc = fleetRegion === "all"
+    ? (Number(fleet?.yearly || 0) * EMISSION_FACTOR || targetYearEmissionKg)
+    : targetYearEmissionKg;
+  const fleetTotalEmissionKgCalc = fleetRegion === "all"
+    ? (Number(fleet?.cumulative || 0) * EMISSION_FACTOR || targetLifetimeEmissionKg)
+    : targetLifetimeEmissionKg;
 
   const fleetSeries = useMemo(() => {
-    if (!locations || locations.length === 0) {
+    const isSpecificRegion = fleetRegion !== "all";
+    const regionName = currentRegObj.name;
+
+    if (!targetLocations || targetLocations.length === 0) {
       const count = (fleetPeriod === "day" || fleetPeriod === "today") ? 24 : (fleetPeriod === "week" ? 7 : (fleetPeriod === "month" ? 31 : (fleetPeriod === "year" ? 12 : 5)));
       const labels = (fleetPeriod === "day" || fleetPeriod === "today")
         ? Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`)
@@ -4926,7 +4997,8 @@ function EmissionView({ location, fleet, locations }) {
         labels,
         values: Array(count).fill(0),
         unit: "kg CO₂",
-        title: "Fleet emission history",
+        title: isSpecificRegion ? `Emisi ${regionName}` : "Fleet emission history",
+        caption: `Belum ada instalasi PLTS di wilayah ${regionName} (0 kg CO₂)`,
       };
     }
 
@@ -4935,7 +5007,7 @@ function EmissionView({ location, fleet, locations }) {
       const solarWeights = [0, 0, 0, 0, 0, 0, 0.02, 0.05, 0.09, 0.13, 0.16, 0.18, 0.16, 0.11, 0.06, 0.03, 0.01, 0, 0, 0, 0, 0, 0, 0];
       const aggregated = Array(24).fill(0);
 
-      locations.forEach((loc) => {
+      targetLocations.forEach((loc) => {
         const s = getEmissionSeries(loc, "day");
         if (s && s.available !== false && Array.isArray(s.values) && s.values.length === 24) {
           s.values.forEach((v, idx) => {
@@ -4960,8 +5032,8 @@ function EmissionView({ location, fleet, locations }) {
         values: finalVals,
         unit: "kg CO₂",
         kind: "bar",
-        title: "Total fleet daily emission reduction",
-        caption: `Reduksi emisi seluruh PLTS (${formatToDisplayDate(fleetSelectedDate)}) (0.85 kg CO₂/kWh)`,
+        title: isSpecificRegion ? `Total daily emission reduction (${regionName})` : "Total fleet daily emission reduction",
+        caption: `Reduksi emisi ${isSpecificRegion ? `wilayah ${regionName}` : "seluruh PLTS"} (${formatToDisplayDate(fleetSelectedDate)}) (0.85 kg CO₂/kWh)`,
       };
     }
 
@@ -4978,7 +5050,7 @@ function EmissionView({ location, fleet, locations }) {
       }
 
       const factors = [0.92, 1.05, 0.88, 1.12, 0.98, 1.02, 1.0];
-      locations.forEach((loc) => {
+      targetLocations.forEach((loc) => {
         const s = getEmissionSeries(loc, "week");
         if (s && s.available !== false && Array.isArray(s.values) && s.values.length === 7) {
           s.values.forEach((v, idx) => {
@@ -4996,9 +5068,9 @@ function EmissionView({ location, fleet, locations }) {
       });
 
       const totalAgg = aggregated.reduce((a, b) => a + b, 0);
-      const finalVals = (totalAgg === 0 && fleetMonthEmissionKg > 0)
+      const finalVals = (totalAgg === 0 && fleetMonthEmissionKgCalc > 0)
         ? factors.map((f, idx) => {
-            const avg = fleetMonthEmissionKg / Math.max(1, now.getDate());
+            const avg = fleetMonthEmissionKgCalc / Math.max(1, now.getDate());
             return Math.round(((idx === 6 && fleetTotalTodayEmissionKg > 0) ? fleetTotalTodayEmissionKg : avg * f) * 10) / 10;
           })
         : aggregated.map((v) => Math.round(v * 10) / 10);
@@ -5009,8 +5081,8 @@ function EmissionView({ location, fleet, locations }) {
         values: finalVals,
         unit: "kg CO₂",
         kind: "bar",
-        title: "Total fleet weekly emission reduction (last 7 days)",
-        caption: `Reduksi emisi 7 hari seluruh PLTS (${formatToDisplayDate(fleetSelectedDate)}) (0.85 kg CO₂/kWh)`,
+        title: isSpecificRegion ? `Total weekly emission reduction (${regionName})` : "Total fleet weekly emission reduction (last 7 days)",
+        caption: `Reduksi emisi 7 hari ${isSpecificRegion ? `wilayah ${regionName}` : "seluruh PLTS"} (${formatToDisplayDate(fleetSelectedDate)}) (0.85 kg CO₂/kWh)`,
       };
     }
 
@@ -5023,7 +5095,7 @@ function EmissionView({ location, fleet, locations }) {
       const labels = Array.from({ length: daysInSelectedMonth }, (_, i) => String(i + 1).padStart(2, "0"));
       const aggregated = Array(daysInSelectedMonth).fill(0);
 
-      locations.forEach((loc) => {
+      targetLocations.forEach((loc) => {
         const s = getEmissionSeries(loc, "month");
         if (s && s.available !== false && Array.isArray(s.values)) {
           s.values.forEach((v, idx) => {
@@ -5049,11 +5121,11 @@ function EmissionView({ location, fleet, locations }) {
       });
 
       const totalAgg = aggregated.reduce((a, b) => a + b, 0);
-      const finalVals = (totalAgg === 0 && fleetMonthEmissionKg > 0)
+      const finalVals = (totalAgg === 0 && fleetMonthEmissionKgCalc > 0)
         ? labels.map((_, i) => {
             if (isFutureMonth || (isCurrentMonth && (i + 1 > now.getDate()))) return 0;
             if (isCurrentMonth && (i + 1 === now.getDate()) && fleetTotalTodayEmissionKg > 0) return Math.round(fleetTotalTodayEmissionKg * 10) / 10;
-            const avg = fleetMonthEmissionKg / Math.max(1, isCurrentMonth ? now.getDate() : daysInSelectedMonth);
+            const avg = fleetMonthEmissionKgCalc / Math.max(1, isCurrentMonth ? now.getDate() : daysInSelectedMonth);
             const factor = 0.85 + (((i + fleetSelectedMonth) * 7) % 30) / 100;
             return Math.round(avg * factor * 10) / 10;
           })
@@ -5068,8 +5140,8 @@ function EmissionView({ location, fleet, locations }) {
         values: finalVals,
         unit: "kg CO₂",
         kind: "bar",
-        title: "Total fleet daily emission reduction this month",
-        caption: `Reduksi emisi harian seluruh PLTS (${MONTH_NAMES[fleetSelectedMonth]} ${fleetSelectedYear}) (0.85 kg CO₂/kWh)`,
+        title: isSpecificRegion ? `Total daily emission reduction this month (${regionName})` : "Total fleet daily emission reduction this month",
+        caption: `Reduksi emisi harian ${isSpecificRegion ? `wilayah ${regionName}` : "seluruh PLTS"} (${MONTH_NAMES[fleetSelectedMonth]} ${fleetSelectedYear}) (0.85 kg CO₂/kWh)`,
       };
     }
 
@@ -5081,7 +5153,7 @@ function EmissionView({ location, fleet, locations }) {
       const nowMonth = now.getMonth();
 
       const aggregated = Array(12).fill(0);
-      locations.forEach((loc) => {
+      targetLocations.forEach((loc) => {
         const s = getEmissionSeries(loc, "year");
         if (s && s.available !== false && Array.isArray(s.values)) {
           s.values.forEach((v, idx) => {
@@ -5107,11 +5179,11 @@ function EmissionView({ location, fleet, locations }) {
       });
 
       const totalAgg = aggregated.reduce((a, b) => a + b, 0);
-      const finalVals = (totalAgg === 0 && fleetYearEmissionKg > 0)
+      const finalVals = (totalAgg === 0 && fleetYearEmissionKgCalc > 0)
         ? months.map((_, i) => {
             if (isFutureYear || (isCurrentYear && i > nowMonth)) return 0;
-            if (isCurrentYear && i === nowMonth && fleetMonthEmissionKg > 0) return Math.round(fleetMonthEmissionKg * 10) / 10;
-            const avgMonth = fleetYearEmissionKg / Math.max(1, isCurrentYear ? nowMonth + 1 : 12);
+            if (isCurrentYear && i === nowMonth && fleetMonthEmissionKgCalc > 0) return Math.round(fleetMonthEmissionKgCalc * 10) / 10;
+            const avgMonth = fleetYearEmissionKgCalc / Math.max(1, isCurrentYear ? nowMonth + 1 : 12);
             const factor = 0.9 + (((i + (fleetSelectedYear % 5)) * 5) % 20) / 100;
             return Math.round(avgMonth * factor * 10) / 10;
           })
@@ -5126,8 +5198,8 @@ function EmissionView({ location, fleet, locations }) {
         values: finalVals,
         unit: "kg CO₂",
         kind: "bar",
-        title: "Total fleet monthly emission reduction this year",
-        caption: `Reduksi emisi bulanan seluruh PLTS (${fleetSelectedYear}) (0.85 kg CO₂/kWh)`,
+        title: isSpecificRegion ? `Total monthly emission reduction this year (${regionName})` : "Total fleet monthly emission reduction this year",
+        caption: `Reduksi emisi bulanan ${isSpecificRegion ? `wilayah ${regionName}` : "seluruh PLTS"} (${fleetSelectedYear}) (0.85 kg CO₂/kWh)`,
       };
     }
 
@@ -5135,7 +5207,7 @@ function EmissionView({ location, fleet, locations }) {
       const years = ["2022", "2023", "2024", "2025", "2026"];
       const aggregated = Array(5).fill(0);
 
-      locations.forEach((loc) => {
+      targetLocations.forEach((loc) => {
         const s = getEmissionSeries(loc, "lifetime");
         if (s && s.available !== false && Array.isArray(s.values)) {
           s.values.forEach((v, idx) => {
@@ -5155,13 +5227,13 @@ function EmissionView({ location, fleet, locations }) {
       });
 
       const totalAgg = aggregated.reduce((a, b) => a + b, 0);
-      const finalVals = (totalAgg === 0 && fleetTotalEmissionKg > 0)
+      const finalVals = (totalAgg === 0 && fleetTotalEmissionKgCalc > 0)
         ? [
-            Math.round(fleetTotalEmissionKg * 0.1 * 10) / 10,
-            Math.round(fleetTotalEmissionKg * 0.2 * 10) / 10,
-            Math.round(fleetTotalEmissionKg * 0.28 * 10) / 10,
-            Math.round(fleetTotalEmissionKg * 0.32 * 10) / 10,
-            fleetYearEmissionKg > 0 ? Math.round(fleetYearEmissionKg * 10) / 10 : Math.round(fleetTotalEmissionKg * 0.1 * 10) / 10,
+            Math.round(fleetTotalEmissionKgCalc * 0.1 * 10) / 10,
+            Math.round(fleetTotalEmissionKgCalc * 0.2 * 10) / 10,
+            Math.round(fleetTotalEmissionKgCalc * 0.28 * 10) / 10,
+            Math.round(fleetTotalEmissionKgCalc * 0.32 * 10) / 10,
+            fleetYearEmissionKgCalc > 0 ? Math.round(fleetYearEmissionKgCalc * 10) / 10 : Math.round(fleetTotalEmissionKgCalc * 0.1 * 10) / 10,
           ]
         : aggregated.map((v) => Math.round(v * 10) / 10);
 
@@ -5171,31 +5243,49 @@ function EmissionView({ location, fleet, locations }) {
         values: finalVals,
         unit: "kg CO₂",
         kind: "bar",
-        title: "Total fleet emission reduction by year",
-        caption: "Akumulasi total reduksi emisi seluruh PLTS tahunan (0.85 kg CO₂/kWh)",
+        title: isSpecificRegion ? `Total emission reduction by year (${regionName})` : "Total fleet emission reduction by year",
+        caption: `Akumulasi total reduksi emisi ${isSpecificRegion ? `wilayah ${regionName}` : "seluruh PLTS"} tahunan (0.85 kg CO₂/kWh)`,
       };
     }
 
     return null;
-  }, [locations, fleetPeriod, fleetSelectedDate, fleetSelectedMonth, fleetSelectedYear, fleetTotalTodayEmissionKg, fleetMonthEmissionKg, fleetYearEmissionKg, fleetTotalEmissionKg]);
+  }, [targetLocations, fleetRegion, currentRegObj, fleetPeriod, fleetSelectedDate, fleetSelectedMonth, fleetSelectedYear, fleetTotalTodayEmissionKg, fleetMonthEmissionKgCalc, fleetYearEmissionKgCalc, fleetTotalEmissionKgCalc]);
 
   const fleetCurveTitle = useMemo(() => {
-    if (fleetPeriod === "day" || fleetPeriod === "today") return "Total fleet daily emission reduction";
-    if (fleetPeriod === "week") return "Total fleet weekly emission reduction (last 7 days)";
-    if (fleetPeriod === "month") return "Total fleet daily emission reduction this month";
-    if (fleetPeriod === "year") return "Total fleet monthly emission reduction this year";
-    return "Total fleet emission reduction by year";
-  }, [fleetPeriod]);
+    const isSpecificRegion = fleetRegion !== "all";
+    const regName = currentRegObj.name;
+    if (fleetPeriod === "day" || fleetPeriod === "today") {
+      return isSpecificRegion ? `Total daily emission reduction (${regName})` : "Total fleet daily emission reduction";
+    }
+    if (fleetPeriod === "week") {
+      return isSpecificRegion ? `Total weekly emission reduction (${regName})` : "Total fleet weekly emission reduction (last 7 days)";
+    }
+    if (fleetPeriod === "month") {
+      return isSpecificRegion ? `Total daily emission reduction this month (${regName})` : "Total fleet daily emission reduction this month";
+    }
+    if (fleetPeriod === "year") {
+      return isSpecificRegion ? `Total monthly emission reduction this year (${regName})` : "Total fleet monthly emission reduction this year";
+    }
+    return isSpecificRegion ? `Total emission reduction by year (${regName})` : "Total fleet emission reduction by year";
+  }, [fleetPeriod, fleetRegion, currentRegObj]);
 
   const fleetCurveSubtitle = useMemo(() => {
-    const stationCount = locations?.length || 0;
-    const prefix = `Semua PLTS (${stationCount} Stasiun)`;
+    const stationCount = targetLocations?.length || 0;
+    const isSpecificRegion = fleetRegion !== "all";
+    const prefix = isSpecificRegion
+      ? `Wilayah ${currentRegObj.name} (${stationCount} Stasiun)`
+      : `Semua PLTS (${stationCount} Stasiun)`;
+
+    if (stationCount === 0) {
+      return `Belum ada instalasi PLTS di wilayah ${currentRegObj.name} (0 kg CO₂)`;
+    }
+
     if (fleetPeriod === "day" || fleetPeriod === "today") return `${prefix} · Total reduksi emisi (${formatToDisplayDate(fleetSelectedDate)}) · 0.85 kg CO₂/kWh`;
     if (fleetPeriod === "week") return `${prefix} · Total reduksi emisi 7 hari (${formatToDisplayDate(fleetSelectedDate)}) · 0.85 kg CO₂/kWh`;
     if (fleetPeriod === "month") return `${prefix} · Total reduksi emisi harian (${MONTH_NAMES[fleetSelectedMonth]} ${fleetSelectedYear}) · 0.85 kg CO₂/kWh`;
     if (fleetPeriod === "year") return `${prefix} · Total reduksi emisi bulanan (${fleetSelectedYear}) · 0.85 kg CO₂/kWh`;
     return `${prefix} · Histori akumulasi total reduksi emisi CO₂ per tahun`;
-  }, [locations, fleetPeriod, fleetSelectedDate, fleetSelectedMonth, fleetSelectedYear]);
+  }, [targetLocations, fleetRegion, currentRegObj, fleetPeriod, fleetSelectedDate, fleetSelectedMonth, fleetSelectedYear]);
 
   const fleetRecordCount = useMemo(() => {
     if (fleetPeriod === "day" || fleetPeriod === "today") return `${fleetSeries?.values?.length || 24} / 24`;
@@ -5447,12 +5537,13 @@ function EmissionView({ location, fleet, locations }) {
               <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                 <h2 className="curve-title">{fleetCurveTitle}</h2>
                 <span className="unit-pill-badge" style={{ background: "#d1fae5", color: "#065f46" }}>
-                  Semua PLTS
+                  {regionLabel}
                 </span>
               </div>
               <p className="curve-subtitle">{fleetCurveSubtitle}</p>
             </div>
             <div className="curve-controls">
+              <RegionDropdownPill value={fleetRegion} onChange={setFleetRegion} />
               <div className="period-toggle-pill">
                 <button
                   type="button"
