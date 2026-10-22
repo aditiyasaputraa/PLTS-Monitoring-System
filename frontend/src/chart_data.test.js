@@ -187,4 +187,40 @@ test("selects SMA energy and calculates revenue and emission series", () => {
   assert.deepEqual(emMonth.values, [38.7, 44.3]);
 });
 
+test("supports day and week periods across energy, revenue, and emission", () => {
+  const energyDay = getEnergySeries(huawei, "day");
+  assert.equal(energyDay.available, true);
+  assert.equal(energyDay.unit, "kW");
+
+  const huaweiWithDaily = {
+    ...huawei,
+    energy_charts: {
+      daily: {
+        labels: ["01", "02", "03", "04", "05", "06", "07", "08"],
+        values: [10, 12, 14, 16, 18, 20, 22, 24],
+      },
+    },
+  };
+
+  const energyWeek = getEnergySeries(huaweiWithDaily, "week");
+  assert.equal(energyWeek.available, true);
+  assert.equal(energyWeek.values.length, 7);
+  assert.deepEqual(energyWeek.values, [12, 14, 16, 18, 20, 22, 24]);
+
+  const revWeek = getRevenueSeries(huaweiWithDaily, "week");
+  assert.equal(revWeek.available, true);
+  // Uses vendor revenue chart [100, 120, 130]
+  assert.deepEqual(revWeek.values, [100, 120, 130]);
+
+  // When revenue_charts is missing, calculates from energy at Rp 900/kWh
+  const huaweiNoRev = { ...huaweiWithDaily, revenue_charts: null };
+  const revWeekCalc = getRevenueSeries(huaweiNoRev, "week");
+  assert.equal(revWeekCalc.available, true);
+  assert.deepEqual(revWeekCalc.values, [10800, 12600, 14400, 16200, 18000, 19800, 21600]);
+
+  const emWeek = getEmissionSeries(huaweiWithDaily, "week");
+  assert.equal(emWeek.available, true);
+  assert.deepEqual(emWeek.values, [10.2, 11.9, 13.6, 15.3, 17, 18.7, 20.4]);
+});
+
 
