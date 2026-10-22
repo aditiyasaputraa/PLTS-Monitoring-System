@@ -299,3 +299,56 @@ test("safely handles Kehua array units and generates complete curves from KPIs",
   assert.equal(emLifetime.available, true);
   assert.equal(emLifetime.unit, "kg CO₂");
 });
+
+test("uses Kehua station_power_trend when daily_generation is truncated at 09:00", () => {
+  const kehuaStationTruncatedAt9 = {
+    source: "kehua",
+    name: "SDN 09 JAKUT",
+    daily_energy_kwh: 50.0,
+    charts: {
+      daily_generation: {
+        unit: ["kWh"],
+        x: Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`),
+        // Stale batch job only populated up to 09:00
+        y: [0, 0, 0, 0, 0, 0, 0, 4, 2, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      },
+      station_power_trend: {
+        unit: "kW",
+        series: {
+          "2026-10-22": {
+            x: ["07:00", "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00"],
+            y: {
+              y_data_elec: [2.4, 4.8, 6.0, 9.6, 12.0, 12.0, 9.6, 6.0, 2.4],
+            },
+          },
+        },
+      },
+    },
+  };
+
+  // 1. Energy Day Series
+  const energy = getEnergySeries(kehuaStationTruncatedAt9, "day");
+  assert.equal(energy.available, true);
+  assert.equal(energy.labels.length, 24);
+  // Verify it does NOT stop at 09:00; hours 10:00 to 15:00 must have non-zero energy
+  const nonZeroHours = energy.labels.filter((_, idx) => energy.values[idx] > 0);
+  assert.deepEqual(nonZeroHours, ["07:00", "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00"]);
+  // Verify total sums closely to today's 50.0 kWh
+  const totalEnergy = energy.values.reduce((a, b) => a + b, 0);
+  assert.ok(Math.abs(totalEnergy - 50.0) < 0.5);
+
+  // 2. Revenue Day Series (Rp 900 / kWh)
+  const revenue = getRevenueSeries(kehuaStationTruncatedAt9, "day");
+  assert.equal(revenue.available, true);
+  assert.equal(revenue.unit, "IDR");
+  const totalRev = revenue.values.reduce((a, b) => a + b, 0);
+  assert.ok(Math.abs(totalRev - 45000) < 500);
+
+  // 3. Emission Day Series (0.85 kg CO2 / kWh)
+  const emission = getEmissionSeries(kehuaStationTruncatedAt9, "day");
+  assert.equal(emission.available, true);
+  assert.equal(emission.unit, "kg CO₂");
+  const totalEm = emission.values.reduce((a, b) => a + b, 0);
+  assert.ok(Math.abs(totalEm - 42.5) < 0.8);
+});
+

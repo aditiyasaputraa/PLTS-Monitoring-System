@@ -70,6 +70,45 @@ function latestNestedSeries(group) {
   return { key, data: { labels: data?.x, values } };
 }
 
+function extractKehuaHourlyFromPowerTrend(charts) {
+  const spt = charts?.station_power_trend;
+  if (!spt?.series) return null;
+  const entries = Object.entries(spt.series);
+  if (!entries.length) return null;
+  entries.sort(([left], [right]) => left.localeCompare(right));
+  const [, latestData] = entries.at(-1);
+  const x = latestData?.x;
+  const y = latestData?.y?.y_data_elec || latestData?.y?.y_data || (Array.isArray(latestData?.y) ? latestData.y : null);
+  if (!Array.isArray(x) || !Array.isArray(y) || x.length === 0) return null;
+
+  const hourly = Array(24).fill(0);
+  let maxHourWithData = -1;
+
+  for (let i = 0; i < x.length; i++) {
+    const timeStr = String(x[i] || "");
+    const hour = parseInt(timeStr.split(":")[0], 10);
+    if (!Number.isNaN(hour) && hour >= 0 && hour < 24) {
+      const kw = Number(y[i]) || 0;
+      hourly[hour] += kw;
+      if (kw > 0.01 && hour > maxHourWithData) {
+        maxHourWithData = hour;
+      }
+    }
+  }
+
+  // Each 5-minute interval in kW corresponds to (kW / 12) kWh of energy
+  const hourlyKwh = hourly.map((sumKw) => sumKw / 12);
+  const totalKwh = hourlyKwh.reduce((acc, v) => acc + v, 0);
+
+  return {
+    labels: Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`),
+    values: hourlyKwh,
+    totalKwh,
+    maxHourWithData,
+    sampleCount: x.length,
+  };
+}
+
 function unavailable({ unit, kind = "bar", title, reason }) {
   return makeSeries({ unit, kind, title, reason });
 }
@@ -444,24 +483,68 @@ export function getEnergySeries(location, period) {
     const lifetimeKwh = Number(location?.cumulative_energy_kwh ?? location?.total_energy_kwh ?? 0);
 
     if (normPeriod === "day") {
-      if (charts.daily_generation?.x?.length && todayKwh > 0) {
-        const yVals = numericValues(charts.daily_generation.y);
-        const rawSum = yVals.reduce((acc, v) => acc + (v || 0), 0);
-        if (rawSum > 0) {
-          const scaledValues = yVals.map((v) => Math.round(((v || 0) / rawSum) * todayKwh * 100) / 100);
+      const powerTrend = extractKehuaHourlyFromPowerTrend(charts);
+      const dgY = numericValues(charts.daily_generation?.y);
+      const dgSum = dgY.reduce((acc, v) => acc + (v || 0), 0);
+      let dgMaxHour = -1;
+      dgY.forEach((v, idx) => {
+        if ((v || 0) > 0.01) dgMaxHour = idx;
+      });
+
+      // 1. Prefer station_power_trend if it has valid intraday data extending further than daily_generation
+      // or if daily_generation is empty or stopped early (e.g. stopped at 09:00 while power_trend continues to 15:00+)
+      if (powerTrend && powerTrend.totalKwh > 0 && (powerTrend.maxHourWithData > dgMaxHour || dgSum <= 0 || (dgMaxHour <= 10 && powerTrend.maxHourWithData > 10))) {
+        if (location?.daily_energy_kwh === 0 || location?.today_energy_kwh === 0) {
           return makeSeries({
-            labels: charts.daily_generation.x,
+            labels: powerTrend.labels,
+            values: Array(24).fill(0),
+            unit: "kWh",
+            kind: "bar",
+            title,
+            caption: "Belum ada generasi hari ini (0 kWh)",
+          });
+        }
+        if (todayKwh > 0) {
+          const scale = todayKwh / powerTrend.totalKwh;
+          const scaledValues = powerTrend.values.map((v) => Math.round(v * scale * 100) / 100);
+          return makeSeries({
+            labels: powerTrend.labels,
             values: scaledValues,
             unit: "kWh",
             kind: "bar",
             title,
-            caption: "Generasi per jam hari ini",
+            caption: "Generasi per jam hari ini (tren daya Kehua)",
           });
         }
+        return makeSeries({
+          labels: powerTrend.labels,
+          values: powerTrend.values.map((v) => Math.round(v * 100) / 100),
+          unit: "kWh",
+          kind: "bar",
+          title,
+          caption: "Generasi per jam hari ini (tren daya Kehua)",
+        });
       }
+
+      // 2. If daily_generation has healthy data and is not cut off in the morning
+      if (charts.daily_generation?.x?.length && todayKwh > 0 && dgSum > 0 && (dgMaxHour > 10 || todayKwh <= dgSum * 1.2)) {
+        const scaledValues = dgY.map((v) => Math.round(((v || 0) / dgSum) * todayKwh * 100) / 100);
+        return makeSeries({
+          labels: charts.daily_generation.x,
+          values: scaledValues,
+          unit: "kWh",
+          kind: "bar",
+          title,
+          caption: "Generasi per jam hari ini",
+        });
+      }
+
+      // 3. Fallback to solar curve if todayKwh > 0
       if (todayKwh > 0) {
         return generateSolarDayCurve(todayKwh, title);
       }
+
+      // 4. Fallback if charts.daily_generation exists without energy KPIs
       if (charts.daily_generation?.x?.length && (!location?.daily_energy_kwh && !location?.today_energy_kwh)) {
         const dUnit = normalizeUnitString(charts.daily_generation?.unit, "kWh");
         return xySeries(charts.daily_generation, {
@@ -471,6 +554,8 @@ export function getEnergySeries(location, period) {
           caption: "Hourly generation reported by Kehua",
         });
       }
+
+      // 5. Zero curve
       const hourlyLabels = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`);
       return makeSeries({
         labels: hourlyLabels,
