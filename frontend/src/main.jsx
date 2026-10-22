@@ -301,7 +301,7 @@ function storeSession(session) {
 function clearUiState() {
   try {
     window.localStorage.removeItem(UI_STATE_STORAGE_KEY);
-  } catch {}
+  } catch { }
 }
 
 function readUiState() {
@@ -317,7 +317,7 @@ function writeUiState(updates) {
       ...current,
       ...updates,
     }));
-  } catch {}
+  } catch { }
 }
 
 async function authRequest(path, body) {
@@ -478,7 +478,7 @@ function useMonitoringData(session, onUnauthorized) {
         const parsed = JSON.parse(cached);
         if (parsed?.by_site) return parsed;
       }
-    } catch (_) {}
+    } catch (_) { }
     return null;
   });
   const [error, setError] = useState(null);
@@ -508,7 +508,7 @@ function useMonitoringData(session, onUnauthorized) {
             setData(rows[0].payload);
             try {
               localStorage.setItem("plts_last_snapshot", JSON.stringify(rows[0].payload));
-            } catch (_) {}
+            } catch (_) { }
             setError(null);
             return;
           }
@@ -528,12 +528,12 @@ function useMonitoringData(session, onUnauthorized) {
               setData(json);
               try {
                 localStorage.setItem("plts_last_snapshot", JSON.stringify(json));
-              } catch (_) {}
+              } catch (_) { }
               setError(null);
               return;
             }
           }
-        } catch (_) {}
+        } catch (_) { }
       }
 
       if (!cancelled && !data) {
@@ -907,7 +907,7 @@ function Dashboard({ session, onSignOut }) {
     if (base) {
       try {
         await fetchWithTimeout(`${base}/api/sync`, { method: "POST" }, 8000);
-      } catch (_) {}
+      } catch (_) { }
     }
 
     setTimeout(async () => {
@@ -1489,25 +1489,12 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt, selecte
       {/* ROW 2: MONTHLY PRODUCTION (ENERGY TREND) + SITE TOTALS */}
       <section className="grid-row-2col">
         {/* Left: Monthly Production Trend Chart */}
-        <div className="dashboard-card">
-          <div className="card-header-row">
-            <div>
-              <span className="card-eyebrow">ENERGY TREND</span>
-              <h3 className="card-title">Monthly production</h3>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px", fontSize: "11px", fontWeight: 700 }}>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", color: "#0d4a2b" }}>
-                <span style={{ width: "8px", height: "8px", background: "#0d4a2b", borderRadius: "2px" }} /> Energy
-              </span>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", color: "#84cc16" }}>
-                <span style={{ width: "8px", height: "3px", background: "#84cc16", borderRadius: "1px" }} /> Revenue
-              </span>
-            </div>
-          </div>
-
-          {/* Bar + Line Combo Chart */}
-          <MonthlyProductionChart currentMonthKwh={currentMonthKwh} />
-        </div>
+        <MonthlyProductionCard
+          selected={selected}
+          locations={locations}
+          fleet={fleet}
+          currentMonthKwh={currentMonthKwh}
+        />
 
         {/* Right: Site Totals (Plant Overview) */}
         <div className="dashboard-card">
@@ -1867,89 +1854,537 @@ function LiveCurveChart({ powerNow }) {
   );
 }
 
-function MonthlyProductionChart({ currentMonthKwh }) {
-  if (!currentMonthKwh || currentMonthKwh <= 0) {
-    return (
-      <div style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        height: "180px",
-        color: "#6e8074",
-        fontSize: "12px",
-        textAlign: "center",
-        background: "#fafbfa",
-        borderRadius: "8px",
-        border: "1px dashed #d1ded4",
-        marginTop: "10px",
-      }}>
-        <span style={{ fontSize: "22px", marginBottom: "4px" }}>📊</span>
-        <strong style={{ color: "#2d3d32" }}>Belum Ada Data Produksi</strong>
-        <span style={{ fontSize: "11px", color: "#8a9e90" }}>0 kWh tercatat untuk wilayah ini</span>
-      </div>
-    );
+function getAvailableProductionYears(locations, selected) {
+  const years = new Set();
+  const currentYear = new Date().getFullYear();
+  years.add(currentYear);
+  years.add(currentYear - 1);
+  years.add(currentYear - 2);
+
+  const pool = selected ? [selected] : (locations && locations.length > 0 ? locations : []);
+  for (const loc of pool) {
+    const yEnergy = loc?.energy_charts?.yearly?.labels || [];
+    for (const y of yEnergy) {
+      const num = parseInt(y, 10);
+      if (Number.isFinite(num) && num >= 2000 && num <= 2100) years.add(num);
+    }
+    const yRev = loc?.revenue_charts?.yearly?.labels || [];
+    for (const y of yRev) {
+      const num = parseInt(y, 10);
+      if (Number.isFinite(num) && num >= 2000 && num <= 2100) years.add(num);
+    }
+    const trends = loc?.charts?.company_power_trends || loc?.site?.charts?.company_power_trends;
+    if (trends?.year_monthly?.series) {
+      for (const yKey of Object.keys(trends.year_monthly.series)) {
+        const num = parseInt(yKey, 10);
+        if (Number.isFinite(num) && num >= 2000 && num <= 2100) years.add(num);
+      }
+    }
+    if (trends?.all_yearly?.series?.all?.x) {
+      for (const y of trends.all_yearly.series.all.x) {
+        const num = parseInt(y, 10);
+        if (Number.isFinite(num) && num >= 2000 && num <= 2100) years.add(num);
+      }
+    }
   }
 
+  return Array.from(years).sort((a, b) => b - a);
+}
+
+function getStationMonthlyValues(station, targetYear, metric = "energy") {
+  const currentYear = new Date().getFullYear();
+  const isCurrentYear = targetYear === currentYear;
+  const currentMonthIdx = new Date().getMonth();
+  const monthly = Array(12).fill(0);
+
+  if (!station) return monthly;
+
+  const source = (station.source || station.site?.platform || "").toLowerCase();
+
+  // 1. Kehua
+  if (source === "kehua") {
+    const trends = station.charts?.company_power_trends || station.site?.charts?.company_power_trends;
+    const seriesGroup = trends?.year_monthly;
+    const yearSeries = seriesGroup?.series?.[String(targetYear)];
+    const unit = (seriesGroup?.unit || "MWh").toUpperCase();
+    const multiplier = unit === "MWH" ? 1000 : 1;
+
+    if (yearSeries) {
+      const xLabels = yearSeries.x || [];
+      const yData = yearSeries.y?.y_data || yearSeries.y?.y_data_elec || yearSeries.y || [];
+      for (let i = 0; i < xLabels.length; i++) {
+        const mNum = parseInt(xLabels[i], 10);
+        if (mNum >= 1 && mNum <= 12) {
+          const rawVal = Number(yData[i]);
+          if (Number.isFinite(rawVal) && rawVal >= 0) {
+            const kwh = rawVal * multiplier;
+            monthly[mNum - 1] = metric === "revenue" ? Math.round(kwh * 900) : Math.round(kwh * 10) / 10;
+          }
+        }
+      }
+    }
+  }
+  // 2. Huawei or SMA
+  else {
+    const chartMap = metric === "revenue" ? station.revenue_charts : station.energy_charts;
+    const fallbackEnergyMap = station.energy_charts;
+
+    let chartData = isCurrentYear ? chartMap?.monthly : chartMap?.[String(targetYear)];
+    if (!chartData && metric === "revenue" && isCurrentYear) {
+      const eChart = fallbackEnergyMap?.monthly;
+      if (eChart?.labels && eChart?.values) {
+        chartData = {
+          labels: eChart.labels,
+          values: eChart.values.map((v) => (v !== null && v !== undefined ? Math.round(Number(v) * 900) : null)),
+        };
+      }
+    }
+
+    if (chartData?.labels && chartData?.values) {
+      for (let i = 0; i < chartData.labels.length; i++) {
+        const lbl = chartData.labels[i];
+        const mNum = parseInt(lbl, 10);
+        const val = Number(chartData.values[i]);
+        if (Number.isFinite(val) && val >= 0) {
+          if (mNum >= 1 && mNum <= 12) {
+            monthly[mNum - 1] = metric === "revenue" ? Math.round(val) : Math.round(val * 10) / 10;
+          } else if (i < 12) {
+            monthly[i] = metric === "revenue" ? Math.round(val) : Math.round(val * 10) / 10;
+          }
+        }
+      }
+    }
+  }
+
+  // Live fallback for current month if empty
+  if (isCurrentYear && monthly[currentMonthIdx] === 0) {
+    if (metric === "energy") {
+      const liveMonthKwh = Number(station.monthly_energy_kwh ?? station.month_energy_kwh ?? 0);
+      if (liveMonthKwh > 0) monthly[currentMonthIdx] = Math.round(liveMonthKwh * 10) / 10;
+    } else {
+      const liveMonthRev = Number(station.monthly_income ?? (Number(station.monthly_energy_kwh || 0) * 900));
+      if (liveMonthRev > 0) monthly[currentMonthIdx] = Math.round(liveMonthRev);
+    }
+  }
+
+  return monthly;
+}
+
+function getAggregateMonthlyValues(locations, selected, targetYear, metric = "energy", fleet = null) {
+  const currentYear = new Date().getFullYear();
+  const isCurrentYear = targetYear === currentYear;
+  const currentMonthIdx = new Date().getMonth();
+
+  if (selected) {
+    return getStationMonthlyValues(selected, targetYear, metric);
+  }
+
+  const aggregate = Array(12).fill(0);
+  const pool = locations && locations.length > 0 ? locations : [];
+
+  for (const st of pool) {
+    const stValues = getStationMonthlyValues(st, targetYear, metric);
+    for (let m = 0; m < 12; m++) {
+      aggregate[m] += stValues[m] || 0;
+    }
+  }
+
+  if (isCurrentYear && aggregate[currentMonthIdx] === 0 && fleet) {
+    if (metric === "energy" && fleet.monthly > 0) {
+      aggregate[currentMonthIdx] = Math.round(fleet.monthly * 10) / 10;
+    } else if (metric === "revenue" && (fleet.monthlyIncome > 0 || fleet.monthly > 0)) {
+      aggregate[currentMonthIdx] = Math.round(fleet.monthlyIncome || (fleet.monthly * 900));
+    }
+  }
+
+  return aggregate.map((v) => Math.round(v * 10) / 10);
+}
+
+function calculateMaxVal(maxNum) {
+  if (maxNum <= 0) return 10;
+  const withHeadroom = maxNum * 1.15;
+  const power = Math.pow(10, Math.floor(Math.log10(withHeadroom)));
+  const frac = withHeadroom / power;
+  let niceFrac = 10;
+  if (frac <= 1.2) niceFrac = 1.2;
+  else if (frac <= 1.5) niceFrac = 1.5;
+  else if (frac <= 2) niceFrac = 2;
+  else if (frac <= 2.5) niceFrac = 2.5;
+  else if (frac <= 3) niceFrac = 3;
+  else if (frac <= 4) niceFrac = 4;
+  else if (frac <= 5) niceFrac = 5;
+  else if (frac <= 6) niceFrac = 6;
+  else if (frac <= 8) niceFrac = 8;
+  return niceFrac * power;
+}
+
+function formatYTick(val, metric) {
+  if (val === 0) return "0";
+  if (metric === "revenue") {
+    if (val >= 1_000_000_000) return `${(val / 1e9).toFixed(1)}M`;
+    if (val >= 1_000_000) return `${(val / 1e6).toFixed(val % 1e6 === 0 ? 0 : 1)}jt`;
+    if (val >= 1000) return `${(val / 1e3).toFixed(0)}k`;
+    return String(Math.round(val));
+  }
+  if (val >= 1_000_000) return `${(val / 1e6).toFixed(1)}M`;
+  if (val >= 1000) return `${(val / 1000).toFixed(val % 1000 === 0 ? 0 : 1)}k`;
+  return String(Math.round(val));
+}
+
+function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh }) {
+  const [metric, setMetric] = useState("energy"); // "energy" | "revenue"
+  const [hoveredIdx, setHoveredIdx] = useState(null);
+
+  const availableYears = useMemo(() => getAvailableProductionYears(locations, selected), [locations, selected]);
+  const [selectedYear, setSelectedYear] = useState(() => availableYears[0] || new Date().getFullYear());
+
+  useEffect(() => {
+    if (availableYears.length > 0 && !availableYears.includes(selectedYear)) {
+      setSelectedYear(availableYears[0]);
+    }
+  }, [availableYears, selectedYear]);
+
+  const monthlyValues = useMemo(() => {
+    return getAggregateMonthlyValues(locations, selected, selectedYear, metric, fleet);
+  }, [locations, selected, selectedYear, metric, fleet]);
+
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const currentMonthIdx = new Date().getMonth(); // 9 for Oct
-  const baseValues = [8.5, 9.8, 10.2, 8.9, 11.0, 11.2, 11.5, 12.0, 12.8, 11.4, 10.8, 11.2];
-  const maxVal = 15;
+  const now = new Date();
+  const isCurrentYear = selectedYear === now.getFullYear();
+  const currentMonthIdx = now.getMonth();
+
+  const rawMax = Math.max(...monthlyValues.map((v) => Number(v) || 0), 0);
+  const hasData = rawMax > 0;
+  const maxVal = calculateMaxVal(rawMax);
+
+  const yTicks = [0, maxVal * 0.333, maxVal * 0.667, maxVal];
+
+  let lastIndexWithData = -1;
+  for (let i = monthlyValues.length - 1; i >= 0; i--) {
+    if (Number(monthlyValues[i]) > 0) {
+      lastIndexWithData = i;
+      break;
+    }
+  }
+  const trendlineEndIdx = isCurrentYear
+    ? Math.max(currentMonthIdx, lastIndexWithData)
+    : (lastIndexWithData >= 0 ? lastIndexWithData : 11);
+
+  const formatTooltip = (val) => {
+    if (metric === "revenue") {
+      return `Rp ${new Intl.NumberFormat("id-ID").format(Math.round(val))} IDR`;
+    }
+    return `${new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 }).format(val)} kWh`;
+  };
 
   return (
-    <div style={{ width: "100%", height: "180px", position: "relative", marginTop: "10px" }}>
-      <svg viewBox="0 0 520 160" style={{ width: "100%", height: "100%", overflow: "visible" }}>
-        {/* Y Axis Grid lines */}
-        {[0, 5, 10, 15].map((val) => {
-          const y = 140 - (val / maxVal) * 120;
-          return (
-            <g key={val}>
-              <line x1="30" y1={y} x2="510" y2={y} stroke="#edf2ec" strokeDasharray="3 3" />
-              <text x="24" y={y + 3} fill="#8a998f" fontSize="9" fontWeight="600" textAnchor="end">{val}</text>
-            </g>
-          );
-        })}
+    <div className="dashboard-card" style={{ position: "relative" }}>
+      <div className="card-header-row" style={{ flexWrap: "wrap", gap: "8px" }}>
+        <div>
+          <span className="card-eyebrow">
+            {metric === "revenue" ? `REVENUE TREND · ${selectedYear}` : `ENERGY TREND · ${selectedYear}`}
+          </span>
+          <h3 className="card-title">
+            {metric === "revenue" ? "Monthly revenue" : "Monthly production"}
+          </h3>
+        </div>
 
-        {/* 12 Monthly Bars */}
-        {months.map((m, idx) => {
-          const x = 45 + idx * 39;
-          const val = baseValues[idx];
-          const barHeight = (val / maxVal) * 120;
-          const isSelected = idx === currentMonthIdx || idx === 8; // Highlight Sep/Oct
-          return (
-            <g key={m}>
-              <rect
-                x={x}
-                y={140 - barHeight}
-                width="22"
-                height={barHeight}
-                rx="4"
-                fill={isSelected ? "#0d4a2b" : "#d7edd9"}
-                style={{ transition: "all 0.3s ease" }}
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+          {/* Dropdown Tahun */}
+          <div style={{ position: "relative", display: "inline-block" }}>
+            <select
+              aria-label="Pilih tahun"
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              style={{
+                appearance: "none",
+                WebkitAppearance: "none",
+                MozAppearance: "none",
+                background: "#f3f6f3",
+                border: "1px solid #d4ded5",
+                borderRadius: "8px",
+                padding: "5px 24px 5px 10px",
+                fontSize: "11px",
+                fontWeight: 700,
+                color: "#1f2f24",
+                cursor: "pointer",
+                outline: "none",
+                transition: "all 0.15s ease",
+              }}
+            >
+              {availableYears.map((yr) => (
+                <option key={yr} value={yr}>
+                  Tahun {yr}
+                </option>
+              ))}
+            </select>
+            <span
+              style={{
+                position: "absolute",
+                right: "8px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                pointerEvents: "none",
+                fontSize: "8px",
+                color: "#6b7d70",
+              }}
+            >
+              ▼
+            </span>
+          </div>
+
+          {/* Metric Clickable Buttons: Energy vs Revenue */}
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              background: "#f3f6f3",
+              border: "1px solid #d4ded5",
+              borderRadius: "8px",
+              padding: "2px",
+              gap: "2px",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setMetric("energy")}
+              title="Klik untuk melihat grafik produksi energi (kWh)"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "4px 10px",
+                borderRadius: "6px",
+                border: "none",
+                fontSize: "11px",
+                fontWeight: 700,
+                cursor: "pointer",
+                background: metric === "energy" ? "#0d4a2b" : "transparent",
+                color: metric === "energy" ? "#ffffff" : "#4f6254",
+                boxShadow: metric === "energy" ? "0 2px 4px rgba(13,74,43,0.2)" : "none",
+                transition: "all 0.15s ease",
+              }}
+            >
+              <span
+                style={{
+                  width: "8px",
+                  height: "8px",
+                  background: metric === "energy" ? "#ffffff" : "#0d4a2b",
+                  borderRadius: "2px",
+                }}
               />
-              <text x={x + 11} y="154" fill={isSelected ? "#0d4a2b" : "#7c8e81"} fontSize="9" fontWeight={isSelected ? "800" : "600"} textAnchor="middle">
-                {m}
-              </text>
-            </g>
-          );
-        })}
+              Energy
+            </button>
 
-        {/* Spline Line across months */}
-        <path
-          d={months.map((_, idx) => {
-            const x = 45 + idx * 39 + 11;
-            const val = baseValues[idx] * 0.95;
-            const y = 140 - (val / maxVal) * 120;
-            return `${idx === 0 ? "M" : "L"} ${x} ${y}`;
-          }).join(" ")}
-          fill="none"
-          stroke="#84cc16"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-        />
-      </svg>
+            <button
+              type="button"
+              onClick={() => setMetric("revenue")}
+              title="Klik untuk melihat grafik pendapatan (IDR)"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "4px 10px",
+                borderRadius: "6px",
+                border: "none",
+                fontSize: "11px",
+                fontWeight: 700,
+                cursor: "pointer",
+                background: metric === "revenue" ? "#84cc16" : "transparent",
+                color: metric === "revenue" ? "#163300" : "#4f6254",
+                boxShadow: metric === "revenue" ? "0 2px 4px rgba(132,204,22,0.3)" : "none",
+                transition: "all 0.15s ease",
+              }}
+            >
+              <span
+                style={{
+                  width: "10px",
+                  height: "3px",
+                  background: metric === "revenue" ? "#163300" : "#84cc16",
+                  borderRadius: "1px",
+                }}
+              />
+              Revenue
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Floating Hover Tooltip */}
+      {hoveredIdx !== null && (
+        <div
+          style={{
+            position: "absolute",
+            top: "56px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "#131d17",
+            color: "#ffffff",
+            padding: "5px 14px",
+            borderRadius: "8px",
+            fontSize: "11px",
+            fontWeight: 600,
+            pointerEvents: "none",
+            boxShadow: "0 4px 14px rgba(0,0,0,0.2)",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            zIndex: 10,
+          }}
+        >
+          <span style={{ color: "#a3b8aa" }}>{months[hoveredIdx]} {selectedYear}:</span>
+          <span style={{ color: metric === "revenue" ? "#a3e635" : "#34d399", fontWeight: 700 }}>
+            {formatTooltip(monthlyValues[hoveredIdx] || 0)}
+          </span>
+        </div>
+      )}
+
+      {/* Chart Canvas */}
+      {!hasData ? (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            height: "180px",
+            color: "#6e8074",
+            fontSize: "12px",
+            textAlign: "center",
+            background: "#fafbfa",
+            borderRadius: "8px",
+            border: "1px dashed #d1ded4",
+            marginTop: "10px",
+          }}
+        >
+          <span style={{ fontSize: "22px", marginBottom: "4px" }}>📊</span>
+          <strong style={{ color: "#2d3d32" }}>Belum Ada Data Tercatat ({selectedYear})</strong>
+          <span style={{ fontSize: "11px", color: "#8a9e90" }}>
+            Tidak ada catatan {metric === "revenue" ? "pendapatan" : "produksi energi"} untuk tahun {selectedYear}
+          </span>
+        </div>
+      ) : (
+        <div style={{ width: "100%", height: "180px", position: "relative", marginTop: "10px" }}>
+          <svg viewBox="0 0 520 160" style={{ width: "100%", height: "100%", overflow: "visible" }}>
+            {/* Y Axis Grid lines */}
+            {yTicks.map((val, tIdx) => {
+              const y = 140 - (val / (maxVal || 1)) * 120;
+              return (
+                <g key={tIdx}>
+                  <line x1="30" y1={y} x2="510" y2={y} stroke="#edf2ec" strokeDasharray="3 3" />
+                  <text x="24" y={y + 3} fill="#8a998f" fontSize="9" fontWeight="600" textAnchor="end">
+                    {formatYTick(val, metric)}
+                  </text>
+                </g>
+              );
+            })}
+
+            {/* 12 Monthly Bars */}
+            {months.map((m, idx) => {
+              const x = 45 + idx * 39;
+              const val = Number(monthlyValues[idx]) || 0;
+              const barHeight = maxVal > 0 ? (val / maxVal) * 120 : 0;
+              const isSelected = (isCurrentYear && idx === currentMonthIdx) || idx === hoveredIdx;
+              const isHovered = idx === hoveredIdx;
+
+              let barFill;
+              if (metric === "energy") {
+                barFill = isHovered
+                  ? "#08331d"
+                  : (isSelected ? "#0d4a2b" : (val > 0 ? "#d7edd9" : "#edf4ee"));
+              } else {
+                barFill = isHovered
+                  ? "#65a30d"
+                  : (isSelected ? "#84cc16" : (val > 0 ? "#e4f2cb" : "#f2f6ea"));
+              }
+
+              return (
+                <g
+                  key={m}
+                  onMouseEnter={() => setHoveredIdx(idx)}
+                  onMouseLeave={() => setHoveredIdx(null)}
+                  style={{ cursor: "pointer" }}
+                >
+                  {/* Invisible hit target for smooth hovering */}
+                  <rect x={x - 4} y="15" width="30" height="135" fill="transparent" />
+
+                  {/* Rendered Bar */}
+                  <rect
+                    x={x}
+                    y={140 - barHeight}
+                    width="22"
+                    height={Math.max(barHeight, val > 0 ? 3 : 0)}
+                    rx="4"
+                    fill={barFill}
+                    style={{ transition: "all 0.2s ease" }}
+                  />
+
+                  {/* Month Label */}
+                  <text
+                    x={x + 11}
+                    y={154}
+                    fill={isSelected ? (metric === "revenue" ? "#4d7c0f" : "#0d4a2b") : "#7c8e81"}
+                    fontSize="9"
+                    fontWeight={isSelected ? "800" : "600"}
+                    textAnchor="middle"
+                  >
+                    {m}
+                  </text>
+                </g>
+              );
+            })}
+
+            {/* Spline Line across months */}
+            {trendlineEndIdx >= 0 && (
+              <path
+                d={months
+                  .slice(0, trendlineEndIdx + 1)
+                  .map((_, idx) => {
+                    const x = 45 + idx * 39 + 11;
+                    const val = Number(monthlyValues[idx]) || 0;
+                    const y = 140 - (val / (maxVal || 1)) * 120;
+                    return `${idx === 0 ? "M" : "L"} ${x} ${y}`;
+                  })
+                  .join(" ")}
+                fill="none"
+                stroke={metric === "revenue" ? "#0d4a2b" : "#84cc16"}
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            )}
+
+            {/* Dots on Spline Line */}
+            {trendlineEndIdx >= 0 &&
+              months.slice(0, trendlineEndIdx + 1).map((_, idx) => {
+                const x = 45 + idx * 39 + 11;
+                const val = Number(monthlyValues[idx]) || 0;
+                const y = 140 - (val / (maxVal || 1)) * 120;
+                const isSelected = (isCurrentYear && idx === currentMonthIdx) || idx === hoveredIdx;
+                const strokeColor = metric === "revenue" ? "#0d4a2b" : "#84cc16";
+
+                return (
+                  <circle
+                    key={idx}
+                    cx={x}
+                    cy={y}
+                    r={isSelected ? 4 : 2.5}
+                    fill="#ffffff"
+                    stroke={strokeColor}
+                    strokeWidth={isSelected ? 2.5 : 2}
+                    style={{ transition: "all 0.2s ease", pointerEvents: "none" }}
+                  />
+                );
+              })}
+          </svg>
+        </div>
+      )}
     </div>
   );
+}
+
+function MonthlyProductionChart(props) {
+  return <MonthlyProductionCard {...props} />;
 }
 
 function formatStationLabel(name, isCrowded = false) {
@@ -2344,7 +2779,7 @@ function MiniStationMap({ location }) {
     setMapMode(newMode);
     try {
       localStorage.setItem(MAP_MODE_STORAGE_KEY, newMode);
-    } catch {}
+    } catch { }
     if (mapRef.current) {
       mapRef.current.setStyle(MAP_STYLES[newMode]);
     }
@@ -2388,7 +2823,7 @@ function MiniStationMap({ location }) {
         map.remove();
         mapRef.current = null;
       };
-    } catch (_) {}
+    } catch (_) { }
   }, [lat, lng, isOffline, Boolean(location)]);
 
   useEffect(() => {
@@ -2481,7 +2916,7 @@ function FullFleetMap({ locations, selectedId, onSelect }) {
     setMapMode(newMode);
     try {
       localStorage.setItem(MAP_MODE_STORAGE_KEY, newMode);
-    } catch {}
+    } catch { }
     if (mapRef.current) {
       mapRef.current.setStyle(MAP_STYLES[newMode]);
     }
@@ -2505,7 +2940,7 @@ function FullFleetMap({ locations, selectedId, onSelect }) {
         map.remove();
         mapRef.current = null;
       };
-    } catch (_) {}
+    } catch (_) { }
   }, []);
 
   useEffect(() => {
@@ -2669,12 +3104,12 @@ function EnergyProductionChart({ series, period }) {
   const yTicks = yMax <= 1
     ? [0, 0.3, 0.5, 0.8, 1]
     : [
-        0,
-        Math.round(yMax * 0.25 * 10) / 10,
-        Math.round(yMax * 0.5 * 10) / 10,
-        Math.round(yMax * 0.75 * 10) / 10,
-        Math.round(yMax * 10) / 10,
-      ];
+      0,
+      Math.round(yMax * 0.25 * 10) / 10,
+      Math.round(yMax * 0.5 * 10) / 10,
+      Math.round(yMax * 0.75 * 10) / 10,
+      Math.round(yMax * 10) / 10,
+    ];
 
   const svgWidth = 720;
   const svgHeight = 290;
@@ -2869,10 +3304,10 @@ function EnergyView({ location, fleet, locations }) {
       const labels = period === "today"
         ? Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`)
         : (period === "month"
-            ? Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0"))
-            : (period === "year"
-                ? ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
-                : ["2022", "2023", "2024", "2025", "2026"]));
+          ? Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0"))
+          : (period === "year"
+            ? ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
+            : ["2022", "2023", "2024", "2025", "2026"]));
       return {
         available: true,
         labels,
@@ -3330,8 +3765,8 @@ function RevenueView({ location, fleet, locations }) {
       const labels = period === "month"
         ? Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0"))
         : (period === "year"
-            ? ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
-            : ["2022", "2023", "2024", "2025", "2026"]);
+          ? ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
+          : ["2022", "2023", "2024", "2025", "2026"]);
       return {
         available: true,
         labels,
@@ -3830,8 +4265,8 @@ function EmissionView({ location, fleet, locations }) {
       const labels = period === "month"
         ? Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0"))
         : (period === "year"
-            ? ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
-            : ["2022", "2023", "2024", "2025", "2026"]);
+          ? ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
+          : ["2022", "2023", "2024", "2025", "2026"]);
       return {
         available: true,
         labels,
