@@ -130,21 +130,44 @@ function generateWeeklyCurve(todayKwh, monthKwh, title) {
   const now = new Date();
   const labels = [];
   const values = [];
-  const avgDay = monthKwh > 0 ? (monthKwh / Math.max(1, now.getDate())) : (todayKwh || 10);
-  const factors = [0.92, 1.05, 0.88, 1.12, 0.98, 1.02, 1.0];
+
+  if (monthKwh <= 0 && todayKwh <= 0) {
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const dayName = days[(d.getDay() + 6) % 7];
+      const dateStr = `${d.getDate()}/${d.getMonth() + 1}`;
+      labels.push(`${dayName} ${dateStr}`);
+      values.push(0);
+    }
+    return makeSeries({
+      labels,
+      values,
+      unit: "kWh",
+      kind: "bar",
+      title,
+      caption: "Belum ada generasi 7 hari terakhir (0 kWh)",
+    });
+  }
+
+  const currentDay = Math.max(1, now.getDate());
+  const avgDay = monthKwh > 0 ? (monthKwh / currentDay) : (todayKwh || 10);
+  const factors = [0.95, 1.05, 0.88, 1.12, 0.96, 1.04, 1.0];
+
   for (let i = 6; i >= 0; i--) {
     const d = new Date(now);
     d.setDate(d.getDate() - i);
     const dayName = days[(d.getDay() + 6) % 7];
     const dateStr = `${d.getDate()}/${d.getMonth() + 1}`;
     labels.push(`${dayName} ${dateStr}`);
-    if (i === 0 && todayKwh > 0) {
+    if (i === 0) {
       values.push(Math.round(todayKwh * 10) / 10);
     } else {
       const val = Math.max(0, avgDay * factors[6 - i]);
       values.push(Math.round(val * 10) / 10);
     }
   }
+
   return makeSeries({
     labels,
     values,
@@ -157,15 +180,41 @@ function generateWeeklyCurve(todayKwh, monthKwh, title) {
 
 function generateMonthlyCurve(todayKwh, monthKwh, title) {
   const now = new Date();
+  const currentDay = now.getDate();
   const daysInMonth = 31;
   const labels = Array.from({ length: daysInMonth }, (_, i) => String(i + 1).padStart(2, "0"));
-  const avg = monthKwh > 0 ? (monthKwh / Math.max(1, now.getDate())) : (todayKwh || 10);
+
+  if (monthKwh <= 0 && todayKwh <= 0) {
+    return makeSeries({
+      labels,
+      values: Array(daysInMonth).fill(0),
+      unit: "kWh",
+      kind: "bar",
+      title,
+      caption: "Belum ada generasi bulan ini (0 kWh)",
+    });
+  }
+
+  const pastDaysCount = Math.max(0, currentDay - 1);
+  const pastKwhTarget = Math.max(0, monthKwh - todayKwh);
+  const rawPastFactors = [];
+  for (let i = 0; i < pastDaysCount; i++) {
+    const factor = 0.85 + ((i * 7 + 3) % 31) / 100;
+    rawPastFactors.push(factor);
+  }
+  const rawPastSum = rawPastFactors.reduce((a, b) => a + b, 0);
+
   const values = labels.map((_, i) => {
-    if (i + 1 > now.getDate()) return 0;
-    if (i + 1 === now.getDate() && todayKwh > 0) return Math.round(todayKwh * 10) / 10;
-    const factor = 0.85 + ((i * 7) % 30) / 100;
-    return Math.round(avg * factor * 10) / 10;
+    const dayNum = i + 1;
+    if (dayNum > currentDay) return 0;
+    if (dayNum === currentDay) return Math.round(todayKwh * 10) / 10;
+    if (pastDaysCount > 0 && rawPastSum > 0) {
+      const val = (rawPastFactors[i] / rawPastSum) * pastKwhTarget;
+      return Math.round(val * 10) / 10;
+    }
+    return 0;
   });
+
   return makeSeries({
     labels,
     values,
@@ -178,14 +227,39 @@ function generateMonthlyCurve(todayKwh, monthKwh, title) {
 
 function generateYearlyCurve(monthKwh, yearKwh, title) {
   const months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
-  const nowMonth = new Date().getMonth();
-  const avgMonth = yearKwh > 0 ? (yearKwh / Math.max(1, nowMonth + 1)) : (monthKwh || 100);
+  const now = new Date();
+  const nowMonth = now.getMonth();
+
+  if (yearKwh <= 0 && monthKwh <= 0) {
+    return makeSeries({
+      labels: months,
+      values: Array(12).fill(0),
+      unit: "kWh",
+      kind: "bar",
+      title,
+      caption: "Belum ada generasi tahun ini (0 kWh)",
+    });
+  }
+
+  const pastMonthsCount = nowMonth;
+  const pastYearKwhTarget = Math.max(0, yearKwh - monthKwh);
+  const rawFactors = [];
+  for (let i = 0; i < pastMonthsCount; i++) {
+    const factor = 0.9 + ((i * 5 + 2) % 21) / 100;
+    rawFactors.push(factor);
+  }
+  const rawSum = rawFactors.reduce((a, b) => a + b, 0);
+
   const values = months.map((_, i) => {
     if (i > nowMonth) return 0;
-    if (i === nowMonth && monthKwh > 0) return Math.round(monthKwh * 10) / 10;
-    const factor = 0.9 + ((i * 5) % 20) / 100;
-    return Math.round(avgMonth * factor * 10) / 10;
+    if (i === nowMonth) return Math.round(monthKwh * 10) / 10;
+    if (pastMonthsCount > 0 && rawSum > 0) {
+      const val = (rawFactors[i] / rawSum) * pastYearKwhTarget;
+      return Math.round(val * 10) / 10;
+    }
+    return 0;
   });
+
   return makeSeries({
     labels: months,
     values,
@@ -197,15 +271,36 @@ function generateYearlyCurve(monthKwh, yearKwh, title) {
 }
 
 function generateLifetimeCurve(yearKwh, lifetimeKwh, title) {
-  const years = ["2022", "2023", "2024", "2025", "2026"];
-  const base = lifetimeKwh > 0 ? lifetimeKwh : (yearKwh > 0 ? yearKwh * 3 : 1000);
-  const values = [
-    Math.round(base * 0.1 * 10) / 10,
-    Math.round(base * 0.2 * 10) / 10,
-    Math.round(base * 0.28 * 10) / 10,
-    Math.round(base * 0.32 * 10) / 10,
-    yearKwh > 0 ? Math.round(yearKwh * 10) / 10 : Math.round(base * 0.1 * 10) / 10,
+  const currentYear = new Date().getFullYear();
+  const years = [
+    String(currentYear - 4),
+    String(currentYear - 3),
+    String(currentYear - 2),
+    String(currentYear - 1),
+    String(currentYear),
   ];
+
+  if (lifetimeKwh <= 0 && yearKwh <= 0) {
+    return makeSeries({
+      labels: years,
+      values: Array(5).fill(0),
+      unit: "kWh",
+      kind: "bar",
+      title,
+      caption: "Belum ada histori generasi tahunan (0 kWh)",
+    });
+  }
+
+  const pastKwh = Math.max(0, lifetimeKwh - yearKwh);
+  const weights = [0.15, 0.23, 0.29, 0.33];
+  const values = [
+    Math.round(pastKwh * weights[0] * 10) / 10,
+    Math.round(pastKwh * weights[1] * 10) / 10,
+    Math.round(pastKwh * weights[2] * 10) / 10,
+    Math.round(pastKwh * weights[3] * 10) / 10,
+    Math.round(yearKwh * 10) / 10,
+  ];
+
   return makeSeries({
     labels: years,
     values,
@@ -218,7 +313,7 @@ function generateLifetimeCurve(yearKwh, lifetimeKwh, title) {
 
 export function getEnergySeries(location, period) {
   const normPeriod = (period === "day" || period === "today") ? "day" : period;
-  const source = location?.source;
+  const source = (location?.source || location?.platform || location?.site?.platform || "").toLowerCase();
   const titleByPeriod = {
     today: "Today's production curve",
     day: "Daily production curve",
@@ -344,12 +439,30 @@ export function getEnergySeries(location, period) {
   if (source === "kehua") {
     const charts = location?.charts || location?.site?.charts || {};
     const todayKwh = Number(location?.today_energy_kwh ?? location?.daily_energy_kwh ?? 0);
-    const monthKwh = Number(location?.monthly_energy_kwh ?? 0);
-    const yearKwh = Number(location?.yearly_energy_kwh ?? 0);
+    const monthKwh = Number(location?.monthly_energy_kwh ?? location?.month_energy_kwh ?? 0);
+    const yearKwh = Number(location?.yearly_energy_kwh ?? location?.year_energy_kwh ?? 0);
     const lifetimeKwh = Number(location?.cumulative_energy_kwh ?? location?.total_energy_kwh ?? 0);
 
     if (normPeriod === "day") {
-      if (charts.daily_generation?.x?.length) {
+      if (charts.daily_generation?.x?.length && todayKwh > 0) {
+        const yVals = numericValues(charts.daily_generation.y);
+        const rawSum = yVals.reduce((acc, v) => acc + (v || 0), 0);
+        if (rawSum > 0) {
+          const scaledValues = yVals.map((v) => Math.round(((v || 0) / rawSum) * todayKwh * 100) / 100);
+          return makeSeries({
+            labels: charts.daily_generation.x,
+            values: scaledValues,
+            unit: "kWh",
+            kind: "bar",
+            title,
+            caption: "Generasi per jam hari ini",
+          });
+        }
+      }
+      if (todayKwh > 0) {
+        return generateSolarDayCurve(todayKwh, title);
+      }
+      if (charts.daily_generation?.x?.length && (!location?.daily_energy_kwh && !location?.today_energy_kwh)) {
         const dUnit = normalizeUnitString(charts.daily_generation?.unit, "kWh");
         return xySeries(charts.daily_generation, {
           unit: dUnit,
@@ -358,32 +471,22 @@ export function getEnergySeries(location, period) {
           caption: "Hourly generation reported by Kehua",
         });
       }
-      const nestedHourly = latestNestedSeries(charts.company_power_trends?.day_hourly);
-      if (nestedHourly.data) {
-        return chartSeries(nestedHourly.data, {
-          unit: normalizeUnitString(charts.company_power_trends?.day_hourly?.unit, "kWh"),
-          kind: "bar",
-          title,
-          caption: "Hourly generation reported by Kehua",
-        });
-      }
-      return generateSolarDayCurve(todayKwh, title);
+      const hourlyLabels = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`);
+      return makeSeries({
+        labels: hourlyLabels,
+        values: Array(24).fill(0),
+        unit: "kWh",
+        kind: "bar",
+        title,
+        caption: "Belum ada generasi hari ini (0 kWh)",
+      });
     }
 
     if (normPeriod === "week") {
       const nested = latestNestedSeries(charts.company_power_trends?.month_daily);
-      if (nested.data?.labels?.length) {
+      if (nested.data?.labels?.length && (!monthKwh && !todayKwh)) {
         return sliceLastDays(nested.data, 7, {
           unit: normalizeUnitString(charts.company_power_trends?.month_daily?.unit, "kWh"),
-          kind: "bar",
-          title,
-          caption: "Daily generation past 7 days",
-        });
-      }
-      if (charts.monthly_generation?.x?.length) {
-        const mUnit = normalizeUnitString(charts.monthly_generation?.unit, "kWh");
-        return sliceLastDaysXY(charts.monthly_generation, 7, {
-          unit: mUnit,
           kind: "bar",
           title,
           caption: "Daily generation past 7 days",
@@ -394,7 +497,7 @@ export function getEnergySeries(location, period) {
 
     if (normPeriod === "month") {
       const nested = latestNestedSeries(charts.company_power_trends?.month_daily);
-      if (nested.data?.labels?.length) {
+      if (nested.data?.labels?.length && (!monthKwh && !todayKwh)) {
         return chartSeries(nested.data, {
           unit: normalizeUnitString(charts.company_power_trends?.month_daily?.unit, "kWh"),
           kind: "bar",
@@ -402,10 +505,29 @@ export function getEnergySeries(location, period) {
           caption: nested.key || "Daily generation",
         });
       }
-      if (charts.monthly_generation?.x?.length) {
-        const mUnit = normalizeUnitString(charts.monthly_generation?.unit, "kWh");
-        return xySeries(charts.monthly_generation, {
-          unit: mUnit,
+      if (charts.monthly_generation?.x?.length && monthKwh > 0) {
+        const now = new Date();
+        const currentDay = now.getDate();
+        const yVals = numericValues(charts.monthly_generation.y);
+        const pastDaysCount = Math.max(0, currentDay - 1);
+        const sumPastRaw = yVals.slice(0, pastDaysCount).reduce((acc, v) => acc + (v || 0), 0);
+        const pastKwhTarget = Math.max(0, monthKwh - todayKwh);
+
+        const scaledValues = charts.monthly_generation.x.map((_, i) => {
+          const dayNum = i + 1;
+          if (dayNum > currentDay) return 0;
+          if (dayNum === currentDay) return Math.round(todayKwh * 10) / 10;
+          if (pastDaysCount > 0 && sumPastRaw > 0) {
+            const val = ((yVals[i] || 0) / sumPastRaw) * pastKwhTarget;
+            return Math.round(val * 10) / 10;
+          }
+          return 0;
+        });
+
+        return makeSeries({
+          labels: charts.monthly_generation.x,
+          values: scaledValues,
+          unit: "kWh",
           kind: "bar",
           title,
           caption: "Daily generation reported by Kehua",
@@ -416,7 +538,7 @@ export function getEnergySeries(location, period) {
 
     if (normPeriod === "year") {
       const nested = latestNestedSeries(charts.company_power_trends?.year_monthly);
-      if (nested.data?.labels?.length) {
+      if (nested.data?.labels?.length && (!yearKwh && !monthKwh)) {
         return chartSeries(nested.data, {
           unit: normalizeUnitString(charts.company_power_trends?.year_monthly?.unit, "MWh"),
           kind: "bar",
@@ -429,7 +551,7 @@ export function getEnergySeries(location, period) {
 
     if (normPeriod === "lifetime") {
       const nested = latestNestedSeries(charts.company_power_trends?.all_yearly);
-      if (nested.data?.labels?.length) {
+      if (nested.data?.labels?.length && (!lifetimeKwh && !yearKwh)) {
         return chartSeries(nested.data, {
           unit: normalizeUnitString(charts.company_power_trends?.all_yearly?.unit, "MWh"),
           kind: "bar",
@@ -518,6 +640,7 @@ export function getEnergySeries(location, period) {
 
 export function getRevenueSeries(location, period) {
   const normPeriod = (period === "day" || period === "today") ? "day" : period;
+  const source = (location?.source || location?.platform || location?.site?.platform || "").toLowerCase();
   const unit = location?.income_currency || "IDR";
   const config = {
     day: {
@@ -547,7 +670,7 @@ export function getRevenueSeries(location, period) {
     },
   }[normPeriod];
 
-  if (location?.source === "kehua" || location?.source === "sma") {
+  if (source === "kehua" || source === "sma") {
     const energySeries = getEnergySeries(location, normPeriod);
     if (energySeries && energySeries.available !== false && Array.isArray(energySeries.values)) {
       const isMwh = normalizeUnitString(energySeries.unit, "").toUpperCase() === "MWH";
@@ -569,11 +692,11 @@ export function getRevenueSeries(location, period) {
       unit: "IDR",
       kind: "bar",
       title: config?.title || "Revenue history",
-      reason: `Histori energi ${normalizeUnitString(location?.source, "").toUpperCase()} tidak tersedia untuk periode ini.`,
+      reason: `Histori energi ${source.toUpperCase()} tidak tersedia untuk periode ini.`,
     });
   }
 
-  if (location?.source !== "huawei") {
+  if (source !== "huawei") {
     return unavailable({
       unit: "IDR",
       kind: "bar",

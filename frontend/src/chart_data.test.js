@@ -269,7 +269,7 @@ test("safely handles Kehua array units and generates complete curves from KPIs",
   const revMonth = getRevenueSeries(realKehuaFromSupabase, "month");
   assert.equal(revMonth.available, true);
   assert.equal(revMonth.unit, "IDR");
-  assert.deepEqual(revMonth.values, [18000, 22500, 27000]);
+  assert.deepEqual(revMonth.values, [308610, 385740, 462870]);
 
   const revYear = getRevenueSeries(realKehuaFromSupabase, "year");
   assert.equal(revYear.available, true);
@@ -289,7 +289,7 @@ test("safely handles Kehua array units and generates complete curves from KPIs",
   const emMonth = getEmissionSeries(realKehuaFromSupabase, "month");
   assert.equal(emMonth.available, true);
   assert.equal(emMonth.unit, "kg CO₂");
-  assert.deepEqual(emMonth.values, [17, 21.3, 25.5]);
+  assert.deepEqual(emMonth.values, [291.5, 364.3, 437.2]);
 
   const emYear = getEmissionSeries(realKehuaFromSupabase, "year");
   assert.equal(emYear.available, true);
