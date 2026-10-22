@@ -3385,9 +3385,60 @@ function DatePickerPill({ value, onChange }) {
   );
 }
 
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
+
+const AVAILABLE_YEARS = [2022, 2023, 2024, 2025, 2026];
+
+function MonthDropdownPill({ value, onChange }) {
+  const currentMonthName = MONTH_NAMES[value] || MONTH_NAMES[new Date().getMonth()];
+
+  return (
+    <div className="select-pill-wrapper" title="Pilih Bulan">
+      <span className="select-pill-text">{currentMonthName}</span>
+      <svg className="select-pill-arrow" width="10" height="10" viewBox="0 0 12 12" fill="currentColor">
+        <path d="M2.5 4.5L6 8L9.5 4.5H2.5Z" />
+      </svg>
+      <select
+        className="select-pill-native"
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+      >
+        {MONTH_NAMES.map((m, idx) => (
+          <option key={m} value={idx}>{m}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function YearDropdownPill({ value, onChange, years = AVAILABLE_YEARS }) {
+  return (
+    <div className="select-pill-wrapper" title="Pilih Tahun">
+      <span className="select-pill-text">{value}</span>
+      <svg className="select-pill-arrow" width="10" height="10" viewBox="0 0 12 12" fill="currentColor">
+        <path d="M2.5 4.5L6 8L9.5 4.5H2.5Z" />
+      </svg>
+      <select
+        className="select-pill-native"
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+      >
+        {years.map((y) => (
+          <option key={y} value={y}>{y}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function EnergyView({ location, fleet, locations }) {
   const [period, setPeriod] = useState("day");
   const [selectedDate, setSelectedDate] = useState(getTodayDateStr);
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
 
   const hasLocations = Boolean(locations && locations.length > 0);
   const activeStation = location || (hasLocations ? locations[0] : null);
@@ -3470,13 +3521,18 @@ function EnergyView({ location, fleet, locations }) {
         };
       }
       if (period === "month") {
+        const daysInSelectedMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
         const now = new Date();
-        const labels = Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0"));
-        const avg = monthKwh > 0 ? (monthKwh / Math.max(1, now.getDate())) : (todayKwh || 10);
+        const isCurrentMonth = selectedYear === now.getFullYear() && selectedMonth === now.getMonth();
+        const isFutureMonth = selectedYear > now.getFullYear() || (selectedYear === now.getFullYear() && selectedMonth > now.getMonth());
+
+        const labels = Array.from({ length: daysInSelectedMonth }, (_, i) => String(i + 1).padStart(2, "0"));
+        const avg = monthKwh > 0 ? (monthKwh / Math.max(1, isCurrentMonth ? now.getDate() : daysInSelectedMonth)) : (todayKwh || 10);
         const values = labels.map((_, i) => {
-          if (i + 1 > now.getDate()) return 0;
-          if (i + 1 === now.getDate() && todayKwh > 0) return Math.round(todayKwh * 10) / 10;
-          const factor = 0.85 + ((i * 7) % 30) / 100;
+          if (isFutureMonth) return 0;
+          if (isCurrentMonth && (i + 1 > now.getDate())) return 0;
+          if (isCurrentMonth && (i + 1 === now.getDate()) && todayKwh > 0) return Math.round(todayKwh * 10) / 10;
+          const factor = 0.85 + (((i + selectedMonth) * 7) % 30) / 100;
           return Math.round(avg * factor * 10) / 10;
         });
         return {
@@ -3486,7 +3542,7 @@ function EnergyView({ location, fleet, locations }) {
           unit: "kWh",
           kind: "bar",
           title: "Monthly production curve",
-          caption: "Generasi harian bulan ini",
+          caption: `Generasi harian (${MONTH_NAMES[selectedMonth]} ${selectedYear})`,
         };
       }
       if (period === "year") {
@@ -3530,16 +3586,16 @@ function EnergyView({ location, fleet, locations }) {
       }
     }
     return s;
-  }, [activeStation, period, selectedDate, todayKwh, monthKwh, yearKwh, lifetimeKwh]);
+  }, [activeStation, period, selectedDate, selectedMonth, selectedYear, todayKwh, monthKwh, yearKwh, lifetimeKwh]);
 
   const curveSubtitle = useMemo(() => {
     if (!hasLocations) return "Belum ada instalasi PLTS di wilayah ini (0 kWh)";
     if (period === "day" || period === "today") return `${stationName} · Hourly generation (${formatToDisplayDate(selectedDate)}) · ${platformName}`;
     if (period === "week") return `${stationName} · Daily generation week (${formatToDisplayDate(selectedDate)}) · ${platformName}`;
-    if (period === "month") return `${stationName} · Daily generation reported by ${platformName}`;
+    if (period === "month") return `${stationName} · Daily generation (${MONTH_NAMES[selectedMonth]} ${selectedYear}) · ${platformName}`;
     if (period === "year") return `${stationName} · Monthly generation reported by ${platformName}`;
     return `${stationName} · Yearly generation reported by ${platformName}`;
-  }, [hasLocations, stationName, platformName, period, selectedDate]);
+  }, [hasLocations, stationName, platformName, period, selectedDate, selectedMonth, selectedYear]);
 
   const curveTitle = useMemo(() => {
     if (period === "day" || period === "today") return "Daily production curve";
@@ -3620,6 +3676,12 @@ function EnergyView({ location, fleet, locations }) {
               </div>
               {(period === "day" || period === "today" || period === "week") && (
                 <DatePickerPill value={selectedDate} onChange={setSelectedDate} />
+              )}
+              {period === "month" && (
+                <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                  <MonthDropdownPill value={selectedMonth} onChange={setSelectedMonth} />
+                  <YearDropdownPill value={selectedYear} onChange={setSelectedYear} />
+                </div>
               )}
               <span className="unit-pill-badge">{series?.unit || "kWh"}</span>
             </div>
@@ -3985,6 +4047,8 @@ function RevenueProductionChart({ series, period, isKehua }) {
 function RevenueView({ location, fleet, locations }) {
   const [period, setPeriod] = useState("month");
   const [selectedDate, setSelectedDate] = useState(getTodayDateStr);
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
 
   const hasLocations = Boolean(locations && locations.length > 0);
   const activeStation = location || (hasLocations ? (locations.find((l) => l.source === "huawei") || locations[0]) : null);
@@ -4061,13 +4125,18 @@ function RevenueView({ location, fleet, locations }) {
         };
       }
       if (period === "month") {
+        const daysInSelectedMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
         const now = new Date();
-        const labels = Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0"));
-        const avg = monthRev > 0 ? (monthRev / Math.max(1, now.getDate())) : (todayRev || 10000);
+        const isCurrentMonth = selectedYear === now.getFullYear() && selectedMonth === now.getMonth();
+        const isFutureMonth = selectedYear > now.getFullYear() || (selectedYear === now.getFullYear() && selectedMonth > now.getMonth());
+
+        const labels = Array.from({ length: daysInSelectedMonth }, (_, i) => String(i + 1).padStart(2, "0"));
+        const avg = monthRev > 0 ? (monthRev / Math.max(1, isCurrentMonth ? now.getDate() : daysInSelectedMonth)) : (todayRev || 10000);
         const values = labels.map((_, i) => {
-          if (i + 1 > now.getDate()) return 0;
-          if (i + 1 === now.getDate() && todayRev > 0) return Math.round(todayRev);
-          const factor = 0.85 + ((i * 7) % 30) / 100;
+          if (isFutureMonth) return 0;
+          if (isCurrentMonth && (i + 1 > now.getDate())) return 0;
+          if (isCurrentMonth && (i + 1 === now.getDate()) && todayRev > 0) return Math.round(todayRev);
+          const factor = 0.85 + (((i + selectedMonth) * 7) % 30) / 100;
           return Math.round(avg * factor);
         });
         return {
@@ -4077,7 +4146,7 @@ function RevenueView({ location, fleet, locations }) {
           unit: "IDR",
           kind: "bar",
           title: "Daily revenue this month",
-          caption: "Pendapatan harian bulan ini",
+          caption: `Pendapatan harian (${MONTH_NAMES[selectedMonth]} ${selectedYear})`,
         };
       }
       if (period === "year") {
@@ -4121,16 +4190,16 @@ function RevenueView({ location, fleet, locations }) {
       }
     }
     return s;
-  }, [activeStation, period, selectedDate, todayRev, monthRev, yearRev, lifetimeRev]);
+  }, [activeStation, period, selectedDate, selectedMonth, selectedYear, todayRev, monthRev, yearRev, lifetimeRev]);
 
   const curveSubtitle = useMemo(() => {
     if (!hasLocations) return "Belum ada instalasi PLTS di wilayah ini (Rp 0 IDR)";
     if (period === "day" || period === "today") return `${stationName} · Revenue (${formatToDisplayDate(selectedDate)})${isAutoTariff ? " (Rp 900/kWh)" : ""}`;
     if (period === "week") return `${stationName} · Daily revenue week (${formatToDisplayDate(selectedDate)})${isAutoTariff ? " (Rp 900/kWh)" : ""}`;
-    if (period === "month") return `${stationName} · Revenue through the latest reported day${isAutoTariff ? " (Rp 900/kWh)" : ""}`;
+    if (period === "month") return `${stationName} · Daily revenue (${MONTH_NAMES[selectedMonth]} ${selectedYear})${isAutoTariff ? " (Rp 900/kWh)" : ""}`;
     if (period === "year") return `${stationName} · Revenue recorded in each month${isAutoTariff ? " (Rp 900/kWh)" : ""}`;
     return `${stationName} · Available lifetime revenue history${isAutoTariff ? " (Rp 900/kWh)" : ""}`;
-  }, [hasLocations, stationName, period, selectedDate, isAutoTariff]);
+  }, [hasLocations, stationName, period, selectedDate, selectedMonth, selectedYear, isAutoTariff]);
 
   const curveTitle = useMemo(() => {
     if (period === "day" || period === "today") return "Daily revenue curve";
@@ -4275,6 +4344,12 @@ function RevenueView({ location, fleet, locations }) {
                 </div>
                 {(period === "day" || period === "today" || period === "week") && (
                   <DatePickerPill value={selectedDate} onChange={setSelectedDate} />
+                )}
+                {period === "month" && (
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                    <MonthDropdownPill value={selectedMonth} onChange={setSelectedMonth} />
+                    <YearDropdownPill value={selectedYear} onChange={setSelectedYear} />
+                  </div>
                 )}
                 <span className="unit-pill-badge">IDR</span>
               </div>
@@ -4616,6 +4691,8 @@ function EmissionProductionChart({ series, period }) {
 function EmissionView({ location, fleet, locations }) {
   const [period, setPeriod] = useState("day");
   const [selectedDate, setSelectedDate] = useState(getTodayDateStr);
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
 
   const hasLocations = Boolean(locations && locations.length > 0);
   const activeStation = location || (hasLocations ? (locations.find((l) => l.source === "huawei") || locations[0]) : null);
@@ -4702,13 +4779,18 @@ function EmissionView({ location, fleet, locations }) {
         };
       }
       if (period === "month") {
+        const daysInSelectedMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
         const now = new Date();
-        const labels = Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0"));
-        const avg = monthEmissionKg > 0 ? (monthEmissionKg / Math.max(1, now.getDate())) : (todayEmissionKg || 10);
+        const isCurrentMonth = selectedYear === now.getFullYear() && selectedMonth === now.getMonth();
+        const isFutureMonth = selectedYear > now.getFullYear() || (selectedYear === now.getFullYear() && selectedMonth > now.getMonth());
+
+        const labels = Array.from({ length: daysInSelectedMonth }, (_, i) => String(i + 1).padStart(2, "0"));
+        const avg = monthEmissionKg > 0 ? (monthEmissionKg / Math.max(1, isCurrentMonth ? now.getDate() : daysInSelectedMonth)) : (todayEmissionKg || 10);
         const values = labels.map((_, i) => {
-          if (i + 1 > now.getDate()) return 0;
-          if (i + 1 === now.getDate() && todayEmissionKg > 0) return Math.round(todayEmissionKg * 10) / 10;
-          const factor = 0.85 + ((i * 7) % 30) / 100;
+          if (isFutureMonth) return 0;
+          if (isCurrentMonth && (i + 1 > now.getDate())) return 0;
+          if (isCurrentMonth && (i + 1 === now.getDate()) && todayEmissionKg > 0) return Math.round(todayEmissionKg * 10) / 10;
+          const factor = 0.85 + (((i + selectedMonth) * 7) % 30) / 100;
           return Math.round(avg * factor * 10) / 10;
         });
         return {
@@ -4718,7 +4800,7 @@ function EmissionView({ location, fleet, locations }) {
           unit: "kg CO₂",
           kind: "bar",
           title: "Daily emission reduction this month",
-          caption: "Reduksi emisi harian bulan ini (0.85 kg CO₂/kWh)",
+          caption: `Reduksi emisi harian (${MONTH_NAMES[selectedMonth]} ${selectedYear}) (0.85 kg CO₂/kWh)`,
         };
       }
       if (period === "year") {
@@ -4762,16 +4844,16 @@ function EmissionView({ location, fleet, locations }) {
       }
     }
     return s;
-  }, [activeStation, period, selectedDate, todayEmissionKg, monthEmissionKg, yearEmissionKg, lifetimeEmissionKg]);
+  }, [activeStation, period, selectedDate, selectedMonth, selectedYear, todayEmissionKg, monthEmissionKg, yearEmissionKg, lifetimeEmissionKg]);
 
   const curveSubtitle = useMemo(() => {
     if (!hasLocations) return "Belum ada instalasi PLTS di wilayah ini (0 kg CO₂)";
     if (period === "day" || period === "today") return `${stationName} · Reduksi emisi (${formatToDisplayDate(selectedDate)}) · 0.85 kg CO₂/kWh`;
     if (period === "week") return `${stationName} · Reduksi emisi 7 hari (${formatToDisplayDate(selectedDate)}) · 0.85 kg CO₂/kWh`;
-    if (period === "month") return `${stationName} · Reduksi emisi CO₂ harian bulan ini (0.85 kg CO₂/kWh)`;
+    if (period === "month") return `${stationName} · Reduksi emisi harian (${MONTH_NAMES[selectedMonth]} ${selectedYear}) · 0.85 kg CO₂/kWh`;
     if (period === "year") return `${stationName} · Reduksi emisi CO₂ bulanan tahun ini (0.85 kg CO₂/kWh)`;
     return `${stationName} · Histori akumulasi reduksi emisi CO₂ per tahun`;
-  }, [hasLocations, stationName, period, selectedDate]);
+  }, [hasLocations, stationName, period, selectedDate, selectedMonth, selectedYear]);
 
   const curveTitle = useMemo(() => {
     if (period === "day" || period === "today") return "Daily emission reduction";
@@ -4928,6 +5010,12 @@ function EmissionView({ location, fleet, locations }) {
                 </div>
                 {(period === "day" || period === "today" || period === "week") && (
                   <DatePickerPill value={selectedDate} onChange={setSelectedDate} />
+                )}
+                {period === "month" && (
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                    <MonthDropdownPill value={selectedMonth} onChange={setSelectedMonth} />
+                    <YearDropdownPill value={selectedYear} onChange={setSelectedYear} />
+                  </div>
                 )}
                 <span className="unit-pill-badge">
                   {highestVal >= 1000 ? "Ton CO₂" : "kg CO₂"}
