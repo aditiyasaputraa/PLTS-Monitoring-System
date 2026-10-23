@@ -879,7 +879,17 @@ function Dashboard({ session, onSignOut }) {
     }
   }, [locations, selectedId]);
 
-  const selected = locations.find((l) => l.uid === selectedId) || locations[0] || null;
+  const selected = useMemo(() => {
+    if (!allLocations || allLocations.length === 0) return null;
+    if (selectedId) {
+      const inRegion = (locations || []).find((l) => l.uid === selectedId || l.id === selectedId);
+      if (inRegion) return inRegion;
+      const inAll = allLocations.find((l) => l.uid === selectedId || l.id === selectedId);
+      if (inAll) return inAll;
+    }
+    return locations[0] || allLocations[0] || null;
+  }, [locations, allLocations, selectedId]);
+
   const fleet = useMemo(() => buildFleet(sites, locations), [sites, locations]);
 
   const [regionDropdownOpen, setRegionDropdownOpen] = useState(false);
@@ -889,13 +899,18 @@ function Dashboard({ session, onSignOut }) {
     setSelectedId(uid);
     writeUiState({ selectedId: uid });
     setSiteDropdownOpen(false);
-  }, []);
+
+    const found = allLocations.find((l) => l.uid === uid || l.id === uid);
+    if (found && selectedRegion !== "all" && found.region && found.region !== selectedRegion) {
+      setSelectedRegion(found.region);
+      writeUiState({ selectedRegion: found.region });
+    }
+  }, [allLocations, selectedRegion]);
 
   const handleSelectRegion = useCallback((regionId) => {
     setSelectedRegion(regionId);
     writeUiState({ selectedRegion: regionId });
     setRegionDropdownOpen(false);
-    setActiveTab("Overview");
   }, []);
 
   const handleSyncNow = useCallback(async () => {
@@ -3481,23 +3496,63 @@ function RegionDropdownPill({ value, onChange, regions = REGIONS }) {
   );
 }
 
-function StationListDarkCard({ locations, activeStation, onSelect, selectedRegion }) {
+function StationListDarkCard({
+  locations,
+  allLocations,
+  activeStation,
+  onSelect,
+  selectedRegion = "all",
+  onSelectRegion,
+}) {
   const currentRegion = REGIONS.find((r) => r.id === selectedRegion) || REGIONS[0];
   const regionLabel = currentRegion?.shortName || currentRegion?.name || "DKI Jakarta";
+
+  const displayLocations = useMemo(() => {
+    const base = (allLocations && allLocations.length > 0) ? allLocations : (locations || []);
+    if (!selectedRegion || selectedRegion === "all") return base;
+    return base.filter((loc) => {
+      const reg = loc.region ? String(loc.region).toLowerCase() : getStationRegion(loc);
+      return reg === selectedRegion;
+    });
+  }, [allLocations, locations, selectedRegion]);
 
   return (
     <div className="analytics-station-list-card">
       <div className="station-list-header">
-        <span className="station-list-title">DAFTAR PLTS ({regionLabel.toUpperCase()})</span>
-        <span className="station-list-count">{locations?.length || 0}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", flex: 1, minWidth: 0 }}>
+          <span className="station-list-title">DAFTAR PLTS</span>
+          {onSelectRegion ? (
+            <select
+              value={selectedRegion || "all"}
+              onChange={(e) => onSelectRegion(e.target.value)}
+              className="station-list-region-dropdown"
+              title="Filter Wilayah"
+              aria-label="Filter Wilayah"
+            >
+              {REGIONS.map((r) => {
+                const count = r.id === "all"
+                  ? (allLocations?.length || locations?.length || 0)
+                  : (allLocations || locations || []).filter((l) => (l.region || getStationRegion(l)) === r.id).length;
+                return (
+                  <option key={r.id} value={r.id}>
+                    ({r.name.toUpperCase()}) · {count}
+                  </option>
+                );
+              })}
+            </select>
+          ) : (
+            <span className="station-list-title">({regionLabel.toUpperCase()})</span>
+          )}
+        </div>
+        <span className="station-list-count">{displayLocations.length}</span>
       </div>
       <div className="station-list-body">
-        {(!locations || locations.length === 0) ? (
-          <div style={{ padding: "16px", color: "#6e8074", fontSize: "12px", textAlign: "center" }}>
-            Belum ada PLTS di wilayah ini
+        {displayLocations.length === 0 ? (
+          <div style={{ padding: "24px 16px", color: "#6e8074", fontSize: "12px", textAlign: "center" }}>
+            Belum ada PLTS di wilayah {regionLabel}
           </div>
         ) : (
-          locations.map((loc) => {
+          displayLocations.map((loc) => {
             const isSelected = (loc.uid && activeStation?.uid && loc.uid === activeStation.uid) ||
               (loc.id && activeStation?.id && loc.id === activeStation.id) ||
               (loc.name && activeStation?.name && loc.name === activeStation.name);
@@ -3821,7 +3876,7 @@ function buildAggregatedFleetSeries({
   };
 }
 
-function EnergyView({ location, fleet, locations, allLocations, onSelect, selectedRegion = "dki-jakarta", onSelectRegion }) {
+function EnergyView({ location, fleet, locations, allLocations, onSelect, selectedRegion = "all", onSelectRegion }) {
   // Station curve controls
   const [period, setPeriod] = useState("day");
   const [selectedDate, setSelectedDate] = useState(getTodayDateStr);
@@ -3829,15 +3884,48 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
   const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
 
   // Fleet curve controls
-  const [fleetRegion, setFleetRegion] = useState(selectedRegion || "dki-jakarta");
+  const [fleetRegion, setFleetRegion] = useState(selectedRegion || "all");
   const [fleetPeriod, setFleetPeriod] = useState("day");
   const [fleetSelectedDate, setFleetSelectedDate] = useState(getTodayDateStr);
   const [fleetSelectedMonth, setFleetSelectedMonth] = useState(() => new Date().getMonth());
   const [fleetSelectedYear, setFleetSelectedYear] = useState(() => new Date().getFullYear());
 
-  const hasLocations = Boolean(locations && locations.length > 0);
-  const activeStation = location || (hasLocations ? locations[0] : null);
-  const stationName = activeStation?.name || (hasLocations ? "Pilih PLTS" : "Tidak Ada PLTS");
+  useEffect(() => {
+    if (selectedRegion) {
+      setFleetRegion(selectedRegion);
+    }
+  }, [selectedRegion]);
+
+  const pool = (allLocations && allLocations.length > 0) ? allLocations : (locations || []);
+
+  const [localStationUid, setLocalStationUid] = useState(location?.uid || null);
+
+  useEffect(() => {
+    if (location?.uid) {
+      setLocalStationUid(location.uid);
+    }
+  }, [location?.uid]);
+
+  const activeStation = useMemo(() => {
+    if (localStationUid) {
+      const match = pool.find((l) => l.uid === localStationUid || l.id === localStationUid);
+      if (match) return match;
+    }
+    if (location) return location;
+    return (locations && locations.length > 0) ? locations[0] : (pool[0] || null);
+  }, [localStationUid, location, locations, pool]);
+
+  const handleSelectStation = useCallback((uid) => {
+    setLocalStationUid(uid);
+    if (onSelect) onSelect(uid);
+  }, [onSelect]);
+
+  const handleFleetRegionChange = useCallback((regId) => {
+    setFleetRegion(regId);
+    if (onSelectRegion) onSelectRegion(regId);
+  }, [onSelectRegion]);
+
+  const stationName = activeStation?.name || ((locations && locations.length > 0) ? "Pilih PLTS" : "Tidak Ada PLTS");
   const platformName = activeStation?.source
     ? (activeStation.source.charAt(0).toUpperCase() + activeStation.source.slice(1))
     : "—";
@@ -3853,7 +3941,6 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
   const lifetimeMwh = (lifetimeKwh / 1000).toFixed(2);
 
   // Fleet pool & target locations
-  const pool = (allLocations && allLocations.length > 0) ? allLocations : (locations || []);
   const targetLocations = useMemo(() => {
     if (fleetRegion === "all") return pool;
     return pool.filter((loc) => {
@@ -4200,10 +4287,12 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
         {/* Right: Dark Station List Card */}
         <div className="analytics-col-side">
           <StationListDarkCard
-            locations={pool}
+            locations={locations}
+            allLocations={allLocations}
             activeStation={activeStation}
-            onSelect={onSelect}
-            selectedRegion={selectedRegion}
+            onSelect={handleSelectStation}
+            selectedRegion={selectedRegion || "all"}
+            onSelectRegion={onSelectRegion}
           />
         </div>
       </div>
@@ -4268,7 +4357,7 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
                 {fleetPeriod === "year" && (
                   <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} />
                 )}
-                <RegionDropdownPill value={fleetRegion} onChange={setFleetRegion} />
+                <RegionDropdownPill value={fleetRegion} onChange={handleFleetRegionChange} />
                 <span className="unit-pill-badge">{fleetSeries?.unit || "kWh"}</span>
               </div>
             </div>
@@ -4581,7 +4670,7 @@ function RevenueProductionChart({ series, period, isKehua }) {
   );
 }
 
-function RevenueView({ location, fleet, locations, allLocations, onSelect, selectedRegion = "dki-jakarta", onSelectRegion }) {
+function RevenueView({ location, fleet, locations, allLocations, onSelect, selectedRegion = "all", onSelectRegion }) {
   // Station curve controls
   const [period, setPeriod] = useState("day");
   const [selectedDate, setSelectedDate] = useState(getTodayDateStr);
@@ -4589,16 +4678,48 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
   const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
 
   // Fleet curve controls
-  const [fleetRegion, setFleetRegion] = useState(selectedRegion || "dki-jakarta");
+  const [fleetRegion, setFleetRegion] = useState(selectedRegion || "all");
   const [fleetPeriod, setFleetPeriod] = useState("day");
   const [fleetSelectedDate, setFleetSelectedDate] = useState(getTodayDateStr);
   const [fleetSelectedMonth, setFleetSelectedMonth] = useState(() => new Date().getMonth());
   const [fleetSelectedYear, setFleetSelectedYear] = useState(() => new Date().getFullYear());
 
+  useEffect(() => {
+    if (selectedRegion) {
+      setFleetRegion(selectedRegion);
+    }
+  }, [selectedRegion]);
+
   const pool = (allLocations && allLocations.length > 0) ? allLocations : (locations || []);
-  const hasLocations = Boolean(pool && pool.length > 0);
-  const activeStation = location || (hasLocations ? (pool.find((l) => l.source === "huawei") || pool[0]) : null);
-  const stationName = activeStation?.name || (hasLocations ? "Pilih PLTS" : "Tidak Ada PLTS");
+
+  const [localStationUid, setLocalStationUid] = useState(location?.uid || null);
+
+  useEffect(() => {
+    if (location?.uid) {
+      setLocalStationUid(location.uid);
+    }
+  }, [location?.uid]);
+
+  const activeStation = useMemo(() => {
+    if (localStationUid) {
+      const match = pool.find((l) => l.uid === localStationUid || l.id === localStationUid);
+      if (match) return match;
+    }
+    if (location) return location;
+    return (locations && locations.length > 0) ? locations[0] : (pool[0] || null);
+  }, [localStationUid, location, locations, pool]);
+
+  const handleSelectStation = useCallback((uid) => {
+    setLocalStationUid(uid);
+    if (onSelect) onSelect(uid);
+  }, [onSelect]);
+
+  const handleFleetRegionChange = useCallback((regId) => {
+    setFleetRegion(regId);
+    if (onSelectRegion) onSelectRegion(regId);
+  }, [onSelectRegion]);
+
+  const stationName = activeStation?.name || ((locations && locations.length > 0) ? "Pilih PLTS" : "Tidak Ada PLTS");
   const platformName = activeStation?.source
     ? (activeStation.source.charAt(0).toUpperCase() + activeStation.source.slice(1))
     : "—";
@@ -4964,10 +5085,12 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
         {/* Right: Dark Station List Card */}
         <div className="analytics-col-side">
           <StationListDarkCard
-            locations={pool}
+            locations={locations}
+            allLocations={allLocations}
             activeStation={activeStation}
-            onSelect={onSelect}
-            selectedRegion={selectedRegion}
+            onSelect={handleSelectStation}
+            selectedRegion={selectedRegion || "all"}
+            onSelectRegion={onSelectRegion}
           />
         </div>
       </div>
@@ -5032,7 +5155,7 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
                 {fleetPeriod === "year" && (
                   <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} />
                 )}
-                <RegionDropdownPill value={fleetRegion} onChange={setFleetRegion} />
+                <RegionDropdownPill value={fleetRegion} onChange={handleFleetRegionChange} />
                 <span className="unit-pill-badge">{fleetSeries?.unit || "IDR"}</span>
               </div>
             </div>
@@ -5354,23 +5477,56 @@ function EmissionProductionChart({ series, period }) {
   );
 }
 
-function EmissionView({ location, fleet, locations, allLocations, onSelect, selectedRegion = "dki-jakarta", onSelectRegion }) {
+function EmissionView({ location, fleet, locations, allLocations, onSelect, selectedRegion = "all", onSelectRegion }) {
   const [period, setPeriod] = useState("day");
   const [selectedDate, setSelectedDate] = useState(getTodayDateStr);
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
 
   // Fleet series states
-  const [fleetRegion, setFleetRegion] = useState(selectedRegion || "dki-jakarta");
+  const [fleetRegion, setFleetRegion] = useState(selectedRegion || "all");
   const [fleetPeriod, setFleetPeriod] = useState("day");
   const [fleetSelectedDate, setFleetSelectedDate] = useState(getTodayDateStr);
   const [fleetSelectedMonth, setFleetSelectedMonth] = useState(() => new Date().getMonth());
   const [fleetSelectedYear, setFleetSelectedYear] = useState(() => new Date().getFullYear());
 
+  useEffect(() => {
+    if (selectedRegion) {
+      setFleetRegion(selectedRegion);
+    }
+  }, [selectedRegion]);
+
   const pool = (allLocations && allLocations.length > 0) ? allLocations : (locations || []);
+
+  const [localStationUid, setLocalStationUid] = useState(location?.uid || null);
+
+  useEffect(() => {
+    if (location?.uid) {
+      setLocalStationUid(location.uid);
+    }
+  }, [location?.uid]);
+
+  const activeStation = useMemo(() => {
+    if (localStationUid) {
+      const match = pool.find((l) => l.uid === localStationUid || l.id === localStationUid);
+      if (match) return match;
+    }
+    if (location) return location;
+    return (locations && locations.length > 0) ? locations[0] : (pool[0] || null);
+  }, [localStationUid, location, locations, pool]);
+
+  const handleSelectStation = useCallback((uid) => {
+    setLocalStationUid(uid);
+    if (onSelect) onSelect(uid);
+  }, [onSelect]);
+
+  const handleFleetRegionChange = useCallback((regId) => {
+    setFleetRegion(regId);
+    if (onSelectRegion) onSelectRegion(regId);
+  }, [onSelectRegion]);
+
   const hasLocations = Boolean(pool && pool.length > 0);
-  const activeStation = location || (hasLocations ? (pool.find((l) => l.source === "huawei") || pool[0]) : null);
-  const stationName = activeStation?.name || (hasLocations ? "Pilih PLTS" : "Tidak Ada PLTS");
+  const stationName = activeStation?.name || ((locations && locations.length > 0) ? "Pilih PLTS" : "Tidak Ada PLTS");
   const platformName = activeStation?.source
     ? (activeStation.source.charAt(0).toUpperCase() + activeStation.source.slice(1))
     : "—";
@@ -5762,10 +5918,12 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
         {/* Right: Dark Station List Card */}
         <div className="analytics-col-side">
           <StationListDarkCard
-            locations={pool}
+            locations={locations}
+            allLocations={allLocations}
             activeStation={activeStation}
-            onSelect={onSelect}
-            selectedRegion={selectedRegion}
+            onSelect={handleSelectStation}
+            selectedRegion={selectedRegion || "all"}
+            onSelectRegion={onSelectRegion}
           />
         </div>
       </div>
@@ -5830,7 +5988,7 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
                 {fleetPeriod === "year" && (
                   <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} />
                 )}
-                <RegionDropdownPill value={fleetRegion} onChange={setFleetRegion} />
+                <RegionDropdownPill value={fleetRegion} onChange={handleFleetRegionChange} />
                 <span className="unit-pill-badge">{fleetSeries?.unit || "kg CO₂"}</span>
               </div>
             </div>
