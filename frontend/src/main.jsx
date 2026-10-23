@@ -1122,7 +1122,12 @@ function Dashboard({ session, onSignOut }) {
       {/* Top Nav Bar */}
       <header className="top-nav">
         <div className="top-nav-inner">
-          <div className="brand-section" onClick={() => setActiveTab("Overview")}>
+          <div
+            className="brand-section"
+            onClick={() => setActiveTab("Overview")}
+            title="Kembali ke Dashboard Utama"
+            style={{ cursor: "pointer" }}
+          >
             <SunFlowerIcon className="brand-logo-icon" />
             <div className="brand-text-wrap">
               <span className="brand-title">PLTS</span>
@@ -1131,26 +1136,19 @@ function Dashboard({ session, onSignOut }) {
           </div>
 
           <nav className="nav-tabs">
-            {/* Overview / Region Tab */}
+            {/* Region Filter Dropdown Tab */}
             <div style={{ position: "relative" }} ref={regionDropdownRef}>
               <button
                 type="button"
                 className={`nav-tab-btn ${activeTab === "Overview" ? "active" : ""}`}
-                onClick={() => {
-                  if (activeTab !== "Overview") {
-                    setActiveTab("Overview");
-                    setRegionDropdownOpen(false);
-                  } else {
-                    setRegionDropdownOpen(!regionDropdownOpen);
-                  }
-                }}
+                onClick={() => setRegionDropdownOpen(!regionDropdownOpen)}
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
                   gap: "6px",
                   cursor: "pointer",
                 }}
-                title={activeTab !== "Overview" ? "Kembali ke Dashboard Utama" : "Pilih Wilayah"}
+                title="Filter Wilayah"
               >
                 <span>{REGIONS.find((r) => r.id === selectedRegion)?.name || "DKI Jakarta"}</span>
                 <span
@@ -1159,11 +1157,6 @@ function Dashboard({ session, onSignOut }) {
                     opacity: 0.7,
                     transform: regionDropdownOpen ? "rotate(180deg)" : "none",
                     transition: "transform 0.2s",
-                    padding: "2px 4px",
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setRegionDropdownOpen(!regionDropdownOpen);
                   }}
                 >
                   ▾
@@ -1199,10 +1192,7 @@ function Dashboard({ session, onSignOut }) {
                       <button
                         key={reg.id}
                         type="button"
-                        onClick={() => {
-                          handleSelectRegion(reg.id);
-                          setActiveTab("Overview");
-                        }}
+                        onClick={() => handleSelectRegion(reg.id)}
                         style={{
                           width: "100%",
                           textAlign: "left",
