@@ -965,21 +965,43 @@ function Dashboard({ session, onSignOut }) {
           </div>
 
           <nav className="nav-tabs">
-            {/* Region Dropdown as the First Tab */}
+            {/* Overview / Region Tab */}
             <div style={{ position: "relative" }}>
               <button
                 type="button"
                 className={`nav-tab-btn ${activeTab === "Overview" ? "active" : ""}`}
-                onClick={() => setRegionDropdownOpen(!regionDropdownOpen)}
+                onClick={() => {
+                  if (activeTab !== "Overview") {
+                    setActiveTab("Overview");
+                    setRegionDropdownOpen(false);
+                  } else {
+                    setRegionDropdownOpen(!regionDropdownOpen);
+                  }
+                }}
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
                   gap: "6px",
                   cursor: "pointer",
                 }}
+                title={activeTab !== "Overview" ? "Kembali ke Dashboard Overview" : "Pilih Wilayah"}
               >
-                <span>{REGIONS.find((r) => r.id === selectedRegion)?.name || "DKI Jakarta"}</span>
-                <span style={{ fontSize: "9px", opacity: 0.7, transform: regionDropdownOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>▾</span>
+                <span>Overview ({REGIONS.find((r) => r.id === selectedRegion)?.shortName || "DKI Jakarta"})</span>
+                <span
+                  style={{
+                    fontSize: "9px",
+                    opacity: 0.7,
+                    transform: regionDropdownOpen ? "rotate(180deg)" : "none",
+                    transition: "transform 0.2s",
+                    padding: "2px 4px",
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setRegionDropdownOpen(!regionDropdownOpen);
+                  }}
+                >
+                  ▾
+                </span>
                 {activeTab === "Overview" && <span className="tab-active-dot" />}
               </button>
 
@@ -999,7 +1021,7 @@ function Dashboard({ session, onSignOut }) {
                   padding: "5px",
                 }}>
                   <div style={{ padding: "6px 10px 4px", fontSize: "10px", fontWeight: 700, color: "#6e8074", letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                    Filter Wilayah
+                    Filter Wilayah & Buka Overview
                   </div>
                   {REGIONS.map((reg) => {
                     const isRegSelected = reg.id === selectedRegion;
@@ -1011,7 +1033,10 @@ function Dashboard({ session, onSignOut }) {
                       <button
                         key={reg.id}
                         type="button"
-                        onClick={() => handleSelectRegion(reg.id)}
+                        onClick={() => {
+                          handleSelectRegion(reg.id);
+                          setActiveTab("Overview");
+                        }}
                         style={{
                           width: "100%",
                           textAlign: "left",
