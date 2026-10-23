@@ -1150,9 +1150,9 @@ function Dashboard({ session, onSignOut }) {
                   gap: "6px",
                   cursor: "pointer",
                 }}
-                title={activeTab !== "Overview" ? "Kembali ke Dashboard Overview" : "Pilih Wilayah"}
+                title={activeTab !== "Overview" ? "Kembali ke Dashboard Utama" : "Pilih Wilayah"}
               >
-                <span>Overview ({REGIONS.find((r) => r.id === selectedRegion)?.shortName || "DKI Jakarta"})</span>
+                <span>{REGIONS.find((r) => r.id === selectedRegion)?.name || "DKI Jakarta"}</span>
                 <span
                   style={{
                     fontSize: "9px",
@@ -1187,7 +1187,7 @@ function Dashboard({ session, onSignOut }) {
                   padding: "5px",
                 }}>
                   <div style={{ padding: "6px 10px 4px", fontSize: "10px", fontWeight: 700, color: "#6e8074", letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                    Filter Wilayah & Buka Overview
+                    Filter Wilayah
                   </div>
                   {REGIONS.map((reg) => {
                     const isRegSelected = reg.id === selectedRegion;
