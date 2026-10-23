@@ -3925,6 +3925,7 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
     if (onSelectRegion) onSelectRegion(regId);
   }, [onSelectRegion]);
 
+  const hasLocations = Boolean(pool && pool.length > 0);
   const stationName = activeStation?.name || ((locations && locations.length > 0) ? "Pilih PLTS" : "Tidak Ada PLTS");
   const platformName = activeStation?.source
     ? (activeStation.source.charAt(0).toUpperCase() + activeStation.source.slice(1))
@@ -4719,6 +4720,7 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
     if (onSelectRegion) onSelectRegion(regId);
   }, [onSelectRegion]);
 
+  const hasLocations = Boolean(pool && pool.length > 0);
   const stationName = activeStation?.name || ((locations && locations.length > 0) ? "Pilih PLTS" : "Tidak Ada PLTS");
   const platformName = activeStation?.source
     ? (activeStation.source.charAt(0).toUpperCase() + activeStation.source.slice(1))
