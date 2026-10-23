@@ -170,6 +170,22 @@ button {
   background: rgba(255, 255, 255, 0.14);
 }
 
+.operations-actions .site-picker-btn {
+  background: #111a14;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #f3f4f6;
+  padding: 7px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+
+.operations-actions .site-picker-btn:hover {
+  background: #1a251d;
+  border-color: rgba(52, 211, 153, 0.4);
+}
+
 .stream-status-pill {
   display: inline-flex;
   align-items: center;

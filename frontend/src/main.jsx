@@ -555,6 +555,157 @@ function useMonitoringData(session, onUnauthorized) {
   return { data, error, refresh };
 }
 
+function SitePickerDropdown({
+  selected,
+  locations,
+  selectedRegion,
+  isOpen,
+  onToggle,
+  onSelect,
+  dropdownRef,
+}) {
+  return (
+    <div style={{ position: "relative" }} ref={dropdownRef}>
+      <button
+        type="button"
+        className="site-picker-btn"
+        onClick={onToggle}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "7px",
+        }}
+        title="Pilih Stasiun PLTS"
+      >
+        <span
+          style={{
+            width: "7px",
+            height: "7px",
+            borderRadius: "50%",
+            flexShrink: 0,
+            background: selected?.status === "offline" || selected?.status === "disconnected" ? "#ef4444" : "#10b981",
+            boxShadow: selected?.status === "offline" || selected?.status === "disconnected"
+              ? "0 0 6px rgba(239, 68, 68, 0.7)"
+              : "0 0 6px rgba(16, 185, 129, 0.7)",
+          }}
+        />
+        <span>
+          {locations.length === 0
+            ? "0 PLTS Terpasang"
+            : (selected?.name ? (selected.name.length > 18 ? `${selected.name.slice(0, 18)}...` : selected.name) : "Pilih PLTS")}
+        </span>
+        <span style={{ fontSize: "10px", opacity: 0.6, transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>▾</span>
+      </button>
+      {isOpen && (
+        <div style={{
+          position: "absolute",
+          top: "100%",
+          left: 0,
+          marginTop: "6px",
+          background: "#111a14",
+          border: "1px solid rgba(255,255,255,0.12)",
+          borderRadius: "12px",
+          boxShadow: "0 10px 25px rgba(0,0,0,0.5)",
+          width: "270px",
+          zIndex: 1000,
+          display: "flex",
+          flexDirection: "column",
+          maxHeight: "min(75vh, 440px)",
+          padding: "4px",
+        }}>
+          <div style={{
+            padding: "6px 10px 6px",
+            fontSize: "10px",
+            fontWeight: 700,
+            color: "#6e8074",
+            letterSpacing: "0.05em",
+            textTransform: "uppercase",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            borderBottom: "1px solid rgba(255,255,255,0.06)",
+            marginBottom: "4px",
+            flexShrink: 0,
+          }}>
+            <span>Daftar PLTS ({REGIONS.find((r) => r.id === selectedRegion)?.shortName || "DKI Jakarta"})</span>
+            <span style={{ fontSize: "9px", opacity: 0.65 }}>{locations.length}</span>
+          </div>
+          <div
+            className="site-dropdown-scroll"
+            style={{
+              overflowY: "auto",
+              overflowX: "hidden",
+              display: "flex",
+              flexDirection: "column",
+              gap: "2px",
+              paddingRight: "2px",
+            }}
+          >
+            {locations.length === 0 ? (
+              <div style={{ padding: "14px 12px", color: "#6e8074", fontSize: "12px", textAlign: "center" }}>
+                Belum ada PLTS di wilayah ini
+              </div>
+            ) : (
+              locations.map((loc) => {
+                const isLocOffline = loc.status === "offline" || loc.status === "disconnected";
+                const isLocSelected = loc.uid === selected?.uid;
+                return (
+                  <button
+                    key={loc.uid}
+                    type="button"
+                    onClick={() => onSelect(loc.uid)}
+                    style={{
+                      width: "100%",
+                      textAlign: "left",
+                      padding: "8px 10px",
+                      background: isLocSelected ? "rgba(16,185,129,0.18)" : "transparent",
+                      color: isLocSelected ? "#34d399" : "#ffffff",
+                      border: "none",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                      fontWeight: isLocSelected ? "700" : "500",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: "8px",
+                      transition: "background 0.15s ease",
+                      flexShrink: 0,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isLocSelected) e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isLocSelected) e.currentTarget.style.background = "transparent";
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, overflow: "hidden" }}>
+                      <span
+                        style={{
+                          width: "7px",
+                          height: "7px",
+                          borderRadius: "50%",
+                          flexShrink: 0,
+                          background: isLocOffline ? "#ef4444" : "#10b981",
+                          boxShadow: isLocOffline
+                            ? "0 0 6px rgba(239, 68, 68, 0.7)"
+                            : "0 0 6px rgba(16, 185, 129, 0.7)",
+                        }}
+                      />
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{loc.name}</span>
+                    </div>
+                    <small style={{ color: "#7d8f82", fontSize: "10px", flexShrink: 0 }}>{loc.source}</small>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const auth = useAuthSession();
 
@@ -894,6 +1045,21 @@ function Dashboard({ session, onSignOut }) {
 
   const [regionDropdownOpen, setRegionDropdownOpen] = useState(false);
   const [siteDropdownOpen, setSiteDropdownOpen] = useState(false);
+  const siteDropdownRef = useRef(null);
+  const regionDropdownRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (siteDropdownRef.current && !siteDropdownRef.current.contains(event.target)) {
+        setSiteDropdownOpen(false);
+      }
+      if (regionDropdownRef.current && !regionDropdownRef.current.contains(event.target)) {
+        setRegionDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleSelectSite = useCallback((uid) => {
     setSelectedId(uid);
@@ -966,7 +1132,7 @@ function Dashboard({ session, onSignOut }) {
 
           <nav className="nav-tabs">
             {/* Overview / Region Tab */}
-            <div style={{ position: "relative" }}>
+            <div style={{ position: "relative" }} ref={regionDropdownRef}>
               <button
                 type="button"
                 className={`nav-tab-btn ${activeTab === "Overview" ? "active" : ""}`}
@@ -1102,145 +1268,6 @@ function Dashboard({ session, onSignOut }) {
           </nav>
 
           <div className="top-nav-controls">
-            {/* Site Picker Dropdown showing PLTS locations */}
-            <div style={{ position: "relative" }}>
-              <button
-                type="button"
-                className="site-picker-btn"
-                onClick={() => setSiteDropdownOpen(!siteDropdownOpen)}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "7px",
-                }}
-              >
-                <span
-                  style={{
-                    width: "7px",
-                    height: "7px",
-                    borderRadius: "50%",
-                    flexShrink: 0,
-                    background: selected?.status === "offline" || selected?.status === "disconnected" ? "#ef4444" : "#10b981",
-                    boxShadow: selected?.status === "offline" || selected?.status === "disconnected"
-                      ? "0 0 6px rgba(239, 68, 68, 0.7)"
-                      : "0 0 6px rgba(16, 185, 129, 0.7)",
-                  }}
-                />
-                <span>
-                  {locations.length === 0
-                    ? "0 PLTS Terpasang"
-                    : (selected?.name ? (selected.name.length > 15 ? `${selected.name.slice(0, 15)}...` : selected.name) : "Pilih PLTS")}
-                </span>
-                <span style={{ fontSize: "10px", opacity: 0.6 }}>▾</span>
-              </button>
-              {siteDropdownOpen && (
-                <div style={{
-                  position: "absolute",
-                  top: "100%",
-                  right: 0,
-                  marginTop: "6px",
-                  background: "#111a14",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  borderRadius: "12px",
-                  boxShadow: "0 10px 25px rgba(0,0,0,0.5)",
-                  width: "265px",
-                  zIndex: 300,
-                  display: "flex",
-                  flexDirection: "column",
-                  maxHeight: "min(75vh, 440px)",
-                  padding: "4px",
-                }}>
-                  <div style={{
-                    padding: "6px 10px 6px",
-                    fontSize: "10px",
-                    fontWeight: 700,
-                    color: "#6e8074",
-                    letterSpacing: "0.05em",
-                    textTransform: "uppercase",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    borderBottom: "1px solid rgba(255,255,255,0.06)",
-                    marginBottom: "4px",
-                    flexShrink: 0,
-                  }}>
-                    <span>Daftar PLTS ({REGIONS.find((r) => r.id === selectedRegion)?.shortName || "DKI Jakarta"})</span>
-                    <span style={{ fontSize: "9px", opacity: 0.65 }}>{locations.length}</span>
-                  </div>
-                  <div
-                    className="site-dropdown-scroll"
-                    style={{
-                      overflowY: "auto",
-                      overflowX: "hidden",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "2px",
-                      paddingRight: "2px",
-                    }}
-                  >
-                    {locations.length === 0 ? (
-                      <div style={{ padding: "14px 12px", color: "#6e8074", fontSize: "12px", textAlign: "center" }}>
-                        Belum ada PLTS di wilayah ini
-                      </div>
-                    ) : (
-                      locations.map((loc) => {
-                        const isLocOffline = loc.status === "offline" || loc.status === "disconnected";
-                        const isLocSelected = loc.uid === selected?.uid;
-                        return (
-                          <button
-                            key={loc.uid}
-                            type="button"
-                            onClick={() => handleSelectSite(loc.uid)}
-                            style={{
-                              width: "100%",
-                              textAlign: "left",
-                              padding: "8px 10px",
-                              background: isLocSelected ? "rgba(16,185,129,0.18)" : "transparent",
-                              color: isLocSelected ? "#34d399" : "#ffffff",
-                              border: "none",
-                              borderRadius: "8px",
-                              fontSize: "12px",
-                              fontWeight: isLocSelected ? "700" : "500",
-                              cursor: "pointer",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              gap: "8px",
-                              transition: "background 0.15s ease",
-                              flexShrink: 0,
-                            }}
-                            onMouseEnter={(e) => {
-                              if (!isLocSelected) e.currentTarget.style.background = "rgba(255,255,255,0.06)";
-                            }}
-                            onMouseLeave={(e) => {
-                              if (!isLocSelected) e.currentTarget.style.background = "transparent";
-                            }}
-                          >
-                            <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, overflow: "hidden" }}>
-                              <span
-                                style={{
-                                  width: "7px",
-                                  height: "7px",
-                                  borderRadius: "50%",
-                                  flexShrink: 0,
-                                  background: isLocOffline ? "#ef4444" : "#10b981",
-                                  boxShadow: isLocOffline
-                                    ? "0 0 6px rgba(239, 68, 68, 0.7)"
-                                    : "0 0 6px rgba(16, 185, 129, 0.7)",
-                                }}
-                              />
-                              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{loc.name}</span>
-                            </div>
-                            <small style={{ color: "#7d8f82", fontSize: "10px", flexShrink: 0 }}>{loc.source}</small>
-                          </button>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
             {/* Stream Status Pill */}
             <div className="stream-status-pill">
               <span className="pulse-dot" />
@@ -1292,6 +1319,17 @@ function Dashboard({ session, onSignOut }) {
             </div>
 
             <div className="operations-actions">
+              {/* Site Picker Dropdown (Moved to left of date) */}
+              <SitePickerDropdown
+                selected={selected}
+                locations={locations}
+                selectedRegion={selectedRegion}
+                isOpen={siteDropdownOpen}
+                onToggle={() => setSiteDropdownOpen(!siteDropdownOpen)}
+                onSelect={handleSelectSite}
+                dropdownRef={siteDropdownRef}
+              />
+
               <div className="date-badge">
                 <CalendarIcon style={{ width: "13px", height: "13px", color: "#6a7c70" }} />
                 <span>{formattedUpdatedDate}</span>
