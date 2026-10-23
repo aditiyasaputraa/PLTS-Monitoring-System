@@ -1929,26 +1929,64 @@ def normalize_kehua_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[d
                 "created_at": info.get("createTime"),
             })
 
-    topology = first_data(grouped, "getTopologyInfo")
-    if isinstance(topology, dict):
-        merge(only_station_key(by_id), {
-            "current_power_kw": power_to_kw(topology.get("outputPower"), topology.get("outputPowerUnit")),
-            "pv_power_kw": power_to_kw(topology.get("pvPower"), topology.get("pvPowerUnit")),
-            "grid_power_kw": power_to_kw(topology.get("gridPower"), topology.get("gridPowerUnit")),
-            "load_power_kw": power_to_kw(topology.get("loadPower"), topology.get("loadPowerUnit")),
-            "battery_power_kw": power_to_kw(topology.get("batteryPower"), topology.get("batteryPowerUnit")),
-            "output_power_kw": power_to_kw(topology.get("outputPower"), topology.get("outputPowerUnit")),
-            "soc_percent": to_float(topology.get("soc")),
-            "energy_flow": compact_non_null({
-                "pv_power_kw": power_to_kw(topology.get("pvPower"), topology.get("pvPowerUnit")),
-                "grid_power_kw": power_to_kw(topology.get("gridPower"), topology.get("gridPowerUnit")),
-                "load_power_kw": power_to_kw(topology.get("loadPower"), topology.get("loadPowerUnit")),
-                "battery_power_kw": power_to_kw(topology.get("batteryPower"), topology.get("batteryPowerUnit")),
-                "diesel_generator_power_kw": power_to_kw(topology.get("dieselGeneratorPower"), topology.get("dieselGeneratorPowerUnit")),
-                "output_power_kw": power_to_kw(topology.get("outputPower"), topology.get("outputPowerUnit")),
-                "soc_percent": to_float(topology.get("soc")),
-            }),
-        })
+    for call in grouped.get("getTopologyInfo", []):
+        topology = response_data(call)
+        if isinstance(topology, dict):
+            call_payload = parse_form_payload(str(call.get("payload_raw") or ""))
+            target_station_id = str(call_payload.get("stationId") or "")
+            key_to_merge = target_station_id if target_station_id in by_id else only_station_key(by_id)
+            if key_to_merge:
+                active_power = power_to_kw(topology.get("outputPower"), topology.get("outputPowerUnit"))
+                pv_power = power_to_kw(topology.get("pvPower"), topology.get("pvPowerUnit"))
+                merge(key_to_merge, {
+                    "current_power_kw": active_power if active_power is not None else pv_power,
+                    "pv_power_kw": pv_power,
+                    "grid_power_kw": power_to_kw(topology.get("gridPower"), topology.get("gridPowerUnit")),
+                    "load_power_kw": power_to_kw(topology.get("loadPower"), topology.get("loadPowerUnit")),
+                    "battery_power_kw": power_to_kw(topology.get("batteryPower"), topology.get("batteryPowerUnit")),
+                    "output_power_kw": active_power,
+                    "soc_percent": to_float(topology.get("soc")),
+                    "energy_flow": compact_non_null({
+                        "pv_power_kw": pv_power,
+                        "grid_power_kw": power_to_kw(topology.get("gridPower"), topology.get("gridPowerUnit")),
+                        "load_power_kw": power_to_kw(topology.get("loadPower"), topology.get("loadPowerUnit")),
+                        "battery_power_kw": power_to_kw(topology.get("batteryPower"), topology.get("batteryPowerUnit")),
+                        "diesel_generator_power_kw": power_to_kw(topology.get("dieselGeneratorPower"), topology.get("dieselGeneratorPowerUnit")),
+                        "output_power_kw": active_power,
+                        "soc_percent": to_float(topology.get("soc")),
+                    }),
+                })
+
+    for call in grouped.get("getPowerTrendChartOfStation", []):
+        chart_res = response_data(call)
+        if isinstance(chart_res, dict):
+            call_payload = parse_form_payload(str(call.get("payload_raw") or ""))
+            target_station_id = str(call_payload.get("stationId") or "")
+            key_to_merge = target_station_id if target_station_id in by_id else only_station_key(by_id)
+            if key_to_merge:
+                inner_data = chart_res.get("data")
+                if isinstance(inner_data, dict):
+                    for _, date_val in inner_data.items():
+                        if isinstance(date_val, dict):
+                            y_elec = date_val.get("y_data_elec") or date_val.get("y_data_grid") or []
+                            if isinstance(y_elec, list):
+                                valid_floats = []
+                                for item_val in y_elec:
+                                    try:
+                                        fv = float(item_val) if item_val is not None else None
+                                        if fv is not None and fv >= 0:
+                                            valid_floats.append(fv)
+                                    except (ValueError, TypeError):
+                                        pass
+                                if valid_floats:
+                                    last_power = valid_floats[-1]
+                                    if last_power > 0:
+                                        target_st = by_id.get(key_to_merge, {})
+                                        if not target_st.get("current_power_kw"):
+                                            merge(key_to_merge, {
+                                                "current_power_kw": round(last_power, 2),
+                                                "output_power_kw": round(last_power, 2),
+                                            })
 
     device_status = first_data(grouped, "getDeviceStatus")
     if isinstance(device_status, dict):

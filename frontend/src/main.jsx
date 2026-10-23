@@ -989,8 +989,18 @@ function Dashboard({ session, onSignOut }) {
         address = "SDN Sukapura 02 Pagi, Jl. Komp. KBN No. 2, Sukapura, Cilincing, Jakarta Utara 14140";
       }
 
+      const isOfflineStation = station.status === "offline" || station.status === "disconnected";
+      const resolvedPower = Number(
+        station.current_power_kw ??
+        station.output_power_kw ??
+        station.pv_power_kw ??
+        station.power_kw ??
+        (isOfflineStation ? 0 : (station.inverter_power_kw ?? 0))
+      );
+
       return {
         ...station,
+        current_power_kw: resolvedPower,
         id,
         name,
         latitude,
@@ -3585,7 +3595,7 @@ function StationListDarkCard({
             const isSelected = (loc.uid && activeStation?.uid && loc.uid === activeStation.uid) ||
               (loc.id && activeStation?.id && loc.id === activeStation.id) ||
               (loc.name && activeStation?.name && loc.name === activeStation.name);
-            const powerVal = Number(loc.current_power_kw ?? loc.power_kw ?? 0);
+            const powerVal = Number(loc.current_power_kw ?? loc.output_power_kw ?? loc.pv_power_kw ?? loc.power_kw ?? 0);
             const dailyVal = Number(loc.daily_energy_kwh ?? loc.today_energy_kwh ?? 0);
             const isOffline = loc.status === "offline" || loc.status === "disconnected" || (powerVal === 0 && dailyVal === 0);
 
@@ -4014,10 +4024,10 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
     return s.size > 0 ? s.size : 3;
   }, [pool]);
   const onlineCount = useMemo(() => {
-    return pool.filter((l) => l.status === "online" || (Number(l.current_power_kw || l.power_kw) > 0)).length;
+    return pool.filter((l) => l.status === "online" || (Number(l.current_power_kw ?? l.output_power_kw ?? l.pv_power_kw ?? l.power_kw ?? 0) > 0)).length;
   }, [pool]);
   const offlineCount = Math.max(0, totalSitesCount - onlineCount);
-  const currentPowerVal = formatNumber(activeStation?.current_power_kw ?? activeStation?.power_kw ?? 0, 2) + " kW";
+  const currentPowerVal = formatNumber(activeStation?.current_power_kw ?? activeStation?.output_power_kw ?? activeStation?.pv_power_kw ?? activeStation?.power_kw ?? 0, 2) + " kW";
 
   const series = useMemo(() => {
     if (!activeStation || !(activeStation.id || activeStation.station_id || activeStation.uid || activeStation.name)) {
