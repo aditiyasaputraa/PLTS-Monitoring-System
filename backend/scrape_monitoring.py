@@ -995,6 +995,20 @@ def kehua_extra_station_calls(
             },
             "payload_raw": f"companyId={company_id or ''}&areaCode={area_code or ''}&stationId={station_id}",
         })
+        calls.append({
+            "id": f"get_topology_info_{station_id}",
+            "site": "kehua",
+            "name": "getTopologyInfo",
+            "method": "POST",
+            "url": f"{base_url}/necp/server-maintenance/monitor/getTopologyInfo",
+            "headers": {
+                "Accept": "application/json, text/plain, */*",
+                "Content-Type": "application/x-www-form-urlencoded",
+                "clientType": "web",
+                "web_version": "3.0.4",
+            },
+            "payload_raw": f"stationId={station_id}",
+        })
         if company_id:
             calls.append({
                 "id": f"get_key_data_{station_id}",

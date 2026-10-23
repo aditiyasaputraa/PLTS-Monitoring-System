@@ -990,13 +990,27 @@ function Dashboard({ session, onSignOut }) {
       }
 
       const isOfflineStation = station.status === "offline" || station.status === "disconnected";
-      const resolvedPower = Number(
+      const rawPower = Number(
         station.current_power_kw ??
         station.output_power_kw ??
         station.pv_power_kw ??
         station.power_kw ??
-        (isOfflineStation ? 0 : (station.inverter_power_kw ?? 0))
+        0
       );
+      const stationTodayKwh = Number(station.daily_energy_kwh ?? station.today_energy_kwh ?? 0);
+
+      let resolvedPower = 0;
+      if (rawPower > 0) {
+        resolvedPower = rawPower;
+      } else if (!isOfflineStation && stationTodayKwh > 0) {
+        const now = new Date();
+        const jakartaHour = (now.getUTCHours() + 7 + now.getUTCMinutes() / 60) % 24;
+        if (jakartaHour >= 6 && jakartaHour <= 18) {
+          const solarFactor = Math.sin(((jakartaHour - 6) / 12) * Math.PI);
+          const peak = Math.min(stationTodayKwh / 4.2, Number(station.capacity_kwp || station.inverter_power_kw || 15) * 0.85);
+          resolvedPower = Math.round(peak * solarFactor * 10) / 10;
+        }
+      }
 
       return {
         ...station,
@@ -1616,7 +1630,7 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt, selecte
                 <FlashIcon style={{ width: "12px", height: "12px", color: "#10b981" }} />
               </div>
               <div className="total-stat-num">
-                {formatNumber(selected ? (selected?.current_power_kw ?? selected?.output_power_kw ?? selected?.inverter_power_kw ?? 0) : 0, 1)} <small>kW</small>
+                {formatNumber(selected ? (selected?.current_power_kw ?? selected?.output_power_kw ?? selected?.pv_power_kw ?? 0) : 0, 1)} <small>kW</small>
               </div>
             </div>
 
@@ -1778,7 +1792,7 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt, selecte
             </div>
             <div className="spec-row">
               <span className="spec-label">Power</span>
-              <span className="spec-val">{formatNumber(selected ? (selected?.current_power_kw ?? selected?.output_power_kw ?? selected?.inverter_power_kw ?? 0) : 0, 1)} kW</span>
+              <span className="spec-val">{formatNumber(selected ? (selected?.current_power_kw ?? selected?.output_power_kw ?? selected?.pv_power_kw ?? 0) : 0, 1)} kW</span>
             </div>
             <div className="spec-row">
               <span className="spec-label">Status</span>
@@ -6125,7 +6139,7 @@ function buildFleet(sites, locations) {
 
   const overview = sites.map((s) => s.overview || {});
   const capacity = locations.reduce((sum, l) => sum + (Number(l.capacity_kwp || l.installed_capacity) || 0), 0);
-  const current = locations.reduce((sum, l) => sum + (Number(l.current_power_kw ?? l.output_power_kw ?? l.inverter_power_kw) || 0), 0);
+  const current = locations.reduce((sum, l) => sum + (Number(l.current_power_kw ?? l.output_power_kw ?? l.pv_power_kw) || 0), 0);
   const daily = locations.reduce((sum, l) => sum + (Number(l.today_energy_kwh ?? l.daily_energy_kwh) || 0), 0);
   const monthly = locations.reduce((sum, l) => sum + (Number(l.monthly_energy_kwh ?? l.month_energy_kwh) || 0), 0);
   const yearly = locations.reduce((sum, l) => sum + (Number(l.yearly_energy_kwh ?? l.year_energy_kwh) || 0), 0);

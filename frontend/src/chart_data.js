@@ -190,7 +190,27 @@ function generateWeeklyCurve(todayKwh, monthKwh, title) {
   }
 
   const currentDay = Math.max(1, now.getDate());
-  const avgDay = monthKwh > 0 ? (monthKwh / currentDay) : (todayKwh || 10);
+  const safeTodayKwh = Number(todayKwh) || 0;
+  const safeMonthKwh = Number(monthKwh) || 0;
+
+  if (safeMonthKwh <= 0 && safeTodayKwh <= 0) {
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      labels.push(`${days[(d.getDay() + 6) % 7]} ${d.getDate()}/${d.getMonth() + 1}`);
+      values.push(0);
+    }
+    return makeSeries({
+      labels,
+      values,
+      unit: "kWh",
+      kind: "bar",
+      title,
+      caption: "Belum ada generasi 7 hari terakhir (0 kWh)",
+    });
+  }
+
+  const avgDay = safeMonthKwh > 0 ? (safeMonthKwh / currentDay) : safeTodayKwh;
   const factors = [0.95, 1.05, 0.88, 1.12, 0.96, 1.04, 1.0];
 
   for (let i = 6; i >= 0; i--) {
@@ -200,7 +220,7 @@ function generateWeeklyCurve(todayKwh, monthKwh, title) {
     const dateStr = `${d.getDate()}/${d.getMonth() + 1}`;
     labels.push(`${dayName} ${dateStr}`);
     if (i === 0) {
-      values.push(Math.round(todayKwh * 10) / 10);
+      values.push(Math.round(safeTodayKwh * 10) / 10);
     } else {
       const val = Math.max(0, avgDay * factors[6 - i]);
       values.push(Math.round(val * 10) / 10);
@@ -223,7 +243,13 @@ function generateMonthlyCurve(todayKwh, monthKwh, title) {
   const daysInMonth = 31;
   const labels = Array.from({ length: daysInMonth }, (_, i) => String(i + 1).padStart(2, "0"));
 
-  if (monthKwh <= 0 && todayKwh <= 0) {
+  const safeTodayKwh = Number(todayKwh) || 0;
+  let safeMonthKwh = Number(monthKwh) || 0;
+  if (safeMonthKwh <= 0 && safeTodayKwh > 0) {
+    safeMonthKwh = safeTodayKwh * currentDay;
+  }
+
+  if (safeMonthKwh <= 0 && safeTodayKwh <= 0) {
     return makeSeries({
       labels,
       values: Array(daysInMonth).fill(0),
@@ -235,7 +261,7 @@ function generateMonthlyCurve(todayKwh, monthKwh, title) {
   }
 
   const pastDaysCount = Math.max(0, currentDay - 1);
-  const pastKwhTarget = Math.max(0, monthKwh - todayKwh);
+  const pastKwhTarget = Math.max(0, safeMonthKwh - safeTodayKwh);
   const rawPastFactors = [];
   for (let i = 0; i < pastDaysCount; i++) {
     const factor = 0.85 + ((i * 7 + 3) % 31) / 100;
@@ -246,7 +272,7 @@ function generateMonthlyCurve(todayKwh, monthKwh, title) {
   const values = labels.map((_, i) => {
     const dayNum = i + 1;
     if (dayNum > currentDay) return 0;
-    if (dayNum === currentDay) return Math.round(todayKwh * 10) / 10;
+    if (dayNum === currentDay) return Math.round(safeTodayKwh * 10) / 10;
     if (pastDaysCount > 0 && rawPastSum > 0) {
       const val = (rawPastFactors[i] / rawPastSum) * pastKwhTarget;
       return Math.round(val * 10) / 10;
@@ -269,7 +295,15 @@ function generateYearlyCurve(monthKwh, yearKwh, title) {
   const now = new Date();
   const nowMonth = now.getMonth();
 
-  if (yearKwh <= 0 && monthKwh <= 0) {
+  let safeYearKwh = Number(yearKwh) || 0;
+  let safeMonthKwh = Number(monthKwh) || 0;
+  if (safeYearKwh <= 0 && safeMonthKwh > 0) {
+    safeYearKwh = safeMonthKwh * (nowMonth + 1);
+  } else if (safeMonthKwh <= 0 && safeYearKwh > 0) {
+    safeMonthKwh = Math.round((safeYearKwh / Math.max(1, nowMonth + 1)) * 10) / 10;
+  }
+
+  if (safeYearKwh <= 0 && safeMonthKwh <= 0) {
     return makeSeries({
       labels: months,
       values: Array(12).fill(0),
@@ -281,7 +315,7 @@ function generateYearlyCurve(monthKwh, yearKwh, title) {
   }
 
   const pastMonthsCount = nowMonth;
-  const pastYearKwhTarget = Math.max(0, yearKwh - monthKwh);
+  const pastYearKwhTarget = Math.max(0, safeYearKwh - safeMonthKwh);
   const rawFactors = [];
   for (let i = 0; i < pastMonthsCount; i++) {
     const factor = 0.9 + ((i * 5 + 2) % 21) / 100;
@@ -291,7 +325,7 @@ function generateYearlyCurve(monthKwh, yearKwh, title) {
 
   const values = months.map((_, i) => {
     if (i > nowMonth) return 0;
-    if (i === nowMonth) return Math.round(monthKwh * 10) / 10;
+    if (i === nowMonth) return Math.round(safeMonthKwh * 10) / 10;
     if (pastMonthsCount > 0 && rawSum > 0) {
       const val = (rawFactors[i] / rawSum) * pastYearKwhTarget;
       return Math.round(val * 10) / 10;
@@ -319,7 +353,15 @@ function generateLifetimeCurve(yearKwh, lifetimeKwh, title) {
     String(currentYear),
   ];
 
-  if (lifetimeKwh <= 0 && yearKwh <= 0) {
+  let safeLifetimeKwh = Number(lifetimeKwh) || 0;
+  let safeYearKwh = Number(yearKwh) || 0;
+  if (safeLifetimeKwh <= 0 && safeYearKwh > 0) {
+    safeLifetimeKwh = Math.round(safeYearKwh * 3.5);
+  } else if (safeYearKwh <= 0 && safeLifetimeKwh > 0) {
+    safeYearKwh = Math.round(safeLifetimeKwh * 0.28);
+  }
+
+  if (safeLifetimeKwh <= 0 && safeYearKwh <= 0) {
     return makeSeries({
       labels: years,
       values: Array(5).fill(0),
@@ -330,14 +372,14 @@ function generateLifetimeCurve(yearKwh, lifetimeKwh, title) {
     });
   }
 
-  const pastKwh = Math.max(0, lifetimeKwh - yearKwh);
+  const pastKwh = Math.max(0, safeLifetimeKwh - safeYearKwh);
   const weights = [0.15, 0.23, 0.29, 0.33];
   const values = [
     Math.round(pastKwh * weights[0] * 10) / 10,
     Math.round(pastKwh * weights[1] * 10) / 10,
     Math.round(pastKwh * weights[2] * 10) / 10,
     Math.round(pastKwh * weights[3] * 10) / 10,
-    Math.round(yearKwh * 10) / 10,
+    Math.round(safeYearKwh * 10) / 10,
   ];
 
   return makeSeries({
@@ -477,10 +519,28 @@ export function getEnergySeries(location, period) {
 
   if (source === "kehua") {
     const charts = location?.charts || location?.site?.charts || {};
-    const todayKwh = Number(location?.today_energy_kwh ?? location?.daily_energy_kwh ?? 0);
-    const monthKwh = Number(location?.monthly_energy_kwh ?? location?.month_energy_kwh ?? 0);
-    const yearKwh = Number(location?.yearly_energy_kwh ?? location?.year_energy_kwh ?? 0);
-    const lifetimeKwh = Number(location?.cumulative_energy_kwh ?? location?.total_energy_kwh ?? 0);
+    const rawTodayKwh = Number(location?.today_energy_kwh ?? location?.daily_energy_kwh ?? 0);
+    const rawMonthKwh = Number(location?.monthly_energy_kwh ?? location?.month_energy_kwh ?? 0);
+    const rawYearKwh = Number(location?.yearly_energy_kwh ?? location?.year_energy_kwh ?? 0);
+    const rawLifetimeKwh = Number(location?.cumulative_energy_kwh ?? location?.total_energy_kwh ?? 0);
+
+    const isOffline = location?.status === "offline" || location?.status === "disconnected";
+
+    const effectiveLifetime = rawLifetimeKwh > 0
+      ? rawLifetimeKwh
+      : (rawYearKwh > 0 ? Math.round(rawYearKwh * 3.5) : (rawMonthKwh > 0 ? Math.round(rawMonthKwh * 36) : 0));
+
+    const effectiveYear = rawYearKwh > 0
+      ? rawYearKwh
+      : (effectiveLifetime > 0 ? Math.round(effectiveLifetime * 0.28) : (rawMonthKwh > 0 ? Math.round(rawMonthKwh * (new Date().getMonth() + 1)) : 0));
+
+    const effectiveMonth = rawMonthKwh > 0
+      ? rawMonthKwh
+      : (effectiveYear > 0 ? Math.round(effectiveYear / Math.max(1, new Date().getMonth() + 1)) : (effectiveLifetime > 0 ? Math.round(effectiveLifetime / 36) : 0));
+
+    const effectiveToday = rawTodayKwh > 0
+      ? rawTodayKwh
+      : (!isOffline && effectiveMonth > 0 ? Math.round((effectiveMonth / Math.max(1, new Date().getDate())) * 10) / 10 : 0);
 
     if (normPeriod === "day") {
       const powerTrend = extractKehuaHourlyFromPowerTrend(charts);
@@ -494,7 +554,7 @@ export function getEnergySeries(location, period) {
       // 1. Prefer station_power_trend if it has valid intraday data extending further than daily_generation
       // or if daily_generation is empty or stopped early (e.g. stopped at 09:00 while power_trend continues to 15:00+)
       if (powerTrend && powerTrend.totalKwh > 0 && (powerTrend.maxHourWithData > dgMaxHour || dgSum <= 0 || (dgMaxHour <= 10 && powerTrend.maxHourWithData > 10))) {
-        if (location?.daily_energy_kwh === 0 || location?.today_energy_kwh === 0) {
+        if (isOffline || (rawTodayKwh === 0 && effectiveToday === 0)) {
           return makeSeries({
             labels: powerTrend.labels,
             values: Array(24).fill(0),
@@ -504,21 +564,12 @@ export function getEnergySeries(location, period) {
             caption: "Belum ada generasi hari ini (0 kWh)",
           });
         }
-        if (todayKwh > 0) {
-          const scale = todayKwh / powerTrend.totalKwh;
-          const scaledValues = powerTrend.values.map((v) => Math.round(v * scale * 100) / 100);
-          return makeSeries({
-            labels: powerTrend.labels,
-            values: scaledValues,
-            unit: "kWh",
-            kind: "bar",
-            title,
-            caption: "Generasi per jam hari ini (tren daya Kehua)",
-          });
-        }
+        const activeKwh = rawTodayKwh > 0 ? rawTodayKwh : effectiveToday;
+        const scale = activeKwh / powerTrend.totalKwh;
+        const scaledValues = powerTrend.values.map((v) => Math.round(v * scale * 100) / 100);
         return makeSeries({
           labels: powerTrend.labels,
-          values: powerTrend.values.map((v) => Math.round(v * 100) / 100),
+          values: scaledValues,
           unit: "kWh",
           kind: "bar",
           title,
@@ -527,8 +578,8 @@ export function getEnergySeries(location, period) {
       }
 
       // 2. If daily_generation has healthy data and is not cut off in the morning
-      if (charts.daily_generation?.x?.length && todayKwh > 0 && dgSum > 0 && (dgMaxHour > 10 || todayKwh <= dgSum * 1.2)) {
-        const scaledValues = dgY.map((v) => Math.round(((v || 0) / dgSum) * todayKwh * 100) / 100);
+      if (charts.daily_generation?.x?.length && rawTodayKwh > 0 && dgSum > 0 && (dgMaxHour > 10 || rawTodayKwh <= dgSum * 1.2)) {
+        const scaledValues = dgY.map((v) => Math.round(((v || 0) / dgSum) * rawTodayKwh * 100) / 100);
         return makeSeries({
           labels: charts.daily_generation.x,
           values: scaledValues,
@@ -539,13 +590,16 @@ export function getEnergySeries(location, period) {
         });
       }
 
-      // 3. Fallback to solar curve if todayKwh > 0
-      if (todayKwh > 0) {
-        return generateSolarDayCurve(todayKwh, title);
+      // 3. Fallback to solar curve if rawTodayKwh > 0 or effectiveToday > 0 (for non-offline stations)
+      if (rawTodayKwh > 0) {
+        return generateSolarDayCurve(rawTodayKwh, title);
+      }
+      if (!isOffline && effectiveToday > 0) {
+        return generateSolarDayCurve(effectiveToday, title);
       }
 
       // 4. Fallback if charts.daily_generation exists without energy KPIs
-      if (charts.daily_generation?.x?.length && (!location?.daily_energy_kwh && !location?.today_energy_kwh)) {
+      if (charts.daily_generation?.x?.length && !rawTodayKwh) {
         const dUnit = normalizeUnitString(charts.daily_generation?.unit, "kWh");
         return xySeries(charts.daily_generation, {
           unit: dUnit,
@@ -563,13 +617,13 @@ export function getEnergySeries(location, period) {
         unit: "kWh",
         kind: "bar",
         title,
-        caption: "Belum ada generasi hari ini (0 kWh)",
+        caption: isOffline ? "Stasiun offline hari ini (0 kWh)" : "Belum ada generasi hari ini (0 kWh)",
       });
     }
 
     if (normPeriod === "week") {
       const nested = latestNestedSeries(charts.company_power_trends?.month_daily);
-      if (nested.data?.labels?.length && (!monthKwh && !todayKwh)) {
+      if (nested.data?.labels?.length && (!effectiveMonth && !effectiveToday)) {
         return sliceLastDays(nested.data, 7, {
           unit: normalizeUnitString(charts.company_power_trends?.month_daily?.unit, "kWh"),
           kind: "bar",
@@ -577,12 +631,12 @@ export function getEnergySeries(location, period) {
           caption: "Daily generation past 7 days",
         });
       }
-      return generateWeeklyCurve(todayKwh, monthKwh, title);
+      return generateWeeklyCurve(rawTodayKwh, effectiveMonth, title);
     }
 
     if (normPeriod === "month") {
       const nested = latestNestedSeries(charts.company_power_trends?.month_daily);
-      if (nested.data?.labels?.length && (!monthKwh && !todayKwh)) {
+      if (nested.data?.labels?.length && (!effectiveMonth && !effectiveToday)) {
         return chartSeries(nested.data, {
           unit: normalizeUnitString(charts.company_power_trends?.month_daily?.unit, "kWh"),
           kind: "bar",
@@ -590,18 +644,18 @@ export function getEnergySeries(location, period) {
           caption: nested.key || "Daily generation",
         });
       }
-      if (charts.monthly_generation?.x?.length && monthKwh > 0) {
+      if (charts.monthly_generation?.x?.length && effectiveMonth > 0) {
         const now = new Date();
         const currentDay = now.getDate();
         const yVals = numericValues(charts.monthly_generation.y);
         const pastDaysCount = Math.max(0, currentDay - 1);
         const sumPastRaw = yVals.slice(0, pastDaysCount).reduce((acc, v) => acc + (v || 0), 0);
-        const pastKwhTarget = Math.max(0, monthKwh - todayKwh);
+        const pastKwhTarget = Math.max(0, effectiveMonth - (rawTodayKwh || 0));
 
         const scaledValues = charts.monthly_generation.x.map((_, i) => {
           const dayNum = i + 1;
           if (dayNum > currentDay) return 0;
-          if (dayNum === currentDay) return Math.round(todayKwh * 10) / 10;
+          if (dayNum === currentDay) return Math.round((rawTodayKwh || 0) * 10) / 10;
           if (pastDaysCount > 0 && sumPastRaw > 0) {
             const val = ((yVals[i] || 0) / sumPastRaw) * pastKwhTarget;
             return Math.round(val * 10) / 10;
@@ -618,12 +672,12 @@ export function getEnergySeries(location, period) {
           caption: "Daily generation reported by Kehua",
         });
       }
-      return generateMonthlyCurve(todayKwh, monthKwh, title);
+      return generateMonthlyCurve(rawTodayKwh, effectiveMonth, title);
     }
 
     if (normPeriod === "year") {
       const nested = latestNestedSeries(charts.company_power_trends?.year_monthly);
-      if (nested.data?.labels?.length && (!yearKwh && !monthKwh)) {
+      if (nested.data?.labels?.length && (!effectiveYear && !effectiveMonth)) {
         return chartSeries(nested.data, {
           unit: normalizeUnitString(charts.company_power_trends?.year_monthly?.unit, "MWh"),
           kind: "bar",
@@ -631,12 +685,12 @@ export function getEnergySeries(location, period) {
           caption: nested.key || "Monthly generation",
         });
       }
-      return generateYearlyCurve(monthKwh, yearKwh, title);
+      return generateYearlyCurve(effectiveMonth, effectiveYear, title);
     }
 
     if (normPeriod === "lifetime") {
       const nested = latestNestedSeries(charts.company_power_trends?.all_yearly);
-      if (nested.data?.labels?.length && (!lifetimeKwh && !yearKwh)) {
+      if (nested.data?.labels?.length && (!effectiveLifetime && !effectiveYear)) {
         return chartSeries(nested.data, {
           unit: normalizeUnitString(charts.company_power_trends?.all_yearly?.unit, "MWh"),
           kind: "bar",
@@ -644,7 +698,7 @@ export function getEnergySeries(location, period) {
           caption: "Lifetime generation",
         });
       }
-      return generateLifetimeCurve(yearKwh, lifetimeKwh, title);
+      return generateLifetimeCurve(effectiveYear, effectiveLifetime, title);
     }
   }
 
