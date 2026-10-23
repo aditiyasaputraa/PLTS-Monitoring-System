@@ -3572,31 +3572,7 @@ function StationListDarkCard({
   return (
     <div className="analytics-station-list-card">
       <div className="station-list-header">
-        <div style={{ display: "flex", alignItems: "center", gap: "6px", flex: 1, minWidth: 0 }}>
-          <span className="station-list-title">DAFTAR PLTS</span>
-          {onSelectRegion ? (
-            <select
-              value={selectedRegion || "all"}
-              onChange={(e) => onSelectRegion(e.target.value)}
-              className="station-list-region-dropdown"
-              title="Filter Wilayah"
-              aria-label="Filter Wilayah"
-            >
-              {REGIONS.map((r) => {
-                const count = r.id === "all"
-                  ? (allLocations?.length || locations?.length || 0)
-                  : (allLocations || locations || []).filter((l) => (l.region || getStationRegion(l)) === r.id).length;
-                return (
-                  <option key={r.id} value={r.id}>
-                    ({r.name.toUpperCase()}) · {count}
-                  </option>
-                );
-              })}
-            </select>
-          ) : (
-            <span className="station-list-title">({regionLabel.toUpperCase()})</span>
-          )}
-        </div>
+        <span className="station-list-title">DAFTAR PLTS ({regionLabel.toUpperCase()})</span>
         <span className="station-list-count">{displayLocations.length}</span>
       </div>
       <div className="station-list-body">
@@ -4411,7 +4387,6 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
                 {fleetPeriod === "year" && (
                   <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} />
                 )}
-                <RegionDropdownPill value={fleetRegion} onChange={handleFleetRegionChange} />
                 <span className="unit-pill-badge">{fleetSeries?.unit || "kWh"}</span>
               </div>
             </div>
@@ -5210,7 +5185,6 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
                 {fleetPeriod === "year" && (
                   <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} />
                 )}
-                <RegionDropdownPill value={fleetRegion} onChange={handleFleetRegionChange} />
                 <span className="unit-pill-badge">{fleetSeries?.unit || "IDR"}</span>
               </div>
             </div>
@@ -6043,7 +6017,6 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
                 {fleetPeriod === "year" && (
                   <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} />
                 )}
-                <RegionDropdownPill value={fleetRegion} onChange={handleFleetRegionChange} />
                 <span className="unit-pill-badge">{fleetSeries?.unit || "kg CO₂"}</span>
               </div>
             </div>
