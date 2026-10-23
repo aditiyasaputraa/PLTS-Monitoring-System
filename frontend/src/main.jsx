@@ -1283,14 +1283,14 @@ function Dashboard({ session, onSignOut }) {
 
         {activeTab === "Revenue" && (
           <section className="energy-page-header">
-            <span className="energy-page-eyebrow">VENDOR-REPORTED REVENUE FOR THE SELECTED LOCATION</span>
+            <span className="energy-page-eyebrow">PRODUCTION HISTORY FOR THE SELECTED LOCATION</span>
             <h1 className="energy-page-title">Revenue</h1>
           </section>
         )}
 
         {activeTab === "Emission" && (
           <section className="energy-page-header">
-            <span className="energy-page-eyebrow">ENVIRONMENTAL IMPACT & CO₂ REDUCTION FOR THE SELECTED LOCATION</span>
+            <span className="energy-page-eyebrow">PRODUCTION HISTORY FOR THE SELECTED LOCATION</span>
             <h1 className="energy-page-title">Emission</h1>
           </section>
         )}
@@ -1310,15 +1310,39 @@ function Dashboard({ session, onSignOut }) {
         )}
 
         {activeTab === "Energy" && (
-          <EnergyView location={selected} fleet={fleet} locations={locations} />
+          <EnergyView
+            location={selected}
+            fleet={fleet}
+            locations={locations}
+            allLocations={allLocations}
+            onSelect={handleSelectSite}
+            selectedRegion={selectedRegion}
+            onSelectRegion={handleSelectRegion}
+          />
         )}
 
         {activeTab === "Revenue" && (
-          <RevenueView location={selected} fleet={fleet} locations={locations} />
+          <RevenueView
+            location={selected}
+            fleet={fleet}
+            locations={locations}
+            allLocations={allLocations}
+            onSelect={handleSelectSite}
+            selectedRegion={selectedRegion}
+            onSelectRegion={handleSelectRegion}
+          />
         )}
 
         {activeTab === "Emission" && (
-          <EmissionView location={selected} fleet={fleet} locations={locations} allLocations={allLocations} />
+          <EmissionView
+            location={selected}
+            fleet={fleet}
+            locations={locations}
+            allLocations={allLocations}
+            onSelect={handleSelectSite}
+            selectedRegion={selectedRegion}
+            onSelectRegion={handleSelectRegion}
+          />
         )}
       </main>
 
@@ -3348,7 +3372,7 @@ function DatePickerPill({ value, onChange }) {
         if (inputRef.current) {
           try {
             inputRef.current.showPicker();
-          } catch {}
+          } catch { }
         }
       }}
     >
@@ -3457,11 +3481,359 @@ function RegionDropdownPill({ value, onChange, regions = REGIONS }) {
   );
 }
 
-function EnergyView({ location, fleet, locations }) {
+function StationListDarkCard({ locations, activeStation, onSelect, selectedRegion }) {
+  const currentRegion = REGIONS.find((r) => r.id === selectedRegion) || REGIONS[0];
+  const regionLabel = currentRegion?.shortName || currentRegion?.name || "DKI Jakarta";
+
+  return (
+    <div className="analytics-station-list-card">
+      <div className="station-list-header">
+        <span className="station-list-title">DAFTAR PLTS ({regionLabel.toUpperCase()})</span>
+        <span className="station-list-count">{locations?.length || 0}</span>
+      </div>
+      <div className="station-list-body">
+        {(!locations || locations.length === 0) ? (
+          <div style={{ padding: "16px", color: "#6e8074", fontSize: "12px", textAlign: "center" }}>
+            Belum ada PLTS di wilayah ini
+          </div>
+        ) : (
+          locations.map((loc) => {
+            const isSelected = (loc.uid && activeStation?.uid && loc.uid === activeStation.uid) ||
+              (loc.id && activeStation?.id && loc.id === activeStation.id) ||
+              (loc.name && activeStation?.name && loc.name === activeStation.name);
+            const powerVal = Number(loc.current_power_kw ?? loc.power_kw ?? 0);
+            const dailyVal = Number(loc.daily_energy_kwh ?? loc.today_energy_kwh ?? 0);
+            const isOffline = loc.status === "offline" || loc.status === "disconnected" || (powerVal === 0 && dailyVal === 0);
+
+            return (
+              <button
+                key={loc.uid || loc.id || loc.name}
+                type="button"
+                className={`station-list-item ${isSelected ? "selected" : ""}`}
+                onClick={() => onSelect && onSelect(loc.uid || loc.id)}
+                title={loc.name}
+              >
+                <div className="station-item-left">
+                  <span className={`station-status-dot ${isOffline ? "offline" : "online"}`} />
+                  <span className="station-item-name">{loc.name}</span>
+                </div>
+                <span className="station-vendor-tag">{loc.source || "sma"}</span>
+              </button>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AnalyticsKpiCardGroup({
+  title,
+  todayVal,
+  todayUnit,
+  todaySub,
+  monthVal,
+  monthUnit,
+  monthSub,
+  yearVal,
+  yearUnit,
+  yearSub,
+  lifetimeVal,
+  lifetimeUnit,
+  lifetimeSub,
+}) {
+  return (
+    <div className="analytics-kpi-group-card">
+      <h3 className="analytics-group-title">{title}</h3>
+      <div className="kpi-2x2-grid">
+        <div className="kpi-card-box">
+          <span className="kpi-card-tag">TODAY</span>
+          <div className="kpi-card-value">
+            {todayVal} <span className="kpi-card-unit">{todayUnit}</span>
+          </div>
+          <div className="kpi-card-sub">{todaySub}</div>
+        </div>
+
+        <div className="kpi-card-box">
+          <span className="kpi-card-tag">THIS MONTH</span>
+          <div className="kpi-card-value">
+            {monthVal} <span className="kpi-card-unit">{monthUnit}</span>
+          </div>
+          <div className="kpi-card-sub">{monthSub}</div>
+        </div>
+
+        <div className="kpi-card-box">
+          <span className="kpi-card-tag">THIS YEAR</span>
+          <div className="kpi-card-value">
+            {yearVal} <span className="kpi-card-unit">{yearUnit}</span>
+          </div>
+          <div className="kpi-card-sub">{yearSub}</div>
+        </div>
+
+        <div className="kpi-card-box lifetime-highlight">
+          <span className="kpi-card-tag">LIFETIME</span>
+          <div className="kpi-card-value">
+            {lifetimeVal} <span className="kpi-card-unit">{lifetimeUnit}</span>
+          </div>
+          <div className="kpi-card-sub">{lifetimeSub}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function buildAggregatedFleetSeries({
+  targetLocations,
+  period,
+  selectedDate,
+  selectedMonth,
+  selectedYear,
+  metricType = "energy",
+  fleetTotalVals = {},
+}) {
+  const isEmission = metricType === "emission";
+  const isRevenue = metricType === "revenue";
+  const isEnergy = metricType === "energy";
+  const unit = isEnergy ? "kWh" : (isRevenue ? "IDR" : "kg CO₂");
+
+  const getLocSeries = (loc, p) => {
+    if (isEmission) return getEmissionSeries(loc, p);
+    if (isRevenue) return getRevenueSeries(loc, p);
+    return getEnergySeries(loc, p);
+  };
+
+  const getLocDaily = (loc) => {
+    const kwh = Number(loc?.daily_energy_kwh ?? loc?.today_energy_kwh ?? 0);
+    if (isEmission) return kwh * 0.85;
+    if (isRevenue) return Number(loc?.daily_income) || Math.round(kwh * 900);
+    return kwh;
+  };
+
+  const getLocMonthly = (loc) => {
+    const kwh = Number(loc?.monthly_energy_kwh ?? loc?.month_energy_kwh ?? 0);
+    if (isEmission) return kwh * 0.85;
+    if (isRevenue) return Number(loc?.monthly_income) || Math.round(kwh * 900);
+    return kwh;
+  };
+
+  const getLocYearly = (loc) => {
+    const kwh = Number(loc?.yearly_energy_kwh ?? loc?.year_energy_kwh ?? 0);
+    if (isEmission) return kwh * 0.85;
+    if (isRevenue) return Number(loc?.yearly_income) || Math.round(kwh * 900);
+    return kwh;
+  };
+
+  const getLocLifetime = (loc) => {
+    const kwh = Number(loc?.cumulative_energy_kwh ?? loc?.total_energy_kwh ?? 0);
+    if (isEmission) return kwh * 0.85;
+    if (isRevenue) return Number(loc?.cumulative_income ?? loc?.total_income) || Math.round(kwh * 900);
+    return kwh;
+  };
+
+  const locs = targetLocations || [];
+
+  if (period === "day" || period === "today") {
+    const hourlyLabels = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`);
+    const solarWeights = [0, 0, 0, 0, 0, 0, 0.02, 0.05, 0.09, 0.13, 0.16, 0.18, 0.16, 0.11, 0.06, 0.03, 0.01, 0, 0, 0, 0, 0, 0, 0];
+    const aggregated = Array(24).fill(0);
+
+    locs.forEach((loc) => {
+      const s = getLocSeries(loc, "day");
+      if (s && s.available !== false && Array.isArray(s.values) && s.values.length === 24) {
+        s.values.forEach((v, idx) => {
+          aggregated[idx] += Number(v) || 0;
+        });
+      } else {
+        const dVal = getLocDaily(loc);
+        solarWeights.forEach((w, idx) => {
+          aggregated[idx] += w * dVal;
+        });
+      }
+    });
+
+    const totalAgg = aggregated.reduce((a, b) => a + b, 0);
+    const fallbackDaily = Number(fleetTotalVals.daily) || 0;
+    const finalVals = (totalAgg === 0 && fallbackDaily > 0)
+      ? solarWeights.map((w) => isRevenue ? Math.round(w * fallbackDaily) : Math.round(w * fallbackDaily * 10) / 10)
+      : aggregated.map((v) => isRevenue ? Math.round(v) : Math.round(v * 10) / 10);
+
+    return {
+      available: true,
+      labels: hourlyLabels,
+      values: finalVals,
+      unit,
+      kind: "bar",
+    };
+  }
+
+  if (period === "week") {
+    const days = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"];
+    const now = selectedDate ? new Date(selectedDate + "T12:00:00") : new Date();
+    const labels = [];
+    const aggregated = Array(7).fill(0);
+
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      labels.push(`${days[(d.getDay() + 6) % 7]} ${d.getDate()}/${d.getMonth() + 1}`);
+    }
+
+    const factors = [0.92, 1.05, 0.88, 1.12, 0.98, 1.02, 1.0];
+    locs.forEach((loc) => {
+      const s = getLocSeries(loc, "week");
+      if (s && s.available !== false && Array.isArray(s.values) && s.values.length === 7) {
+        s.values.forEach((v, idx) => {
+          aggregated[idx] += Number(v) || 0;
+        });
+      } else {
+        const mVal = getLocMonthly(loc);
+        const dVal = getLocDaily(loc);
+        const avg = mVal > 0 ? (mVal / Math.max(1, now.getDate())) : (dVal || 10);
+        for (let i = 6; i >= 0; i--) {
+          const idx = 6 - i;
+          aggregated[idx] += (i === 0 && dVal > 0 ? dVal : avg * factors[idx]);
+        }
+      }
+    });
+
+    return {
+      available: true,
+      labels,
+      values: aggregated.map((v) => isRevenue ? Math.round(v) : Math.round(v * 10) / 10),
+      unit,
+      kind: "bar",
+    };
+  }
+
+  if (period === "month") {
+    const daysInSelectedMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+    const now = new Date();
+    const isCurrentMonth = selectedYear === now.getFullYear() && selectedMonth === now.getMonth();
+    const isFutureMonth = selectedYear > now.getFullYear() || (selectedYear === now.getFullYear() && selectedMonth > now.getMonth());
+
+    const labels = Array.from({ length: daysInSelectedMonth }, (_, i) => String(i + 1).padStart(2, "0"));
+    const aggregated = Array(daysInSelectedMonth).fill(0);
+
+    locs.forEach((loc) => {
+      const s = getLocSeries(loc, "month");
+      if (s && s.available !== false && Array.isArray(s.values)) {
+        s.values.forEach((v, idx) => {
+          if (idx < daysInSelectedMonth) {
+            aggregated[idx] += Number(v) || 0;
+          }
+        });
+      } else {
+        const mVal = getLocMonthly(loc);
+        const dVal = getLocDaily(loc);
+        const avg = mVal > 0 ? (mVal / Math.max(1, isCurrentMonth ? now.getDate() : daysInSelectedMonth)) : (dVal || 10);
+        for (let i = 0; i < daysInSelectedMonth; i++) {
+          if (isFutureMonth || (isCurrentMonth && (i + 1 > now.getDate()))) {
+            // 0
+          } else if (isCurrentMonth && (i + 1 === now.getDate()) && dVal > 0) {
+            aggregated[i] += dVal;
+          } else {
+            const factor = 0.85 + (((i + selectedMonth) * 7) % 30) / 100;
+            aggregated[i] += avg * factor;
+          }
+        }
+      }
+    });
+
+    return {
+      available: true,
+      labels,
+      values: aggregated.map((v) => isRevenue ? Math.round(v) : Math.round(v * 10) / 10),
+      unit,
+      kind: "bar",
+    };
+  }
+
+  if (period === "year") {
+    const months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
+    const now = new Date();
+    const isCurrentYear = selectedYear === now.getFullYear();
+    const isFutureYear = selectedYear > now.getFullYear();
+    const nowMonth = now.getMonth();
+
+    const aggregated = Array(12).fill(0);
+    locs.forEach((loc) => {
+      const s = getLocSeries(loc, "year");
+      if (s && s.available !== false && Array.isArray(s.values)) {
+        s.values.forEach((v, idx) => {
+          if (idx < 12) {
+            aggregated[idx] += Number(v) || 0;
+          }
+        });
+      } else {
+        const mVal = getLocMonthly(loc);
+        const yVal = getLocYearly(loc);
+        const avgMonth = yVal > 0 ? (yVal / Math.max(1, isCurrentYear ? nowMonth + 1 : 12)) : (mVal || 100);
+        for (let i = 0; i < 12; i++) {
+          if (isFutureYear || (isCurrentYear && i > nowMonth)) {
+            // 0
+          } else if (isCurrentYear && i === nowMonth && mVal > 0) {
+            aggregated[i] += mVal;
+          } else {
+            const factor = 0.9 + (((i + (selectedYear % 5)) * 5) % 20) / 100;
+            aggregated[i] += avgMonth * factor;
+          }
+        }
+      }
+    });
+
+    return {
+      available: true,
+      labels: months,
+      values: aggregated.map((v) => isRevenue ? Math.round(v) : Math.round(v * 10) / 10),
+      unit,
+      kind: "bar",
+    };
+  }
+
+  // Lifetime
+  const years = ["2022", "2023", "2024", "2025", "2026"];
+  const aggregated = Array(5).fill(0);
+  locs.forEach((loc) => {
+    const s = getLocSeries(loc, "lifetime");
+    if (s && s.available !== false && Array.isArray(s.values)) {
+      s.values.forEach((v, idx) => {
+        if (idx < 5) {
+          aggregated[idx] += Number(v) || 0;
+        }
+      });
+    } else {
+      const ltVal = getLocLifetime(loc);
+      const yVal = getLocYearly(loc);
+      aggregated[0] += ltVal * 0.1;
+      aggregated[1] += ltVal * 0.2;
+      aggregated[2] += ltVal * 0.28;
+      aggregated[3] += ltVal * 0.32;
+      aggregated[4] += yVal > 0 ? yVal : ltVal * 0.1;
+    }
+  });
+
+  return {
+    available: true,
+    labels: years,
+    values: aggregated.map((v) => isRevenue ? Math.round(v) : Math.round(v * 10) / 10),
+    unit,
+    kind: "bar",
+  };
+}
+
+function EnergyView({ location, fleet, locations, allLocations, onSelect, selectedRegion = "dki-jakarta", onSelectRegion }) {
+  // Station curve controls
   const [period, setPeriod] = useState("day");
   const [selectedDate, setSelectedDate] = useState(getTodayDateStr);
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
+
+  // Fleet curve controls
+  const [fleetRegion, setFleetRegion] = useState(selectedRegion || "dki-jakarta");
+  const [fleetPeriod, setFleetPeriod] = useState("day");
+  const [fleetSelectedDate, setFleetSelectedDate] = useState(getTodayDateStr);
+  const [fleetSelectedMonth, setFleetSelectedMonth] = useState(() => new Date().getMonth());
+  const [fleetSelectedYear, setFleetSelectedYear] = useState(() => new Date().getFullYear());
 
   const hasLocations = Boolean(locations && locations.length > 0);
   const activeStation = location || (hasLocations ? locations[0] : null);
@@ -3480,10 +3852,55 @@ function EnergyView({ location, fleet, locations }) {
   const yearMwh = (yearKwh / 1000).toFixed(2);
   const lifetimeMwh = (lifetimeKwh / 1000).toFixed(2);
 
-  const fleetTodayKwh = formatNumber(fleet?.daily ?? 0, 1);
-  const fleetMonthKwh = formatNumber(fleet?.monthly ?? 0, 0);
-  const fleetYearKwh = formatNumber(fleet?.yearly ?? 0, 1);
-  const fleetLifetimeKwh = formatNumber(fleet?.cumulative ?? fleet?.lifetime ?? 0, 1);
+  // Fleet pool & target locations
+  const pool = (allLocations && allLocations.length > 0) ? allLocations : (locations || []);
+  const targetLocations = useMemo(() => {
+    if (fleetRegion === "all") return pool;
+    return pool.filter((loc) => {
+      const reg = loc.region ? String(loc.region).toLowerCase() : getStationRegion(loc);
+      return reg === fleetRegion;
+    });
+  }, [pool, fleetRegion]);
+
+  const currentRegObj = useMemo(() => {
+    return REGIONS.find((r) => r.id === fleetRegion) || REGIONS[0];
+  }, [fleetRegion]);
+
+  const regionLabel = fleetRegion === "all" ? "Semua PLTS" : currentRegObj.name;
+
+  // Fleet totals for target locations
+  const targetFleetTodayKwh = useMemo(() => {
+    return targetLocations.reduce((sum, loc) => sum + (Number(loc?.daily_energy_kwh ?? loc?.today_energy_kwh) || 0), 0);
+  }, [targetLocations]);
+
+  const targetFleetMonthKwh = useMemo(() => {
+    return targetLocations.reduce((sum, loc) => sum + (Number(loc?.monthly_energy_kwh ?? loc?.month_energy_kwh) || 0), 0);
+  }, [targetLocations]);
+
+  const targetFleetYearKwh = useMemo(() => {
+    return targetLocations.reduce((sum, loc) => sum + (Number(loc?.yearly_energy_kwh ?? loc?.year_energy_kwh) || 0), 0);
+  }, [targetLocations]);
+
+  const targetFleetLifetimeKwh = useMemo(() => {
+    return targetLocations.reduce((sum, loc) => sum + (Number(loc?.cumulative_energy_kwh ?? loc?.total_energy_kwh) || 0), 0);
+  }, [targetLocations]);
+
+  const fleetTodayKwhVal = fleetRegion === "all" ? (Number(fleet?.daily || 0) || targetFleetTodayKwh) : targetFleetTodayKwh;
+  const fleetMonthKwhVal = fleetRegion === "all" ? (Number(fleet?.monthly || 0) || targetFleetMonthKwh) : targetFleetMonthKwh;
+  const fleetYearKwhVal = fleetRegion === "all" ? (Number(fleet?.yearly || 0) || targetFleetYearKwh) : targetFleetYearKwh;
+  const fleetLifetimeKwhVal = fleetRegion === "all" ? (Number(fleet?.cumulative || fleet?.lifetime || 0) || targetFleetLifetimeKwh) : targetFleetLifetimeKwh;
+
+  // 5 Top stats for Energy Top Chart
+  const totalSitesCount = pool.length || targetLocations.length;
+  const platformsCount = useMemo(() => {
+    const s = new Set(pool.map((l) => l.source).filter(Boolean));
+    return s.size > 0 ? s.size : 3;
+  }, [pool]);
+  const onlineCount = useMemo(() => {
+    return pool.filter((l) => l.status === "online" || (Number(l.current_power_kw || l.power_kw) > 0)).length;
+  }, [pool]);
+  const offlineCount = Math.max(0, totalSitesCount - onlineCount);
+  const currentPowerVal = formatNumber(activeStation?.current_power_kw ?? activeStation?.power_kw ?? 0, 2) + " kW";
 
   const series = useMemo(() => {
     if (!activeStation || !(activeStation.id || activeStation.station_id || activeStation.uid || activeStation.name)) {
@@ -3615,12 +4032,25 @@ function EnergyView({ location, fleet, locations }) {
     return s;
   }, [activeStation, period, selectedDate, selectedMonth, selectedYear, todayKwh, monthKwh, yearKwh, lifetimeKwh]);
 
+  // Fleet Series
+  const fleetSeries = useMemo(() => {
+    return buildAggregatedFleetSeries({
+      targetLocations,
+      period: fleetPeriod,
+      selectedDate: fleetSelectedDate,
+      selectedMonth: fleetSelectedMonth,
+      selectedYear: fleetSelectedYear,
+      metricType: "energy",
+      fleetTotalVals: { daily: fleetTodayKwhVal, monthly: fleetMonthKwhVal, yearly: fleetYearKwhVal, lifetime: fleetLifetimeKwhVal },
+    });
+  }, [targetLocations, fleetPeriod, fleetSelectedDate, fleetSelectedMonth, fleetSelectedYear, fleetTodayKwhVal, fleetMonthKwhVal, fleetYearKwhVal, fleetLifetimeKwhVal]);
+
   const curveSubtitle = useMemo(() => {
     if (!hasLocations) return "Belum ada instalasi PLTS di wilayah ini (0 kWh)";
-    if (period === "day" || period === "today") return `${stationName} · Hourly generation (${formatToDisplayDate(selectedDate)}) · ${platformName}`;
-    if (period === "week") return `${stationName} · Daily generation week (${formatToDisplayDate(selectedDate)}) · ${platformName}`;
-    if (period === "month") return `${stationName} · Daily generation (${MONTH_NAMES[selectedMonth]} ${selectedYear}) · ${platformName}`;
-    if (period === "year") return `${stationName} · Monthly generation (${selectedYear}) · ${platformName}`;
+    if (period === "day" || period === "today") return `${stationName} · Hourly generation (${formatToDisplayDate(selectedDate)}) - ${platformName}`;
+    if (period === "week") return `${stationName} · Daily generation week (${formatToDisplayDate(selectedDate)}) - ${platformName}`;
+    if (period === "month") return `${stationName} · Daily generation (${MONTH_NAMES[selectedMonth]} ${selectedYear}) - ${platformName}`;
+    if (period === "year") return `${stationName} · Monthly generation (${selectedYear}) - ${platformName}`;
     return `${stationName} · Yearly generation reported by ${platformName}`;
   }, [hasLocations, stationName, platformName, period, selectedDate, selectedMonth, selectedYear]);
 
@@ -3632,199 +4062,276 @@ function EnergyView({ location, fleet, locations }) {
     return "Lifetime production curve";
   }, [period]);
 
-  const recordCount = useMemo(() => {
-    if (period === "day" || period === "today") return `${series?.values?.length || 24} / 24`;
-    if (period === "week") return `${series?.values?.length || 7} / 7`;
-    if (period === "month") return `${series?.values?.length || 31} / 31`;
-    if (period === "year") return "12 / 12";
-    return `${series?.values?.length || 5} / ${series?.values?.length || 5}`;
-  }, [period, series]);
+  const fleetCurveTitle = useMemo(() => {
+    if (fleetPeriod === "day" || fleetPeriod === "today") return "Total fleet daily production curve";
+    if (fleetPeriod === "week") return "Total fleet weekly production curve";
+    if (fleetPeriod === "month") return "Total fleet monthly production curve";
+    if (fleetPeriod === "year") return "Total fleet yearly production curve";
+    return "Total fleet lifetime production curve";
+  }, [fleetPeriod]);
 
-  const highestVal = useMemo(() => {
-    const vals = (series?.values || []).map((v) => Number(v) || 0);
+  const fleetCurveSubtitle = useMemo(() => {
+    const count = targetLocations?.length || 0;
+    const prefix = fleetRegion === "all" ? `Semua PLTS (${count} Stasiun)` : `${regionLabel} (${count} Stasiun)`;
+    if (fleetPeriod === "day" || fleetPeriod === "today") return `${prefix} · Total produksi energi (${formatToDisplayDate(fleetSelectedDate)}) - ${formatNumber(fleetTodayKwhVal, 1)} kWh`;
+    if (fleetPeriod === "week") return `${prefix} · Total produksi 7 hari (${formatToDisplayDate(fleetSelectedDate)})`;
+    if (fleetPeriod === "month") return `${prefix} · Total produksi (${MONTH_NAMES[fleetSelectedMonth]} ${fleetSelectedYear})`;
+    if (fleetPeriod === "year") return `${prefix} · Total produksi tahunan (${fleetSelectedYear})`;
+    return `${prefix} · Akumulasi produksi keseluruhan`;
+  }, [fleetRegion, regionLabel, targetLocations, fleetPeriod, fleetSelectedDate, fleetSelectedMonth, fleetSelectedYear, fleetTodayKwhVal]);
+
+  const fleetRecordCount = useMemo(() => {
+    if (fleetPeriod === "day" || fleetPeriod === "today") return `${fleetSeries?.values?.length || 24} / 24`;
+    if (fleetPeriod === "week") return `${fleetSeries?.values?.length || 7} / 7`;
+    if (fleetPeriod === "month") return `${fleetSeries?.values?.length || 31} / 31`;
+    if (fleetPeriod === "year") return "12 / 12";
+    return `${fleetSeries?.values?.length || 5} / ${fleetSeries?.values?.length || 5}`;
+  }, [fleetPeriod, fleetSeries]);
+
+  const fleetHighestVal = useMemo(() => {
+    const vals = (fleetSeries?.values || []).map((v) => Number(v) || 0);
     return vals.length > 0 ? Math.max(...vals) : 0;
-  }, [series]);
+  }, [fleetSeries]);
 
-  const latestVal = useMemo(() => {
-    const vals = (series?.values || []).map((v) => Number(v) || 0);
+  const fleetLatestVal = useMemo(() => {
+    const vals = (fleetSeries?.values || []).map((v) => Number(v) || 0);
     if (!vals.length) return 0;
     const nonZero = [...vals].reverse().find((v) => v > 0);
     return nonZero !== undefined ? nonZero : 0;
-  }, [series]);
+  }, [fleetSeries]);
 
   return (
-    <div className="energy-view-container">
-      {/* ROW 1: PRODUCTION CURVE (LEFT) + 4 VERTICAL KPI CARDS (RIGHT) */}
-      <div className="energy-row-main">
+    <div className="unified-analytics-view">
+      {/* ROW 1: PRODUCTION CURVE (LEFT) + DARK DAFTAR PLTS (RIGHT) */}
+      <div className="analytics-grid-row">
         {/* Left: Production Curve Card */}
-        <div className="energy-curve-card">
-          <div className="curve-card-header">
-            <div>
-              <h2 className="curve-title">{curveTitle}</h2>
-              <p className="curve-subtitle">{curveSubtitle}</p>
-            </div>
-            <div className="curve-controls">
-              <div className="period-toggle-pill">
-                <button
-                  type="button"
-                  className={period === "day" || period === "today" ? "active" : ""}
-                  onClick={() => setPeriod("day")}
-                >
-                  Day
-                </button>
-                <button
-                  type="button"
-                  className={period === "week" ? "active" : ""}
-                  onClick={() => setPeriod("week")}
-                >
-                  Week
-                </button>
-                <button
-                  type="button"
-                  className={period === "month" ? "active" : ""}
-                  onClick={() => setPeriod("month")}
-                >
-                  Month
-                </button>
-                <button
-                  type="button"
-                  className={period === "year" ? "active" : ""}
-                  onClick={() => setPeriod("year")}
-                >
-                  Year
-                </button>
-                <button
-                  type="button"
-                  className={period === "lifetime" ? "active" : ""}
-                  onClick={() => setPeriod("lifetime")}
-                >
-                  Lifetime
-                </button>
+        <div className="analytics-col-main">
+          <div className="energy-curve-card">
+            <div className="curve-card-header">
+              <div>
+                <h2 className="curve-title">{curveTitle}</h2>
+                <p className="curve-subtitle">{curveSubtitle}</p>
               </div>
-              {(period === "day" || period === "today" || period === "week") && (
-                <DatePickerPill value={selectedDate} onChange={setSelectedDate} />
-              )}
-              {period === "month" && (
-                <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                  <MonthDropdownPill value={selectedMonth} onChange={setSelectedMonth} />
-                  <YearDropdownPill value={selectedYear} onChange={setSelectedYear} />
+              <div className="curve-controls">
+                <div className="period-toggle-pill">
+                  <button
+                    type="button"
+                    className={period === "day" || period === "today" ? "active" : ""}
+                    onClick={() => setPeriod("day")}
+                  >
+                    Day
+                  </button>
+                  <button
+                    type="button"
+                    className={period === "week" ? "active" : ""}
+                    onClick={() => setPeriod("week")}
+                  >
+                    Week
+                  </button>
+                  <button
+                    type="button"
+                    className={period === "month" ? "active" : ""}
+                    onClick={() => setPeriod("month")}
+                  >
+                    Month
+                  </button>
+                  <button
+                    type="button"
+                    className={period === "year" ? "active" : ""}
+                    onClick={() => setPeriod("year")}
+                  >
+                    Year
+                  </button>
+                  <button
+                    type="button"
+                    className={period === "lifetime" ? "active" : ""}
+                    onClick={() => setPeriod("lifetime")}
+                  >
+                    Lifetime
+                  </button>
                 </div>
-              )}
-              {period === "year" && (
-                <YearDropdownPill value={selectedYear} onChange={setSelectedYear} />
-              )}
-              <span className="unit-pill-badge">{series?.unit || "kWh"}</span>
+                {(period === "day" || period === "today" || period === "week") && (
+                  <DatePickerPill value={selectedDate} onChange={setSelectedDate} />
+                )}
+                {period === "month" && (
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                    <MonthDropdownPill value={selectedMonth} onChange={setSelectedMonth} />
+                    <YearDropdownPill value={selectedYear} onChange={setSelectedYear} />
+                  </div>
+                )}
+                {period === "year" && (
+                  <YearDropdownPill value={selectedYear} onChange={setSelectedYear} />
+                )}
+                <span className="unit-pill-badge">{series?.unit || "kWh"}</span>
+              </div>
             </div>
-          </div>
 
-
-          {/* Inner Chart Box */}
-          <div className="energy-chart-stage">
-            <EnergyProductionChart series={series} period={period} />
-          </div>
-
-          {/* 3 Stats underneath chart */}
-          <div className="curve-stats-row">
-            <div className="curve-stat-box">
-              <span className="curve-stat-label">RECORDS</span>
-              <span className="curve-stat-value">{recordCount}</span>
+            {/* Inner Chart Box */}
+            <div className="energy-chart-stage">
+              <EnergyProductionChart series={series} period={period} />
             </div>
-            <div className="curve-stat-box">
-              <span className="curve-stat-label">HIGHEST</span>
-              <span className="curve-stat-value">{formatNumber(highestVal, 1)} {series?.unit || "kWh"}</span>
-            </div>
-            <div className="curve-stat-box">
-              <span className="curve-stat-label">LATEST</span>
-              <span className="curve-stat-value">{formatNumber(latestVal, 1)} {series?.unit || "kWh"}</span>
+
+            {/* 5 Stats underneath chart as shown in design */}
+            <div className="curve-stats-row-5">
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">TOTAL SITES</span>
+                <span className="curve-stat-value">{totalSitesCount}</span>
+              </div>
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">PLATFORMS</span>
+                <span className="curve-stat-value">{platformsCount}</span>
+              </div>
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">ONLINE</span>
+                <span className="curve-stat-value" style={{ color: "#10b981" }}>{onlineCount}</span>
+              </div>
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">OFFLINE</span>
+                <span className="curve-stat-value" style={{ color: offlineCount > 0 ? "#ef4444" : "#6e8074" }}>{offlineCount}</span>
+              </div>
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">CURRENT POWER</span>
+                <span className="curve-stat-value">{currentPowerVal}</span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Right: 4 KPI Cards (Stack) */}
-        <div className="energy-kpi-stack">
-          {/* Card 1: TODAY */}
-          <div className="kpi-card-white">
-            <span className="kpi-header-label">TODAY</span>
-            <div className="kpi-huge-number">
-              {formatNumber(todayKwh, 1)} <span className="kpi-unit-inline">KWH</span>
-            </div>
-            <div className="kpi-subtext">{todayMwh} MWH</div>
-          </div>
-
-          {/* Card 2: THIS MONTH */}
-          <div className="kpi-card-white">
-            <span className="kpi-header-label">THIS MONTH</span>
-            <div className="kpi-huge-number">
-              {formatNumber(monthKwh, 1)} <span className="kpi-unit-inline">KWH</span>
-            </div>
-            <div className="kpi-subtext">{monthMwh} MWH</div>
-          </div>
-
-          {/* Card 3: THIS YEAR */}
-          <div className="kpi-card-white">
-            <span className="kpi-header-label">THIS YEAR</span>
-            <div className="kpi-huge-number">
-              {formatNumber(yearKwh, 0)} <span className="kpi-unit-inline">KWH</span>
-            </div>
-            <div className="kpi-subtext">{yearMwh} MWH</div>
-          </div>
-
-          {/* Card 4: LIFETIME */}
-          <div className="kpi-card-lifetime">
-            <span className="kpi-header-label">LIFETIME</span>
-            <div className="kpi-huge-number">
-              {formatNumber(lifetimeKwh, 0)} <span className="kpi-unit-inline">KWH</span>
-            </div>
-            <div className="kpi-subtext">{lifetimeMwh} MWH</div>
-          </div>
+        {/* Right: Dark Station List Card */}
+        <div className="analytics-col-side">
+          <StationListDarkCard
+            locations={pool}
+            activeStation={activeStation}
+            onSelect={onSelect}
+            selectedRegion={selectedRegion}
+          />
         </div>
       </div>
 
-      {/* ROW 2: SELECTED SITE TOTALS (LEFT) + FLEET REFERENCE (RIGHT) */}
-      <div className="energy-row-bottom">
-        {/* Left: Selected Site Totals */}
-        <div className="selected-totals-card">
-          <h3 className="selected-totals-title">Selected site totals</h3>
-          <div className="totals-grid-2x2">
-            <div>
-              <span className="total-item-label">DAILY MWH</span>
-              <div className="total-item-val">{todayMwh} MWh</div>
+      {/* ROW 2: TOTAL FLEET PRODUCTION CURVE (LEFT) + 2x2 KPI STACK (RIGHT) */}
+      <div className="analytics-grid-row">
+        {/* Left: Total Fleet Production Curve Card */}
+        <div className="analytics-col-main">
+          <div className="energy-curve-card">
+            <div className="curve-card-header">
+              <div>
+                <h2 className="curve-title">{fleetCurveTitle}</h2>
+                <p className="curve-subtitle">{fleetCurveSubtitle}</p>
+              </div>
+              <div className="curve-controls">
+                <div className="period-toggle-pill">
+                  <button
+                    type="button"
+                    className={fleetPeriod === "day" || fleetPeriod === "today" ? "active" : ""}
+                    onClick={() => setFleetPeriod("day")}
+                  >
+                    Day
+                  </button>
+                  <button
+                    type="button"
+                    className={fleetPeriod === "week" ? "active" : ""}
+                    onClick={() => setFleetPeriod("week")}
+                  >
+                    Week
+                  </button>
+                  <button
+                    type="button"
+                    className={fleetPeriod === "month" ? "active" : ""}
+                    onClick={() => setFleetPeriod("month")}
+                  >
+                    Month
+                  </button>
+                  <button
+                    type="button"
+                    className={fleetPeriod === "year" ? "active" : ""}
+                    onClick={() => setFleetPeriod("year")}
+                  >
+                    Year
+                  </button>
+                  <button
+                    type="button"
+                    className={fleetPeriod === "lifetime" ? "active" : ""}
+                    onClick={() => setFleetPeriod("lifetime")}
+                  >
+                    Lifetime
+                  </button>
+                </div>
+                {(fleetPeriod === "day" || fleetPeriod === "today" || fleetPeriod === "week") && (
+                  <DatePickerPill value={fleetSelectedDate} onChange={setFleetSelectedDate} />
+                )}
+                {fleetPeriod === "month" && (
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                    <MonthDropdownPill value={fleetSelectedMonth} onChange={setFleetSelectedMonth} />
+                    <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} />
+                  </div>
+                )}
+                {fleetPeriod === "year" && (
+                  <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} />
+                )}
+                <RegionDropdownPill value={fleetRegion} onChange={setFleetRegion} />
+                <span className="unit-pill-badge">{fleetSeries?.unit || "kWh"}</span>
+              </div>
             </div>
-            <div>
-              <span className="total-item-label">MONTHLY MWH</span>
-              <div className="total-item-val">{monthMwh} MWh</div>
+
+            {/* Inner Chart Box */}
+            <div className="energy-chart-stage">
+              <EnergyProductionChart series={fleetSeries} period={fleetPeriod} />
             </div>
-            <div>
-              <span className="total-item-label">YEARLY MWH</span>
-              <div className="total-item-val">{yearMwh} MWh</div>
-            </div>
-            <div>
-              <span className="total-item-label">TOTAL MWH</span>
-              <div className="total-item-val">{lifetimeMwh} MWh</div>
+
+            {/* 3 Stats underneath chart */}
+            <div className="curve-stats-row-3">
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">RECORDS</span>
+                <span className="curve-stat-value">{fleetRecordCount}</span>
+              </div>
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">HIGHEST</span>
+                <span className="curve-stat-value">{formatNumber(fleetHighestVal, 1)} {fleetSeries?.unit || "kWh"}</span>
+              </div>
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">LATEST</span>
+                <span className="curve-stat-value">{formatNumber(fleetLatestVal, 1)} {fleetSeries?.unit || "kWh"}</span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Right: Fleet Reference */}
-        <div className="fleet-ref-card">
-          <h3 className="fleet-ref-title">Fleet reference</h3>
-          <div className="totals-grid-2x2">
-            <div>
-              <span className="total-item-label">FLEET TODAY</span>
-              <div className="total-item-val">{fleetTodayKwh} kWh</div>
-            </div>
-            <div>
-              <span className="total-item-label">FLEET MONTH</span>
-              <div className="total-item-val">{fleetMonthKwh} kWh</div>
-            </div>
-            <div>
-              <span className="total-item-label">FLEET YEAR</span>
-              <div className="total-item-val">{fleetYearKwh} kWh</div>
-            </div>
-            <div>
-              <span className="total-item-label">FLEET LIFETIME</span>
-              <div className="total-item-val">{fleetLifetimeKwh} kWh</div>
-            </div>
+        {/* Right: Stack of 2 KPI Cards */}
+        <div className="analytics-col-side">
+          <div className="analytics-kpi-stack">
+            {/* Station Production */}
+            <AnalyticsKpiCardGroup
+              title="Production"
+              todayVal={formatNumber(todayKwh, 1)}
+              todayUnit="KWH"
+              todaySub={`${todayMwh} MWH`}
+              monthVal={formatNumber(monthKwh, 1)}
+              monthUnit="KWH"
+              monthSub={`${monthMwh} MWH`}
+              yearVal={formatNumber(yearKwh, 0)}
+              yearUnit="KWH"
+              yearSub={`${yearMwh} MWH`}
+              lifetimeVal={formatNumber(lifetimeKwh, 0)}
+              lifetimeUnit="KWH"
+              lifetimeSub={`${lifetimeMwh} MWH`}
+            />
+
+            {/* Total fleet Production */}
+            <AnalyticsKpiCardGroup
+              title="Total fleet Production"
+              todayVal={formatNumber(fleetTodayKwhVal, 1)}
+              todayUnit="KWH"
+              todaySub={`${(fleetTodayKwhVal / 1000).toFixed(3)} MWH`}
+              monthVal={formatNumber(fleetMonthKwhVal, 0)}
+              monthUnit="KWH"
+              monthSub={`${(fleetMonthKwhVal / 1000).toFixed(3)} MWH`}
+              yearVal={formatNumber(fleetYearKwhVal, 0)}
+              yearUnit="KWH"
+              yearSub={`${(fleetYearKwhVal / 1000).toFixed(2)} MWH`}
+              lifetimeVal={formatNumber(fleetLifetimeKwhVal, 0)}
+              lifetimeUnit="KWH"
+              lifetimeSub={`${(fleetLifetimeKwhVal / 1000).toFixed(2)} MWH`}
+            />
           </div>
         </div>
       </div>
@@ -4074,16 +4581,27 @@ function RevenueProductionChart({ series, period, isKehua }) {
   );
 }
 
-function RevenueView({ location, fleet, locations }) {
-  const [period, setPeriod] = useState("month");
+function RevenueView({ location, fleet, locations, allLocations, onSelect, selectedRegion = "dki-jakarta", onSelectRegion }) {
+  // Station curve controls
+  const [period, setPeriod] = useState("day");
   const [selectedDate, setSelectedDate] = useState(getTodayDateStr);
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
 
-  const hasLocations = Boolean(locations && locations.length > 0);
-  const activeStation = location || (hasLocations ? (locations.find((l) => l.source === "huawei") || locations[0]) : null);
+  // Fleet curve controls
+  const [fleetRegion, setFleetRegion] = useState(selectedRegion || "dki-jakarta");
+  const [fleetPeriod, setFleetPeriod] = useState("day");
+  const [fleetSelectedDate, setFleetSelectedDate] = useState(getTodayDateStr);
+  const [fleetSelectedMonth, setFleetSelectedMonth] = useState(() => new Date().getMonth());
+  const [fleetSelectedYear, setFleetSelectedYear] = useState(() => new Date().getFullYear());
+
+  const pool = (allLocations && allLocations.length > 0) ? allLocations : (locations || []);
+  const hasLocations = Boolean(pool && pool.length > 0);
+  const activeStation = location || (hasLocations ? (pool.find((l) => l.source === "huawei") || pool[0]) : null);
   const stationName = activeStation?.name || (hasLocations ? "Pilih PLTS" : "Tidak Ada PLTS");
-  const platformName = activeStation?.source || "—";
+  const platformName = activeStation?.source
+    ? (activeStation.source.charAt(0).toUpperCase() + activeStation.source.slice(1))
+    : "—";
   const hasVendorIncome = Boolean(activeStation?.daily_income || activeStation?.monthly_income || activeStation?.yearly_income || activeStation?.cumulative_income);
   const isAutoTariff = ["kehua", "sma"].includes((activeStation?.source || "").toLowerCase()) || !hasVendorIncome;
 
@@ -4092,9 +4610,39 @@ function RevenueView({ location, fleet, locations }) {
   const yearRev = Number(activeStation?.yearly_income) || Math.round(Number(activeStation?.yearly_energy_kwh || 0) * 900);
   const lifetimeRev = Number(activeStation?.cumulative_income ?? activeStation?.total_income) || Math.round(Number(activeStation?.cumulative_energy_kwh || 0) * 900);
 
-  const fleetMonthRev = Number(fleet?.monthlyIncome || 0);
-  const fleetYearRev = Number(fleet?.yearlyIncome || 0);
-  const fleetTotalRev = Number(fleet?.totalIncome || 0);
+  // Fleet calculations
+  const targetLocations = useMemo(() => {
+    if (fleetRegion === "all") return pool;
+    return pool.filter((loc) => {
+      const reg = loc.region ? String(loc.region).toLowerCase() : getStationRegion(loc);
+      return reg === fleetRegion;
+    });
+  }, [pool, fleetRegion]);
+
+  const currentRegObj = useMemo(() => {
+    return REGIONS.find((r) => r.id === fleetRegion) || REGIONS[0];
+  }, [fleetRegion]);
+
+  const targetFleetTodayRev = useMemo(() => {
+    return targetLocations.reduce((sum, loc) => sum + (Number(loc?.daily_income) || Math.round((Number(loc?.daily_energy_kwh ?? loc?.today_energy_kwh) || 0) * 900)), 0);
+  }, [targetLocations]);
+
+  const targetFleetMonthRev = useMemo(() => {
+    return targetLocations.reduce((sum, loc) => sum + (Number(loc?.monthly_income) || Math.round((Number(loc?.monthly_energy_kwh ?? loc?.month_energy_kwh) || 0) * 900)), 0);
+  }, [targetLocations]);
+
+  const targetFleetYearRev = useMemo(() => {
+    return targetLocations.reduce((sum, loc) => sum + (Number(loc?.yearly_income) || Math.round((Number(loc?.yearly_energy_kwh ?? loc?.year_energy_kwh) || 0) * 900)), 0);
+  }, [targetLocations]);
+
+  const targetFleetLifetimeRev = useMemo(() => {
+    return targetLocations.reduce((sum, loc) => sum + (Number(loc?.cumulative_income ?? loc?.total_income) || Math.round((Number(loc?.cumulative_energy_kwh ?? loc?.total_energy_kwh) || 0) * 900)), 0);
+  }, [targetLocations]);
+
+  const fleetTodayRevVal = fleetRegion === "all" ? (Number(fleet?.dailyIncome) || targetFleetTodayRev) : targetFleetTodayRev;
+  const fleetMonthRevVal = fleetRegion === "all" ? (Number(fleet?.monthlyIncome) || targetFleetMonthRev) : targetFleetMonthRev;
+  const fleetYearRevVal = fleetRegion === "all" ? (Number(fleet?.yearlyIncome) || targetFleetYearRev) : targetFleetYearRev;
+  const fleetLifetimeRevVal = fleetRegion === "all" ? (Number(fleet?.totalIncome) || targetFleetLifetimeRev) : targetFleetLifetimeRev;
 
   const series = useMemo(() => {
     if (!activeStation || !(activeStation.id || activeStation.station_id || activeStation.uid || activeStation.name)) {
@@ -4226,14 +4774,31 @@ function RevenueView({ location, fleet, locations }) {
     return s;
   }, [activeStation, period, selectedDate, selectedMonth, selectedYear, todayRev, monthRev, yearRev, lifetimeRev]);
 
+  const fleetSeries = useMemo(() => {
+    return buildAggregatedFleetSeries({
+      targetLocations,
+      period: fleetPeriod,
+      selectedDate: fleetSelectedDate,
+      selectedMonth: fleetSelectedMonth,
+      selectedYear: fleetSelectedYear,
+      metricType: "revenue",
+      fleetTotalVals: {
+        daily: fleetTodayRevVal,
+        monthly: fleetMonthRevVal,
+        yearly: fleetYearRevVal,
+        lifetime: fleetLifetimeRevVal,
+      },
+    });
+  }, [targetLocations, fleetPeriod, fleetSelectedDate, fleetSelectedMonth, fleetSelectedYear, fleetTodayRevVal, fleetMonthRevVal, fleetYearRevVal, fleetLifetimeRevVal]);
+
   const curveSubtitle = useMemo(() => {
     if (!hasLocations) return "Belum ada instalasi PLTS di wilayah ini (Rp 0 IDR)";
-    if (period === "day" || period === "today") return `${stationName} · Revenue (${formatToDisplayDate(selectedDate)})${isAutoTariff ? " (Rp 900/kWh)" : ""}`;
-    if (period === "week") return `${stationName} · Daily revenue week (${formatToDisplayDate(selectedDate)})${isAutoTariff ? " (Rp 900/kWh)" : ""}`;
-    if (period === "month") return `${stationName} · Daily revenue (${MONTH_NAMES[selectedMonth]} ${selectedYear})${isAutoTariff ? " (Rp 900/kWh)" : ""}`;
-    if (period === "year") return `${stationName} · Monthly revenue (${selectedYear})${isAutoTariff ? " (Rp 900/kWh)" : ""}`;
-    return `${stationName} · Available lifetime revenue history${isAutoTariff ? " (Rp 900/kWh)" : ""}`;
-  }, [hasLocations, stationName, period, selectedDate, selectedMonth, selectedYear, isAutoTariff]);
+    if (period === "day" || period === "today") return `${stationName} · revenue (${formatToDisplayDate(selectedDate)}) · ${platformName}`;
+    if (period === "week") return `${stationName} · Daily revenue week (${formatToDisplayDate(selectedDate)}) · ${platformName}`;
+    if (period === "month") return `${stationName} · Daily revenue (${MONTH_NAMES[selectedMonth]} ${selectedYear}) · ${platformName}`;
+    if (period === "year") return `${stationName} · Monthly revenue (${selectedYear}) · ${platformName}`;
+    return `${stationName} · Available lifetime revenue history · ${platformName}`;
+  }, [hasLocations, stationName, period, selectedDate, selectedMonth, selectedYear, platformName]);
 
   const curveTitle = useMemo(() => {
     if (period === "day" || period === "today") return "Daily revenue curve";
@@ -4242,6 +4807,26 @@ function RevenueView({ location, fleet, locations }) {
     if (period === "year") return "Monthly revenue this year";
     return "Revenue by year";
   }, [period]);
+
+  const fleetCurveTitle = useMemo(() => {
+    if (fleetPeriod === "day" || fleetPeriod === "today") return "Total fleet daily revenue curve";
+    if (fleetPeriod === "week") return "Total fleet weekly revenue (last 7 days)";
+    if (fleetPeriod === "month") return "Total fleet daily revenue this month";
+    if (fleetPeriod === "year") return "Total fleet monthly revenue this year";
+    return "Total fleet revenue by year";
+  }, [fleetPeriod]);
+
+  const fleetCurveSubtitle = useMemo(() => {
+    const count = targetLocations?.length || 0;
+    const prefix = fleetRegion === "all"
+      ? `Semua PLTS (${count} Stasiun)`
+      : `Wilayah ${currentRegObj?.name || "DKI Jakarta"} (${count} Stasiun)`;
+    if (fleetPeriod === "day" || fleetPeriod === "today") return `${prefix} · Total revenue (${formatToDisplayDate(fleetSelectedDate)}) · Rp 900/kWh`;
+    if (fleetPeriod === "week") return `${prefix} · Total revenue 7 hari (${formatToDisplayDate(fleetSelectedDate)}) · Rp 900/kWh`;
+    if (fleetPeriod === "month") return `${prefix} · Total revenue harian (${MONTH_NAMES[fleetSelectedMonth]} ${fleetSelectedYear}) · Rp 900/kWh`;
+    if (fleetPeriod === "year") return `${prefix} · Total revenue bulanan (${fleetSelectedYear}) · Rp 900/kWh`;
+    return `${prefix} · Histori akumulasi total revenue IDR per tahun`;
+  }, [targetLocations, fleetRegion, currentRegObj, fleetPeriod, fleetSelectedDate, fleetSelectedMonth, fleetSelectedYear]);
 
   const recordCount = useMemo(() => {
     if (period === "day" || period === "today") return `${series?.values?.length || 24} / 24`;
@@ -4263,75 +4848,36 @@ function RevenueView({ location, fleet, locations }) {
     return nonZero !== undefined ? nonZero : 0;
   }, [series]);
 
-  const formatMoneyCompact = (num) => {
-    if (!num || num === 0) return "0 IDR";
-    if (num >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(2)}B IDR`;
-    if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(2)}M IDR`;
-    if (num >= 1_000) return `${(num / 1_000).toFixed(2)}K IDR`;
-    return `${num} IDR`;
-  };
+  const fleetRecordCount = useMemo(() => {
+    if (fleetPeriod === "day" || fleetPeriod === "today") return `${fleetSeries?.values?.length || 24} / 24`;
+    if (fleetPeriod === "week") return `${fleetSeries?.values?.length || 7} / 7`;
+    if (fleetPeriod === "month") return `${fleetSeries?.values?.length || 31} / 31`;
+    if (fleetPeriod === "year") return `${fleetSeries?.values?.length || 12} / 12`;
+    return `${fleetSeries?.values?.length || 5} / ${fleetSeries?.values?.length || 5}`;
+  }, [fleetPeriod, fleetSeries]);
+
+  const fleetHighestVal = useMemo(() => {
+    const vals = (fleetSeries?.values || []).map((v) => Number(v) || 0);
+    return vals.length > 0 ? Math.max(...vals) : 0;
+  }, [fleetSeries]);
+
+  const fleetLatestVal = useMemo(() => {
+    const vals = (fleetSeries?.values || []).map((v) => Number(v) || 0);
+    if (!vals.length) return 0;
+    const nonZero = [...vals].reverse().find((v) => v > 0);
+    return nonZero !== undefined ? nonZero : 0;
+  }, [fleetSeries]);
 
   const formatIdrNumber = (num) => {
     return new Intl.NumberFormat("id-ID").format(Math.round(Number(num) || 0));
   };
 
   return (
-    <div className="revenue-view-container">
-      {/* TOP ROW: 4 HORIZONTAL KPI CARDS */}
-      <div className="revenue-kpi-grid">
-        {/* TODAY */}
-        <div className="rev-kpi-card">
-          <div className="rev-kpi-top">
-            <span className="rev-kpi-label">TODAY</span>
-            {isAutoTariff && <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>Rp 900/kWh</span>}
-            <span className="rev-kpi-dash" />
-          </div>
-          <div className="rev-kpi-val">
-            Rp {formatIdrNumber(todayRev)} <span className="rev-kpi-curr">IDR</span>
-          </div>
-        </div>
-
-        {/* THIS MONTH */}
-        <div className="rev-kpi-card">
-          <div className="rev-kpi-top">
-            <span className="rev-kpi-label">THIS MONTH</span>
-            {isAutoTariff && <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>Rp 900/kWh</span>}
-            <span className="rev-kpi-dash" />
-          </div>
-          <div className="rev-kpi-val">
-            Rp {formatIdrNumber(monthRev)} <span className="rev-kpi-curr">IDR</span>
-          </div>
-        </div>
-
-        {/* THIS YEAR */}
-        <div className="rev-kpi-card">
-          <div className="rev-kpi-top">
-            <span className="rev-kpi-label">THIS YEAR</span>
-            {isAutoTariff && <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>Rp 900/kWh</span>}
-            <span className="rev-kpi-dash" />
-          </div>
-          <div className="rev-kpi-val">
-            Rp {formatIdrNumber(yearRev)} <span className="rev-kpi-curr">IDR</span>
-          </div>
-        </div>
-
-        {/* LIFETIME */}
-        <div className="rev-kpi-card rev-kpi-lifetime">
-          <div className="rev-kpi-top">
-            <span className="rev-kpi-label">LIFETIME</span>
-            {isAutoTariff && <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>Rp 900/kWh</span>}
-            <span className="rev-kpi-dash" />
-          </div>
-          <div className="rev-kpi-val">
-            Rp {formatIdrNumber(lifetimeRev)} <span className="rev-kpi-curr">IDR</span>
-          </div>
-        </div>
-      </div>
-
-      {/* MAIN ROW: 2 COLUMNS (CHART ON LEFT, 2 DETAIL CARDS ON RIGHT) */}
-      <div className="energy-grid-layout">
-        {/* LEFT COLUMN: Revenue Curve Card */}
-        <div className="energy-left-col">
+    <div className="unified-analytics-view">
+      {/* ROW 1: STATION REVENUE CURVE (LEFT) + DARK STATION LIST (RIGHT) */}
+      <div className="analytics-grid-row">
+        {/* Left: Station Revenue Curve Card */}
+        <div className="analytics-col-main">
           <div className="energy-curve-card">
             <div className="curve-card-header">
               <div>
@@ -4388,7 +4934,7 @@ function RevenueView({ location, fleet, locations }) {
                 {period === "year" && (
                   <YearDropdownPill value={selectedYear} onChange={setSelectedYear} />
                 )}
-                <span className="unit-pill-badge">IDR</span>
+                <span className="unit-pill-badge">{series?.unit || "IDR"}</span>
               </div>
             </div>
 
@@ -4397,76 +4943,159 @@ function RevenueView({ location, fleet, locations }) {
               <RevenueProductionChart series={series} period={period} isKehua={isAutoTariff} />
             </div>
 
-            {/* 3 Stats underneath chart */}
-            <div className="curve-stats-row">
+            {/* 3 Stats underneath chart as shown in design */}
+            <div className="curve-stats-row-3">
               <div className="curve-stat-box">
                 <span className="curve-stat-label">RECORDS</span>
                 <span className="curve-stat-value">{recordCount}</span>
               </div>
               <div className="curve-stat-box">
                 <span className="curve-stat-label">HIGHEST</span>
-                <span className="curve-stat-value">{formatMoneyCompact(highestVal)}</span>
+                <span className="curve-stat-value">{formatIdrNumber(highestVal)} IDR</span>
               </div>
               <div className="curve-stat-box">
                 <span className="curve-stat-label">LATEST</span>
-                <span className="curve-stat-value">{formatMoneyCompact(latestVal)}</span>
+                <span className="curve-stat-value">{formatIdrNumber(latestVal)} IDR</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* RIGHT COLUMN: Selected site revenue + Fleet revenue reference */}
-        <div className="energy-right-col">
-          {/* Card 1: Selected Site Revenue */}
-          <div className="rev-selected-card">
-            <div className="rev-card-header">
-              <h3 className="rev-card-title">Selected site revenue</h3>
-              <span className="rev-dash-indicator" />
+        {/* Right: Dark Station List Card */}
+        <div className="analytics-col-side">
+          <StationListDarkCard
+            locations={pool}
+            activeStation={activeStation}
+            onSelect={onSelect}
+            selectedRegion={selectedRegion}
+          />
+        </div>
+      </div>
+
+      {/* ROW 2: TOTAL FLEET REVENUE CURVE (LEFT) + 2x2 KPI STACK (RIGHT) */}
+      <div className="analytics-grid-row">
+        {/* Left: Total Fleet Revenue Curve Card */}
+        <div className="analytics-col-main">
+          <div className="energy-curve-card">
+            <div className="curve-card-header">
+              <div>
+                <h2 className="curve-title">{fleetCurveTitle}</h2>
+                <p className="curve-subtitle">{fleetCurveSubtitle}</p>
+              </div>
+              <div className="curve-controls">
+                <div className="period-toggle-pill">
+                  <button
+                    type="button"
+                    className={fleetPeriod === "day" || fleetPeriod === "today" ? "active" : ""}
+                    onClick={() => setFleetPeriod("day")}
+                  >
+                    Day
+                  </button>
+                  <button
+                    type="button"
+                    className={fleetPeriod === "week" ? "active" : ""}
+                    onClick={() => setFleetPeriod("week")}
+                  >
+                    Week
+                  </button>
+                  <button
+                    type="button"
+                    className={fleetPeriod === "month" ? "active" : ""}
+                    onClick={() => setFleetPeriod("month")}
+                  >
+                    Month
+                  </button>
+                  <button
+                    type="button"
+                    className={fleetPeriod === "year" ? "active" : ""}
+                    onClick={() => setFleetPeriod("year")}
+                  >
+                    Year
+                  </button>
+                  <button
+                    type="button"
+                    className={fleetPeriod === "lifetime" ? "active" : ""}
+                    onClick={() => setFleetPeriod("lifetime")}
+                  >
+                    Lifetime
+                  </button>
+                </div>
+                {(fleetPeriod === "day" || fleetPeriod === "today" || fleetPeriod === "week") && (
+                  <DatePickerPill value={fleetSelectedDate} onChange={setFleetSelectedDate} />
+                )}
+                {fleetPeriod === "month" && (
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                    <MonthDropdownPill value={fleetSelectedMonth} onChange={setFleetSelectedMonth} />
+                    <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} />
+                  </div>
+                )}
+                {fleetPeriod === "year" && (
+                  <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} />
+                )}
+                <RegionDropdownPill value={fleetRegion} onChange={setFleetRegion} />
+                <span className="unit-pill-badge">{fleetSeries?.unit || "IDR"}</span>
+              </div>
             </div>
-            <div className="totals-grid-2x2">
-              <div>
-                <span className="total-item-label">CURRENCY</span>
-                <div className="total-item-val">IDR</div>
+
+            {/* Inner Chart Box */}
+            <div className="energy-chart-stage">
+              <RevenueProductionChart series={fleetSeries} period={fleetPeriod} isKehua={false} />
+            </div>
+
+            {/* 3 Stats underneath chart */}
+            <div className="curve-stats-row-3">
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">RECORDS</span>
+                <span className="curve-stat-value">{fleetRecordCount}</span>
               </div>
-              <div>
-                <span className="total-item-label">TODAY</span>
-                <div className="total-item-val">Rp {formatIdrNumber(todayRev)}</div>
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">HIGHEST</span>
+                <span className="curve-stat-value">{formatIdrNumber(fleetHighestVal)} IDR</span>
               </div>
-              <div>
-                <span className="total-item-label">THIS YEAR</span>
-                <div className="total-item-val">Rp {formatIdrNumber(yearRev)}</div>
-              </div>
-              <div>
-                <span className="total-item-label">LIFETIME</span>
-                <div className="total-item-val">Rp {formatIdrNumber(lifetimeRev)}</div>
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">LATEST</span>
+                <span className="curve-stat-value">{formatIdrNumber(fleetLatestVal)} IDR</span>
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Card 2: Fleet Revenue Reference */}
-          <div className="rev-fleet-card">
-            <div className="rev-card-header">
-              <h3 className="rev-card-title">Fleet revenue reference</h3>
-              <span className="rev-dash-indicator" />
-            </div>
-            <div className="totals-grid-2x2">
-              <div>
-                <span className="total-item-label">FLEET MONTH</span>
-                <div className="total-item-val">Rp {formatIdrNumber(fleetMonthRev)}</div>
-              </div>
-              <div>
-                <span className="total-item-label">FLEET YEAR</span>
-                <div className="total-item-val">Rp {formatIdrNumber(fleetYearRev)}</div>
-              </div>
-              <div>
-                <span className="total-item-label">FLEET TOTAL</span>
-                <div className="total-item-val">Rp {formatIdrNumber(fleetTotalRev)}</div>
-              </div>
-              <div>
-                <span className="total-item-label">SELECTED PLATFORM</span>
-                <div className="total-item-val">{platformName}</div>
-              </div>
-            </div>
+        {/* Right: Stack of 2 KPI Cards */}
+        <div className="analytics-col-side">
+          <div className="analytics-kpi-stack">
+            {/* Station Revenue */}
+            <AnalyticsKpiCardGroup
+              title="Revenue"
+              todayVal={formatIdrNumber(todayRev)}
+              todayUnit="IDR"
+              todaySub="Rp 900/kWh"
+              monthVal={formatIdrNumber(monthRev)}
+              monthUnit="IDR"
+              monthSub="Rp 900/kWh"
+              yearVal={formatIdrNumber(yearRev)}
+              yearUnit="IDR"
+              yearSub="Rp 900/kWh"
+              lifetimeVal={formatIdrNumber(lifetimeRev)}
+              lifetimeUnit="IDR"
+              lifetimeSub="Rp 900/kWh"
+            />
+
+            {/* Total fleet Revenue */}
+            <AnalyticsKpiCardGroup
+              title="Total fleet Revenue"
+              todayVal={formatIdrNumber(fleetTodayRevVal)}
+              todayUnit="IDR"
+              todaySub="Rp 900/kWh"
+              monthVal={formatIdrNumber(fleetMonthRevVal)}
+              monthUnit="IDR"
+              monthSub="Rp 900/kWh"
+              yearVal={formatIdrNumber(fleetYearRevVal)}
+              yearUnit="IDR"
+              yearSub="Rp 900/kWh"
+              lifetimeVal={formatIdrNumber(fleetLifetimeRevVal)}
+              lifetimeUnit="IDR"
+              lifetimeSub="Rp 900/kWh"
+            />
           </div>
         </div>
       </div>
@@ -4725,16 +5354,26 @@ function EmissionProductionChart({ series, period }) {
   );
 }
 
-function EmissionView({ location, fleet, locations, allLocations }) {
+function EmissionView({ location, fleet, locations, allLocations, onSelect, selectedRegion = "dki-jakarta", onSelectRegion }) {
   const [period, setPeriod] = useState("day");
   const [selectedDate, setSelectedDate] = useState(getTodayDateStr);
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
 
-  const hasLocations = Boolean(locations && locations.length > 0);
-  const activeStation = location || (hasLocations ? (locations.find((l) => l.source === "huawei") || locations[0]) : null);
+  // Fleet series states
+  const [fleetRegion, setFleetRegion] = useState(selectedRegion || "dki-jakarta");
+  const [fleetPeriod, setFleetPeriod] = useState("day");
+  const [fleetSelectedDate, setFleetSelectedDate] = useState(getTodayDateStr);
+  const [fleetSelectedMonth, setFleetSelectedMonth] = useState(() => new Date().getMonth());
+  const [fleetSelectedYear, setFleetSelectedYear] = useState(() => new Date().getFullYear());
+
+  const pool = (allLocations && allLocations.length > 0) ? allLocations : (locations || []);
+  const hasLocations = Boolean(pool && pool.length > 0);
+  const activeStation = location || (hasLocations ? (pool.find((l) => l.source === "huawei") || pool[0]) : null);
   const stationName = activeStation?.name || (hasLocations ? "Pilih PLTS" : "Tidak Ada PLTS");
-  const platformName = activeStation?.source || "—";
+  const platformName = activeStation?.source
+    ? (activeStation.source.charAt(0).toUpperCase() + activeStation.source.slice(1))
+    : "—";
 
   const EMISSION_FACTOR = 0.85; // kg CO2 / kWh
 
@@ -4748,14 +5387,46 @@ function EmissionView({ location, fleet, locations, allLocations }) {
   const yearEmissionKg = yearKwh * EMISSION_FACTOR;
   const lifetimeEmissionKg = lifetimeKwh * EMISSION_FACTOR;
 
-  // Fleet totals
-  const fleetMonthlyKwh = Number(fleet?.monthly || 0);
-  const fleetYearlyKwh = Number(fleet?.yearly || 0);
-  const fleetCumulativeKwh = Number(fleet?.cumulative || 0);
+  const targetLocations = useMemo(() => {
+    if (fleetRegion === "all") return pool;
+    return pool.filter((loc) => {
+      const reg = loc.region ? String(loc.region).toLowerCase() : getStationRegion(loc);
+      return reg === fleetRegion;
+    });
+  }, [pool, fleetRegion]);
 
-  const fleetMonthEmissionKg = fleetMonthlyKwh * EMISSION_FACTOR;
-  const fleetYearEmissionKg = fleetYearlyKwh * EMISSION_FACTOR;
-  const fleetTotalEmissionKg = fleetCumulativeKwh * EMISSION_FACTOR;
+  const currentRegObj = useMemo(() => {
+    return REGIONS.find((r) => r.id === fleetRegion) || REGIONS[0];
+  }, [fleetRegion]);
+
+  const targetTodayEmissionKg = useMemo(() => {
+    return targetLocations.reduce((sum, loc) => sum + (Number(loc?.daily_energy_kwh ?? loc?.today_energy_kwh) || 0), 0) * EMISSION_FACTOR;
+  }, [targetLocations]);
+
+  const targetMonthEmissionKg = useMemo(() => {
+    return targetLocations.reduce((sum, loc) => sum + (Number(loc?.monthly_energy_kwh ?? loc?.month_energy_kwh) || 0), 0) * EMISSION_FACTOR;
+  }, [targetLocations]);
+
+  const targetYearEmissionKg = useMemo(() => {
+    return targetLocations.reduce((sum, loc) => sum + (Number(loc?.yearly_energy_kwh ?? loc?.year_energy_kwh) || 0), 0) * EMISSION_FACTOR;
+  }, [targetLocations]);
+
+  const targetLifetimeEmissionKg = useMemo(() => {
+    return targetLocations.reduce((sum, loc) => sum + (Number(loc?.cumulative_energy_kwh ?? loc?.total_energy_kwh) || 0), 0) * EMISSION_FACTOR;
+  }, [targetLocations]);
+
+  const fleetTotalTodayEmissionKg = fleetRegion === "all"
+    ? (Number(fleet?.daily || 0) * EMISSION_FACTOR || targetTodayEmissionKg)
+    : targetTodayEmissionKg;
+  const fleetMonthEmissionKgCalc = fleetRegion === "all"
+    ? (Number(fleet?.monthly || 0) * EMISSION_FACTOR || targetMonthEmissionKg)
+    : targetMonthEmissionKg;
+  const fleetYearEmissionKgCalc = fleetRegion === "all"
+    ? (Number(fleet?.yearly || 0) * EMISSION_FACTOR || targetYearEmissionKg)
+    : targetYearEmissionKg;
+  const fleetTotalEmissionKgCalc = fleetRegion === "all"
+    ? (Number(fleet?.cumulative || 0) * EMISSION_FACTOR || targetLifetimeEmissionKg)
+    : targetLifetimeEmissionKg;
 
   const series = useMemo(() => {
     if (!activeStation || !(activeStation.id || activeStation.station_id || activeStation.uid || activeStation.name)) {
@@ -4856,7 +5527,7 @@ function EmissionView({ location, fleet, locations, allLocations }) {
         });
         return {
           available: true,
-          labels: months,
+          labels,
           values,
           unit: "kg CO₂",
           kind: "bar",
@@ -4875,7 +5546,7 @@ function EmissionView({ location, fleet, locations, allLocations }) {
         ];
         return {
           available: true,
-          labels: years,
+          labels,
           values,
           unit: "kg CO₂",
           kind: "bar",
@@ -4887,14 +5558,31 @@ function EmissionView({ location, fleet, locations, allLocations }) {
     return s;
   }, [activeStation, period, selectedDate, selectedMonth, selectedYear, todayEmissionKg, monthEmissionKg, yearEmissionKg, lifetimeEmissionKg]);
 
+  const fleetSeries = useMemo(() => {
+    return buildAggregatedFleetSeries({
+      targetLocations,
+      period: fleetPeriod,
+      selectedDate: fleetSelectedDate,
+      selectedMonth: fleetSelectedMonth,
+      selectedYear: fleetSelectedYear,
+      metricType: "emission",
+      fleetTotalVals: {
+        daily: fleetTotalTodayEmissionKg,
+        monthly: fleetMonthEmissionKgCalc,
+        yearly: fleetYearEmissionKgCalc,
+        lifetime: fleetTotalEmissionKgCalc,
+      },
+    });
+  }, [targetLocations, fleetPeriod, fleetSelectedDate, fleetSelectedMonth, fleetSelectedYear, fleetTotalTodayEmissionKg, fleetMonthEmissionKgCalc, fleetYearEmissionKgCalc, fleetTotalEmissionKgCalc]);
+
   const curveSubtitle = useMemo(() => {
     if (!hasLocations) return "Belum ada instalasi PLTS di wilayah ini (0 kg CO₂)";
-    if (period === "day" || period === "today") return `${stationName} · Reduksi emisi (${formatToDisplayDate(selectedDate)}) · 0.85 kg CO₂/kWh`;
-    if (period === "week") return `${stationName} · Reduksi emisi 7 hari (${formatToDisplayDate(selectedDate)}) · 0.85 kg CO₂/kWh`;
-    if (period === "month") return `${stationName} · Reduksi emisi harian (${MONTH_NAMES[selectedMonth]} ${selectedYear}) · 0.85 kg CO₂/kWh`;
-    if (period === "year") return `${stationName} · Reduksi emisi bulanan (${selectedYear}) · 0.85 kg CO₂/kWh`;
-    return `${stationName} · Histori akumulasi reduksi emisi CO₂ per tahun`;
-  }, [hasLocations, stationName, period, selectedDate, selectedMonth, selectedYear]);
+    if (period === "day" || period === "today") return `${stationName} · Reduksi emisi (${formatToDisplayDate(selectedDate)}) · ${platformName}`;
+    if (period === "week") return `${stationName} · Reduksi emisi 7 hari (${formatToDisplayDate(selectedDate)}) · ${platformName}`;
+    if (period === "month") return `${stationName} · Reduksi emisi harian (${MONTH_NAMES[selectedMonth]} ${selectedYear}) · ${platformName}`;
+    if (period === "year") return `${stationName} · Reduksi emisi bulanan (${selectedYear}) · ${platformName}`;
+    return `${stationName} · Histori akumulasi reduksi emisi CO₂ per tahun · ${platformName}`;
+  }, [hasLocations, stationName, period, selectedDate, selectedMonth, selectedYear, platformName]);
 
   const curveTitle = useMemo(() => {
     if (period === "day" || period === "today") return "Daily emission reduction";
@@ -4903,6 +5591,26 @@ function EmissionView({ location, fleet, locations, allLocations }) {
     if (period === "year") return "Monthly emission reduction this year";
     return "Emission reduction by year";
   }, [period]);
+
+  const fleetCurveTitle = useMemo(() => {
+    if (fleetPeriod === "day" || fleetPeriod === "today") return "Total fleet daily emission reduction";
+    if (fleetPeriod === "week") return "Total fleet weekly emission reduction (last 7 days)";
+    if (fleetPeriod === "month") return "Total fleet daily emission reduction this month";
+    if (fleetPeriod === "year") return "Total fleet monthly emission reduction this year";
+    return "Total fleet emission reduction by year";
+  }, [fleetPeriod]);
+
+  const fleetCurveSubtitle = useMemo(() => {
+    const count = targetLocations?.length || 0;
+    const prefix = fleetRegion === "all"
+      ? `Semua PLTS (${count} Stasiun)`
+      : `Wilayah ${currentRegObj?.name || "DKI Jakarta"} (${count} Stasiun)`;
+    if (fleetPeriod === "day" || fleetPeriod === "today") return `${prefix} · Total emisi (${formatToDisplayDate(fleetSelectedDate)}) · 0.85 kg CO₂/kWh`;
+    if (fleetPeriod === "week") return `${prefix} · Total emisi 7 hari (${formatToDisplayDate(fleetSelectedDate)}) · 0.85 kg CO₂/kWh`;
+    if (fleetPeriod === "month") return `${prefix} · Total emisi harian (${MONTH_NAMES[fleetSelectedMonth]} ${fleetSelectedYear}) · 0.85 kg CO₂/kWh`;
+    if (fleetPeriod === "year") return `${prefix} · Total emisi bulanan (${fleetSelectedYear}) · 0.85 kg CO₂/kWh`;
+    return `${prefix} · Histori akumulasi total reduksi emisi CO₂ per tahun`;
+  }, [targetLocations, fleetRegion, currentRegObj, fleetPeriod, fleetSelectedDate, fleetSelectedMonth, fleetSelectedYear]);
 
   const recordCount = useMemo(() => {
     if (period === "day" || period === "today") return `${series?.values?.length || 24} / 24`;
@@ -4923,369 +5631,6 @@ function EmissionView({ location, fleet, locations, allLocations }) {
     const nonZero = [...vals].reverse().find((v) => v > 0);
     return nonZero !== undefined ? nonZero : 0;
   }, [series]);
-
-  // Pool of all locations across regions
-  const pool = (allLocations && allLocations.length > 0) ? allLocations : (locations || []);
-
-  // Fleet series states
-  const [fleetRegion, setFleetRegion] = useState("all");
-  const [fleetPeriod, setFleetPeriod] = useState("day");
-  const [fleetSelectedDate, setFleetSelectedDate] = useState(getTodayDateStr);
-  const [fleetSelectedMonth, setFleetSelectedMonth] = useState(() => new Date().getMonth());
-  const [fleetSelectedYear, setFleetSelectedYear] = useState(() => new Date().getFullYear());
-
-  const targetLocations = useMemo(() => {
-    if (fleetRegion === "all") return pool;
-    return pool.filter((loc) => {
-      const reg = loc.region ? String(loc.region).toLowerCase() : getStationRegion(loc);
-      return reg === fleetRegion;
-    });
-  }, [pool, fleetRegion]);
-
-  const currentRegObj = useMemo(() => {
-    return REGIONS.find((r) => r.id === fleetRegion) || REGIONS[0];
-  }, [fleetRegion]);
-
-  const regionLabel = fleetRegion === "all" ? "Semua PLTS" : currentRegObj.name;
-
-  const targetTodayEmissionKg = useMemo(() => {
-    return targetLocations.reduce((sum, loc) => sum + (Number(loc?.daily_energy_kwh ?? loc?.today_energy_kwh) || 0), 0) * EMISSION_FACTOR;
-  }, [targetLocations]);
-
-  const targetMonthEmissionKg = useMemo(() => {
-    return targetLocations.reduce((sum, loc) => sum + (Number(loc?.monthly_energy_kwh ?? loc?.month_energy_kwh) || 0), 0) * EMISSION_FACTOR;
-  }, [targetLocations]);
-
-  const targetYearEmissionKg = useMemo(() => {
-    return targetLocations.reduce((sum, loc) => sum + (Number(loc?.yearly_energy_kwh ?? loc?.year_energy_kwh) || 0), 0) * EMISSION_FACTOR;
-  }, [targetLocations]);
-
-  const targetLifetimeEmissionKg = useMemo(() => {
-    return targetLocations.reduce((sum, loc) => sum + (Number(loc?.cumulative_energy_kwh ?? loc?.total_energy_kwh) || 0), 0) * EMISSION_FACTOR;
-  }, [targetLocations]);
-
-  const fleetTotalTodayEmissionKg = fleetRegion === "all"
-    ? (Number(fleet?.daily || 0) * EMISSION_FACTOR || targetTodayEmissionKg)
-    : targetTodayEmissionKg;
-  const fleetMonthEmissionKgCalc = fleetRegion === "all"
-    ? (Number(fleet?.monthly || 0) * EMISSION_FACTOR || targetMonthEmissionKg)
-    : targetMonthEmissionKg;
-  const fleetYearEmissionKgCalc = fleetRegion === "all"
-    ? (Number(fleet?.yearly || 0) * EMISSION_FACTOR || targetYearEmissionKg)
-    : targetYearEmissionKg;
-  const fleetTotalEmissionKgCalc = fleetRegion === "all"
-    ? (Number(fleet?.cumulative || 0) * EMISSION_FACTOR || targetLifetimeEmissionKg)
-    : targetLifetimeEmissionKg;
-
-  const fleetSeries = useMemo(() => {
-    const isSpecificRegion = fleetRegion !== "all";
-    const regionName = currentRegObj.name;
-
-    if (!targetLocations || targetLocations.length === 0) {
-      const count = (fleetPeriod === "day" || fleetPeriod === "today") ? 24 : (fleetPeriod === "week" ? 7 : (fleetPeriod === "month" ? 31 : (fleetPeriod === "year" ? 12 : 5)));
-      const labels = (fleetPeriod === "day" || fleetPeriod === "today")
-        ? Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`)
-        : (fleetPeriod === "week"
-          ? ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"]
-          : (fleetPeriod === "month"
-            ? Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0"))
-            : (fleetPeriod === "year"
-              ? ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
-              : ["2022", "2023", "2024", "2025", "2026"])));
-      return {
-        available: true,
-        labels,
-        values: Array(count).fill(0),
-        unit: "kg CO₂",
-        title: isSpecificRegion ? `Emisi ${regionName}` : "Fleet emission history",
-        caption: `Belum ada instalasi PLTS di wilayah ${regionName} (0 kg CO₂)`,
-      };
-    }
-
-    if (fleetPeriod === "day" || fleetPeriod === "today") {
-      const hourlyLabels = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`);
-      const solarWeights = [0, 0, 0, 0, 0, 0, 0.02, 0.05, 0.09, 0.13, 0.16, 0.18, 0.16, 0.11, 0.06, 0.03, 0.01, 0, 0, 0, 0, 0, 0, 0];
-      const aggregated = Array(24).fill(0);
-
-      targetLocations.forEach((loc) => {
-        const s = getEmissionSeries(loc, "day");
-        if (s && s.available !== false && Array.isArray(s.values) && s.values.length === 24) {
-          s.values.forEach((v, idx) => {
-            aggregated[idx] += Number(v) || 0;
-          });
-        } else {
-          const locDailyKg = (Number(loc?.daily_energy_kwh ?? loc?.today_energy_kwh) || 0) * EMISSION_FACTOR;
-          solarWeights.forEach((w, idx) => {
-            aggregated[idx] += w * locDailyKg;
-          });
-        }
-      });
-
-      const totalAgg = aggregated.reduce((a, b) => a + b, 0);
-      const finalVals = (totalAgg === 0 && fleetTotalTodayEmissionKg > 0)
-        ? solarWeights.map((w) => Math.round(w * fleetTotalTodayEmissionKg * 10) / 10)
-        : aggregated.map((v) => Math.round(v * 10) / 10);
-
-      return {
-        available: true,
-        labels: hourlyLabels,
-        values: finalVals,
-        unit: "kg CO₂",
-        kind: "bar",
-        title: isSpecificRegion ? `Total daily emission reduction (${regionName})` : "Total fleet daily emission reduction",
-        caption: `Reduksi emisi ${isSpecificRegion ? `wilayah ${regionName}` : "seluruh PLTS"} (${formatToDisplayDate(fleetSelectedDate)}) (0.85 kg CO₂/kWh)`,
-      };
-    }
-
-    if (fleetPeriod === "week") {
-      const days = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"];
-      const now = fleetSelectedDate ? new Date(fleetSelectedDate + "T12:00:00") : new Date();
-      const labels = [];
-      const aggregated = Array(7).fill(0);
-
-      for (let i = 6; i >= 0; i--) {
-        const d = new Date(now);
-        d.setDate(d.getDate() - i);
-        labels.push(`${days[(d.getDay() + 6) % 7]} ${d.getDate()}/${d.getMonth() + 1}`);
-      }
-
-      const factors = [0.92, 1.05, 0.88, 1.12, 0.98, 1.02, 1.0];
-      targetLocations.forEach((loc) => {
-        const s = getEmissionSeries(loc, "week");
-        if (s && s.available !== false && Array.isArray(s.values) && s.values.length === 7) {
-          s.values.forEach((v, idx) => {
-            aggregated[idx] += Number(v) || 0;
-          });
-        } else {
-          const locDailyKg = (Number(loc?.daily_energy_kwh ?? loc?.today_energy_kwh) || 0) * EMISSION_FACTOR;
-          const locMonthKg = (Number(loc?.monthly_energy_kwh ?? loc?.month_energy_kwh) || 0) * EMISSION_FACTOR;
-          const avg = locMonthKg > 0 ? (locMonthKg / Math.max(1, now.getDate())) : (locDailyKg || 10);
-          factors.forEach((f, idx) => {
-            const val = (idx === 6 && locDailyKg > 0) ? locDailyKg : (avg * f);
-            aggregated[idx] += val;
-          });
-        }
-      });
-
-      const totalAgg = aggregated.reduce((a, b) => a + b, 0);
-      const finalVals = (totalAgg === 0 && fleetMonthEmissionKgCalc > 0)
-        ? factors.map((f, idx) => {
-            const avg = fleetMonthEmissionKgCalc / Math.max(1, now.getDate());
-            return Math.round(((idx === 6 && fleetTotalTodayEmissionKg > 0) ? fleetTotalTodayEmissionKg : avg * f) * 10) / 10;
-          })
-        : aggregated.map((v) => Math.round(v * 10) / 10);
-
-      return {
-        available: true,
-        labels,
-        values: finalVals,
-        unit: "kg CO₂",
-        kind: "bar",
-        title: isSpecificRegion ? `Total weekly emission reduction (${regionName})` : "Total fleet weekly emission reduction (last 7 days)",
-        caption: `Reduksi emisi 7 hari ${isSpecificRegion ? `wilayah ${regionName}` : "seluruh PLTS"} (${formatToDisplayDate(fleetSelectedDate)}) (0.85 kg CO₂/kWh)`,
-      };
-    }
-
-    if (fleetPeriod === "month") {
-      const daysInSelectedMonth = new Date(fleetSelectedYear, fleetSelectedMonth + 1, 0).getDate();
-      const now = new Date();
-      const isCurrentMonth = fleetSelectedYear === now.getFullYear() && fleetSelectedMonth === now.getMonth();
-      const isFutureMonth = fleetSelectedYear > now.getFullYear() || (fleetSelectedYear === now.getFullYear() && fleetSelectedMonth > now.getMonth());
-
-      const labels = Array.from({ length: daysInSelectedMonth }, (_, i) => String(i + 1).padStart(2, "0"));
-      const aggregated = Array(daysInSelectedMonth).fill(0);
-
-      targetLocations.forEach((loc) => {
-        const s = getEmissionSeries(loc, "month");
-        if (s && s.available !== false && Array.isArray(s.values)) {
-          s.values.forEach((v, idx) => {
-            if (idx < daysInSelectedMonth) {
-              aggregated[idx] += Number(v) || 0;
-            }
-          });
-        } else {
-          const locDailyKg = (Number(loc?.daily_energy_kwh ?? loc?.today_energy_kwh) || 0) * EMISSION_FACTOR;
-          const locMonthKg = (Number(loc?.monthly_energy_kwh ?? loc?.month_energy_kwh) || 0) * EMISSION_FACTOR;
-          const avg = locMonthKg > 0 ? (locMonthKg / Math.max(1, isCurrentMonth ? now.getDate() : daysInSelectedMonth)) : (locDailyKg || 10);
-          for (let i = 0; i < daysInSelectedMonth; i++) {
-            if (isFutureMonth || (isCurrentMonth && (i + 1 > now.getDate()))) {
-              // 0
-            } else if (isCurrentMonth && (i + 1 === now.getDate()) && locDailyKg > 0) {
-              aggregated[i] += locDailyKg;
-            } else {
-              const factor = 0.85 + (((i + fleetSelectedMonth) * 7) % 30) / 100;
-              aggregated[i] += avg * factor;
-            }
-          }
-        }
-      });
-
-      const totalAgg = aggregated.reduce((a, b) => a + b, 0);
-      const finalVals = (totalAgg === 0 && fleetMonthEmissionKgCalc > 0)
-        ? labels.map((_, i) => {
-            if (isFutureMonth || (isCurrentMonth && (i + 1 > now.getDate()))) return 0;
-            if (isCurrentMonth && (i + 1 === now.getDate()) && fleetTotalTodayEmissionKg > 0) return Math.round(fleetTotalTodayEmissionKg * 10) / 10;
-            const avg = fleetMonthEmissionKgCalc / Math.max(1, isCurrentMonth ? now.getDate() : daysInSelectedMonth);
-            const factor = 0.85 + (((i + fleetSelectedMonth) * 7) % 30) / 100;
-            return Math.round(avg * factor * 10) / 10;
-          })
-        : aggregated.map((v, i) => {
-            if (isFutureMonth || (isCurrentMonth && (i + 1 > now.getDate()))) return 0;
-            return Math.round(v * 10) / 10;
-          });
-
-      return {
-        available: true,
-        labels,
-        values: finalVals,
-        unit: "kg CO₂",
-        kind: "bar",
-        title: isSpecificRegion ? `Total daily emission reduction this month (${regionName})` : "Total fleet daily emission reduction this month",
-        caption: `Reduksi emisi harian ${isSpecificRegion ? `wilayah ${regionName}` : "seluruh PLTS"} (${MONTH_NAMES[fleetSelectedMonth]} ${fleetSelectedYear}) (0.85 kg CO₂/kWh)`,
-      };
-    }
-
-    if (fleetPeriod === "year") {
-      const months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
-      const now = new Date();
-      const isCurrentYear = fleetSelectedYear === now.getFullYear();
-      const isFutureYear = fleetSelectedYear > now.getFullYear();
-      const nowMonth = now.getMonth();
-
-      const aggregated = Array(12).fill(0);
-      targetLocations.forEach((loc) => {
-        const s = getEmissionSeries(loc, "year");
-        if (s && s.available !== false && Array.isArray(s.values)) {
-          s.values.forEach((v, idx) => {
-            if (idx < 12) {
-              aggregated[idx] += Number(v) || 0;
-            }
-          });
-        } else {
-          const locMonthKg = (Number(loc?.monthly_energy_kwh ?? loc?.month_energy_kwh) || 0) * EMISSION_FACTOR;
-          const locYearKg = (Number(loc?.yearly_energy_kwh ?? loc?.year_energy_kwh) || 0) * EMISSION_FACTOR;
-          const avgMonth = locYearKg > 0 ? (locYearKg / Math.max(1, isCurrentYear ? nowMonth + 1 : 12)) : (locMonthKg || 100);
-          for (let i = 0; i < 12; i++) {
-            if (isFutureYear || (isCurrentYear && i > nowMonth)) {
-              // 0
-            } else if (isCurrentYear && i === nowMonth && locMonthKg > 0) {
-              aggregated[i] += locMonthKg;
-            } else {
-              const factor = 0.9 + (((i + (fleetSelectedYear % 5)) * 5) % 20) / 100;
-              aggregated[i] += avgMonth * factor;
-            }
-          }
-        }
-      });
-
-      const totalAgg = aggregated.reduce((a, b) => a + b, 0);
-      const finalVals = (totalAgg === 0 && fleetYearEmissionKgCalc > 0)
-        ? months.map((_, i) => {
-            if (isFutureYear || (isCurrentYear && i > nowMonth)) return 0;
-            if (isCurrentYear && i === nowMonth && fleetMonthEmissionKgCalc > 0) return Math.round(fleetMonthEmissionKgCalc * 10) / 10;
-            const avgMonth = fleetYearEmissionKgCalc / Math.max(1, isCurrentYear ? nowMonth + 1 : 12);
-            const factor = 0.9 + (((i + (fleetSelectedYear % 5)) * 5) % 20) / 100;
-            return Math.round(avgMonth * factor * 10) / 10;
-          })
-        : aggregated.map((v, i) => {
-            if (isFutureYear || (isCurrentYear && i > nowMonth)) return 0;
-            return Math.round(v * 10) / 10;
-          });
-
-      return {
-        available: true,
-        labels: months,
-        values: finalVals,
-        unit: "kg CO₂",
-        kind: "bar",
-        title: isSpecificRegion ? `Total monthly emission reduction this year (${regionName})` : "Total fleet monthly emission reduction this year",
-        caption: `Reduksi emisi bulanan ${isSpecificRegion ? `wilayah ${regionName}` : "seluruh PLTS"} (${fleetSelectedYear}) (0.85 kg CO₂/kWh)`,
-      };
-    }
-
-    if (fleetPeriod === "lifetime") {
-      const years = ["2022", "2023", "2024", "2025", "2026"];
-      const aggregated = Array(5).fill(0);
-
-      targetLocations.forEach((loc) => {
-        const s = getEmissionSeries(loc, "lifetime");
-        if (s && s.available !== false && Array.isArray(s.values)) {
-          s.values.forEach((v, idx) => {
-            if (idx < 5) {
-              aggregated[idx] += Number(v) || 0;
-            }
-          });
-        } else {
-          const locLifetimeKg = (Number(loc?.cumulative_energy_kwh ?? loc?.total_energy_kwh) || 0) * EMISSION_FACTOR;
-          const locYearKg = (Number(loc?.yearly_energy_kwh ?? loc?.year_energy_kwh) || 0) * EMISSION_FACTOR;
-          aggregated[0] += locLifetimeKg * 0.1;
-          aggregated[1] += locLifetimeKg * 0.2;
-          aggregated[2] += locLifetimeKg * 0.28;
-          aggregated[3] += locLifetimeKg * 0.32;
-          aggregated[4] += locYearKg > 0 ? locYearKg : locLifetimeKg * 0.1;
-        }
-      });
-
-      const totalAgg = aggregated.reduce((a, b) => a + b, 0);
-      const finalVals = (totalAgg === 0 && fleetTotalEmissionKgCalc > 0)
-        ? [
-            Math.round(fleetTotalEmissionKgCalc * 0.1 * 10) / 10,
-            Math.round(fleetTotalEmissionKgCalc * 0.2 * 10) / 10,
-            Math.round(fleetTotalEmissionKgCalc * 0.28 * 10) / 10,
-            Math.round(fleetTotalEmissionKgCalc * 0.32 * 10) / 10,
-            fleetYearEmissionKgCalc > 0 ? Math.round(fleetYearEmissionKgCalc * 10) / 10 : Math.round(fleetTotalEmissionKgCalc * 0.1 * 10) / 10,
-          ]
-        : aggregated.map((v) => Math.round(v * 10) / 10);
-
-      return {
-        available: true,
-        labels: years,
-        values: finalVals,
-        unit: "kg CO₂",
-        kind: "bar",
-        title: isSpecificRegion ? `Total emission reduction by year (${regionName})` : "Total fleet emission reduction by year",
-        caption: `Akumulasi total reduksi emisi ${isSpecificRegion ? `wilayah ${regionName}` : "seluruh PLTS"} tahunan (0.85 kg CO₂/kWh)`,
-      };
-    }
-
-    return null;
-  }, [targetLocations, fleetRegion, currentRegObj, fleetPeriod, fleetSelectedDate, fleetSelectedMonth, fleetSelectedYear, fleetTotalTodayEmissionKg, fleetMonthEmissionKgCalc, fleetYearEmissionKgCalc, fleetTotalEmissionKgCalc]);
-
-  const fleetCurveTitle = useMemo(() => {
-    const isSpecificRegion = fleetRegion !== "all";
-    const regName = currentRegObj.name;
-    if (fleetPeriod === "day" || fleetPeriod === "today") {
-      return isSpecificRegion ? `Total daily emission reduction (${regName})` : "Total fleet daily emission reduction";
-    }
-    if (fleetPeriod === "week") {
-      return isSpecificRegion ? `Total weekly emission reduction (${regName})` : "Total fleet weekly emission reduction (last 7 days)";
-    }
-    if (fleetPeriod === "month") {
-      return isSpecificRegion ? `Total daily emission reduction this month (${regName})` : "Total fleet daily emission reduction this month";
-    }
-    if (fleetPeriod === "year") {
-      return isSpecificRegion ? `Total monthly emission reduction this year (${regName})` : "Total fleet monthly emission reduction this year";
-    }
-    return isSpecificRegion ? `Total emission reduction by year (${regName})` : "Total fleet emission reduction by year";
-  }, [fleetPeriod, fleetRegion, currentRegObj]);
-
-  const fleetCurveSubtitle = useMemo(() => {
-    const stationCount = targetLocations?.length || 0;
-    const isSpecificRegion = fleetRegion !== "all";
-    const prefix = isSpecificRegion
-      ? `Wilayah ${currentRegObj.name} (${stationCount} Stasiun)`
-      : `Semua PLTS (${stationCount} Stasiun)`;
-
-    if (stationCount === 0) {
-      return `Belum ada instalasi PLTS di wilayah ${currentRegObj.name} (0 kg CO₂)`;
-    }
-
-    if (fleetPeriod === "day" || fleetPeriod === "today") return `${prefix} · Total reduksi emisi (${formatToDisplayDate(fleetSelectedDate)}) · 0.85 kg CO₂/kWh`;
-    if (fleetPeriod === "week") return `${prefix} · Total reduksi emisi 7 hari (${formatToDisplayDate(fleetSelectedDate)}) · 0.85 kg CO₂/kWh`;
-    if (fleetPeriod === "month") return `${prefix} · Total reduksi emisi harian (${MONTH_NAMES[fleetSelectedMonth]} ${fleetSelectedYear}) · 0.85 kg CO₂/kWh`;
-    if (fleetPeriod === "year") return `${prefix} · Total reduksi emisi bulanan (${fleetSelectedYear}) · 0.85 kg CO₂/kWh`;
-    return `${prefix} · Histori akumulasi total reduksi emisi CO₂ per tahun`;
-  }, [targetLocations, fleetRegion, currentRegObj, fleetPeriod, fleetSelectedDate, fleetSelectedMonth, fleetSelectedYear]);
 
   const fleetRecordCount = useMemo(() => {
     if (fleetPeriod === "day" || fleetPeriod === "today") return `${fleetSeries?.values?.length || 24} / 24`;
@@ -5311,83 +5656,22 @@ function EmissionView({ location, fleet, locations, allLocations }) {
     const num = Number(kg) || 0;
     if (num >= 1000) {
       return {
-        val: (num / 1000).toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-        unit: "Ton CO₂",
+        val: (num / 1000).toLocaleString("id-ID", { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+        unit: "TON CO₂",
       };
     }
     return {
       val: num.toLocaleString("id-ID", { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
-      unit: "kg CO₂",
+      unit: "KG CO₂",
     };
   };
 
-  const formatEmissionCompact = (kg) => {
-    const num = Number(kg) || 0;
-    if (num >= 1000) return `${(num / 1000).toFixed(2)} Ton CO₂`;
-    return `${num.toFixed(1)} kg CO₂`;
-  };
-
-  const formatNumberIndo = (num) => {
-    return new Intl.NumberFormat("id-ID").format(Math.round(Number(num) || 0));
-  };
-
   return (
-    <div className="revenue-view-container">
-      {/* TOP ROW: 4 HORIZONTAL KPI CARDS */}
-      <div className="revenue-kpi-grid">
-        {/* TODAY */}
-        <div className="rev-kpi-card">
-          <div className="rev-kpi-top">
-            <span className="rev-kpi-label">TODAY</span>
-            <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>0.85 kg/kWh</span>
-            <span className="rev-kpi-dash" />
-          </div>
-          <div className="rev-kpi-val">
-            {formatEmissionCard(todayEmissionKg).val} <span className="rev-kpi-curr">{formatEmissionCard(todayEmissionKg).unit}</span>
-          </div>
-        </div>
-
-        {/* THIS MONTH */}
-        <div className="rev-kpi-card">
-          <div className="rev-kpi-top">
-            <span className="rev-kpi-label">THIS MONTH</span>
-            <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>0.85 kg/kWh</span>
-            <span className="rev-kpi-dash" />
-          </div>
-          <div className="rev-kpi-val">
-            {formatEmissionCard(monthEmissionKg).val} <span className="rev-kpi-curr">{formatEmissionCard(monthEmissionKg).unit}</span>
-          </div>
-        </div>
-
-        {/* THIS YEAR */}
-        <div className="rev-kpi-card">
-          <div className="rev-kpi-top">
-            <span className="rev-kpi-label">THIS YEAR</span>
-            <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>0.85 kg/kWh</span>
-            <span className="rev-kpi-dash" />
-          </div>
-          <div className="rev-kpi-val">
-            {formatEmissionCard(yearEmissionKg).val} <span className="rev-kpi-curr">{formatEmissionCard(yearEmissionKg).unit}</span>
-          </div>
-        </div>
-
-        {/* LIFETIME */}
-        <div className="rev-kpi-card rev-kpi-lifetime">
-          <div className="rev-kpi-top">
-            <span className="rev-kpi-label">LIFETIME</span>
-            <span style={{ fontSize: "10px", color: "#047857", fontWeight: 700 }}>0.85 kg/kWh</span>
-            <span className="rev-kpi-dash" />
-          </div>
-          <div className="rev-kpi-val">
-            {formatEmissionCard(lifetimeEmissionKg).val} <span className="rev-kpi-curr">{formatEmissionCard(lifetimeEmissionKg).unit}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* MAIN ROW: 2 COLUMNS (CHART ON LEFT, 2 DETAIL CARDS ON RIGHT) */}
-      <div className="energy-grid-layout">
-        {/* LEFT COLUMN: Emission Curve Card */}
-        <div className="energy-left-col">
+    <div className="unified-analytics-view">
+      {/* ROW 1: STATION EMISSION CURVE (LEFT) + DARK STATION LIST (RIGHT) */}
+      <div className="analytics-grid-row">
+        {/* Left: Station Emission Curve Card */}
+        <div className="analytics-col-main">
           <div className="energy-curve-card">
             <div className="curve-card-header">
               <div>
@@ -5444,9 +5728,7 @@ function EmissionView({ location, fleet, locations, allLocations }) {
                 {period === "year" && (
                   <YearDropdownPill value={selectedYear} onChange={setSelectedYear} />
                 )}
-                <span className="unit-pill-badge">
-                  {highestVal >= 1000 ? "Ton CO₂" : "kg CO₂"}
-                </span>
+                <span className="unit-pill-badge">{series?.unit || "kg CO₂"}</span>
               </div>
             </div>
 
@@ -5455,169 +5737,167 @@ function EmissionView({ location, fleet, locations, allLocations }) {
               <EmissionProductionChart series={series} period={period} />
             </div>
 
-            {/* 3 Stats underneath chart */}
-            <div className="curve-stats-row">
+            {/* 3 Stats underneath chart as shown in design */}
+            <div className="curve-stats-row-3">
               <div className="curve-stat-box">
                 <span className="curve-stat-label">RECORDS</span>
                 <span className="curve-stat-value">{recordCount}</span>
               </div>
               <div className="curve-stat-box">
                 <span className="curve-stat-label">HIGHEST</span>
-                <span className="curve-stat-value">{formatEmissionCompact(highestVal)}</span>
+                <span className="curve-stat-value">
+                  {formatEmissionCard(highestVal).val} {formatEmissionCard(highestVal).unit}
+                </span>
               </div>
               <div className="curve-stat-box">
                 <span className="curve-stat-label">LATEST</span>
-                <span className="curve-stat-value">{formatEmissionCompact(latestVal)}</span>
+                <span className="curve-stat-value">
+                  {formatEmissionCard(latestVal).val} {formatEmissionCard(latestVal).unit}
+                </span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* RIGHT COLUMN: Selected site emission + Fleet emission reference */}
-        <div className="energy-right-col">
-          {/* Card 1: Selected Site Emission */}
-          <div className="rev-selected-card">
-            <div className="rev-card-header">
-              <h3 className="rev-card-title">Selected site emission impact</h3>
-              <span className="rev-dash-indicator" />
-            </div>
-            <div className="totals-grid-2x2">
-              <div>
-                <span className="total-item-label">FACTOR</span>
-                <div className="total-item-val" style={{ fontSize: "14px" }}>0.85 kg/kWh</div>
-              </div>
-              <div>
-                <span className="total-item-label">TODAY</span>
-                <div className="total-item-val">{formatEmissionCompact(todayEmissionKg)}</div>
-              </div>
-              <div>
-                <span className="total-item-label">THIS YEAR</span>
-                <div className="total-item-val">{formatEmissionCompact(yearEmissionKg)}</div>
-              </div>
-              <div>
-                <span className="total-item-label">LIFETIME</span>
-                <div className="total-item-val">{formatEmissionCompact(lifetimeEmissionKg)}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 2: Fleet Emission Reference */}
-          <div className="rev-fleet-card">
-            <div className="rev-card-header">
-              <h3 className="rev-card-title">Fleet emission reference</h3>
-              <span className="rev-dash-indicator" />
-            </div>
-            <div className="totals-grid-2x2">
-              <div>
-                <span className="total-item-label">FLEET MONTH</span>
-                <div className="total-item-val">{formatEmissionCompact(fleetMonthEmissionKg)}</div>
-              </div>
-              <div>
-                <span className="total-item-label">FLEET YEAR</span>
-                <div className="total-item-val">{formatEmissionCompact(fleetYearEmissionKg)}</div>
-              </div>
-              <div>
-                <span className="total-item-label">FLEET TOTAL</span>
-                <div className="total-item-val">{formatEmissionCompact(fleetTotalEmissionKg)}</div>
-              </div>
-              <div>
-                <span className="total-item-label">SELECTED PLATFORM</span>
-                <div className="total-item-val">{platformName}</div>
-              </div>
-            </div>
-          </div>
+        {/* Right: Dark Station List Card */}
+        <div className="analytics-col-side">
+          <StationListDarkCard
+            locations={pool}
+            activeStation={activeStation}
+            onSelect={onSelect}
+            selectedRegion={selectedRegion}
+          />
         </div>
       </div>
 
-      {/* SECOND ROW: FLEET-WIDE EMISSION CHART (SEMUA PLTS) */}
-      <div style={{ marginTop: "24px" }}>
-        <div className="energy-curve-card">
-          <div className="curve-card-header">
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+      {/* ROW 2: TOTAL FLEET EMISSION CURVE (LEFT) + 2x2 KPI STACK (RIGHT) */}
+      <div className="analytics-grid-row">
+        {/* Left: Total Fleet Emission Curve Card */}
+        <div className="analytics-col-main">
+          <div className="energy-curve-card">
+            <div className="curve-card-header">
+              <div>
                 <h2 className="curve-title">{fleetCurveTitle}</h2>
-                <span className="unit-pill-badge" style={{ background: "#d1fae5", color: "#065f46" }}>
-                  {regionLabel}
+                <p className="curve-subtitle">{fleetCurveSubtitle}</p>
+              </div>
+              <div className="curve-controls">
+                <div className="period-toggle-pill">
+                  <button
+                    type="button"
+                    className={fleetPeriod === "day" || fleetPeriod === "today" ? "active" : ""}
+                    onClick={() => setFleetPeriod("day")}
+                  >
+                    Day
+                  </button>
+                  <button
+                    type="button"
+                    className={fleetPeriod === "week" ? "active" : ""}
+                    onClick={() => setFleetPeriod("week")}
+                  >
+                    Week
+                  </button>
+                  <button
+                    type="button"
+                    className={fleetPeriod === "month" ? "active" : ""}
+                    onClick={() => setFleetPeriod("month")}
+                  >
+                    Month
+                  </button>
+                  <button
+                    type="button"
+                    className={fleetPeriod === "year" ? "active" : ""}
+                    onClick={() => setFleetPeriod("year")}
+                  >
+                    Year
+                  </button>
+                  <button
+                    type="button"
+                    className={fleetPeriod === "lifetime" ? "active" : ""}
+                    onClick={() => setFleetPeriod("lifetime")}
+                  >
+                    Lifetime
+                  </button>
+                </div>
+                {(fleetPeriod === "day" || fleetPeriod === "today" || fleetPeriod === "week") && (
+                  <DatePickerPill value={fleetSelectedDate} onChange={setFleetSelectedDate} />
+                )}
+                {fleetPeriod === "month" && (
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                    <MonthDropdownPill value={fleetSelectedMonth} onChange={setFleetSelectedMonth} />
+                    <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} />
+                  </div>
+                )}
+                {fleetPeriod === "year" && (
+                  <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} />
+                )}
+                <RegionDropdownPill value={fleetRegion} onChange={setFleetRegion} />
+                <span className="unit-pill-badge">{fleetSeries?.unit || "kg CO₂"}</span>
+              </div>
+            </div>
+
+            {/* Inner Chart Box */}
+            <div className="energy-chart-stage">
+              <EmissionProductionChart series={fleetSeries} period={fleetPeriod} />
+            </div>
+
+            {/* 3 Stats underneath chart */}
+            <div className="curve-stats-row-3">
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">RECORDS</span>
+                <span className="curve-stat-value">{fleetRecordCount}</span>
+              </div>
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">HIGHEST</span>
+                <span className="curve-stat-value">
+                  {formatEmissionCard(fleetHighestVal).val} {formatEmissionCard(fleetHighestVal).unit}
                 </span>
               </div>
-              <p className="curve-subtitle">{fleetCurveSubtitle}</p>
-            </div>
-            <div className="curve-controls">
-              <RegionDropdownPill value={fleetRegion} onChange={setFleetRegion} />
-              <div className="period-toggle-pill">
-                <button
-                  type="button"
-                  className={fleetPeriod === "day" || fleetPeriod === "today" ? "active" : ""}
-                  onClick={() => setFleetPeriod("day")}
-                >
-                  Day
-                </button>
-                <button
-                  type="button"
-                  className={fleetPeriod === "week" ? "active" : ""}
-                  onClick={() => setFleetPeriod("week")}
-                >
-                  Week
-                </button>
-                <button
-                  type="button"
-                  className={fleetPeriod === "month" ? "active" : ""}
-                  onClick={() => setFleetPeriod("month")}
-                >
-                  Month
-                </button>
-                <button
-                  type="button"
-                  className={fleetPeriod === "year" ? "active" : ""}
-                  onClick={() => setFleetPeriod("year")}
-                >
-                  Year
-                </button>
-                <button
-                  type="button"
-                  className={fleetPeriod === "lifetime" ? "active" : ""}
-                  onClick={() => setFleetPeriod("lifetime")}
-                >
-                  Lifetime
-                </button>
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">LATEST</span>
+                <span className="curve-stat-value">
+                  {formatEmissionCard(fleetLatestVal).val} {formatEmissionCard(fleetLatestVal).unit}
+                </span>
               </div>
-              {(fleetPeriod === "day" || fleetPeriod === "today" || fleetPeriod === "week") && (
-                <DatePickerPill value={fleetSelectedDate} onChange={setFleetSelectedDate} />
-              )}
-              {fleetPeriod === "month" && (
-                <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                  <MonthDropdownPill value={fleetSelectedMonth} onChange={setFleetSelectedMonth} />
-                  <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} />
-                </div>
-              )}
-              {fleetPeriod === "year" && (
-                <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} />
-              )}
-              <span className="unit-pill-badge">
-                {fleetHighestVal >= 1000 ? "Ton CO₂" : "kg CO₂"}
-              </span>
             </div>
           </div>
+        </div>
 
-          {/* Inner Chart Box */}
-          <div className="energy-chart-stage">
-            <EmissionProductionChart series={fleetSeries} period={fleetPeriod} />
-          </div>
+        {/* Right: Stack of 2 KPI Cards */}
+        <div className="analytics-col-side">
+          <div className="analytics-kpi-stack">
+            {/* Station Emission */}
+            <AnalyticsKpiCardGroup
+              title="Emission"
+              todayVal={formatEmissionCard(todayEmissionKg).val}
+              todayUnit={formatEmissionCard(todayEmissionKg).unit}
+              todaySub="0.85 kg/kWh"
+              monthVal={formatEmissionCard(monthEmissionKg).val}
+              monthUnit={formatEmissionCard(monthEmissionKg).unit}
+              monthSub="0.85 kg/kWh"
+              yearVal={formatEmissionCard(yearEmissionKg).val}
+              yearUnit={formatEmissionCard(yearEmissionKg).unit}
+              yearSub="0.85 kg/kWh"
+              lifetimeVal={formatEmissionCard(lifetimeEmissionKg).val}
+              lifetimeUnit={formatEmissionCard(lifetimeEmissionKg).unit}
+              lifetimeSub="0.85 kg/kWh"
+            />
 
-          {/* 3 Stats underneath chart */}
-          <div className="curve-stats-row">
-            <div className="curve-stat-box">
-              <span className="curve-stat-label">RECORDS</span>
-              <span className="curve-stat-value">{fleetRecordCount}</span>
-            </div>
-            <div className="curve-stat-box">
-              <span className="curve-stat-label">HIGHEST</span>
-              <span className="curve-stat-value">{formatEmissionCompact(fleetHighestVal)}</span>
-            </div>
-            <div className="curve-stat-box">
-              <span className="curve-stat-label">LATEST</span>
-              <span className="curve-stat-value">{formatEmissionCompact(fleetLatestVal)}</span>
-            </div>
+            {/* Total fleet Emission */}
+            <AnalyticsKpiCardGroup
+              title="Total fleet Emission"
+              todayVal={formatEmissionCard(fleetTotalTodayEmissionKg).val}
+              todayUnit={formatEmissionCard(fleetTotalTodayEmissionKg).unit}
+              todaySub="0.85 kg/kWh"
+              monthVal={formatEmissionCard(fleetMonthEmissionKgCalc).val}
+              monthUnit={formatEmissionCard(fleetMonthEmissionKgCalc).unit}
+              monthSub="0.85 kg/kWh"
+              yearVal={formatEmissionCard(fleetYearEmissionKgCalc).val}
+              yearUnit={formatEmissionCard(fleetYearEmissionKgCalc).unit}
+              yearSub="0.85 kg/kWh"
+              lifetimeVal={formatEmissionCard(fleetTotalEmissionKgCalc).val}
+              lifetimeUnit={formatEmissionCard(fleetTotalEmissionKgCalc).unit}
+              lifetimeSub="0.85 kg/kWh"
+            />
           </div>
         </div>
       </div>

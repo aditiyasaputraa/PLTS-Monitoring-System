@@ -1843,5 +1843,316 @@ button {
   background: rgba(52, 211, 153, 0.7);
 }
 
+/* ==================== UNIFIED ANALYTICS VIEW (ENERGY / REVENUE / EMISSION) ==================== */
+
+.unified-analytics-view {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+}
+
+.analytics-grid-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.62fr) minmax(320px, 1fr);
+  gap: 20px;
+  align-items: stretch;
+}
+
+@media (max-width: 1100px) {
+  .analytics-grid-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.analytics-col-main {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+}
+
+.analytics-col-side {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+}
+
+/* Dark Station List Card */
+.analytics-station-list-card {
+  background: #080c09;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 16px 16px 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 380px;
+  max-height: 520px;
+  box-sizing: border-box;
+}
+
+.station-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.station-list-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #7c8d82;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.station-list-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: #7c8d82;
+}
+
+.station-list-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(52, 211, 153, 0.4) rgba(255, 255, 255, 0.04);
+}
+
+.station-list-body::-webkit-scrollbar {
+  width: 5px;
+}
+
+.station-list-body::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 4px;
+}
+
+.station-list-body::-webkit-scrollbar-thumb {
+  background: rgba(52, 211, 153, 0.35);
+  border-radius: 4px;
+}
+
+.station-list-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(52, 211, 153, 0.7);
+}
+
+.station-list-item {
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  background: transparent;
+  color: #e5e7eb;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.station-list-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.station-list-item.selected {
+  background: rgba(16, 185, 129, 0.16);
+  color: #34d399;
+}
+
+.station-item-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.station-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.station-status-dot.online {
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.55);
+}
+
+.station-status-dot.offline {
+  background: #ef4444;
+  box-shadow: 0 0 5px rgba(239, 68, 68, 0.45);
+}
+
+.station-item-name {
+  font-size: 12px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.station-list-item.selected .station-item-name {
+  font-weight: 700;
+  color: #34d399;
+}
+
+.station-vendor-tag {
+  font-size: 10px;
+  color: #6b7280;
+  font-weight: 500;
+  text-transform: lowercase;
+  flex-shrink: 0;
+}
+
+/* KPI Stack (Bottom Right) */
+.analytics-kpi-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+}
+
+.analytics-kpi-group-card {
+  background: #ffffff;
+  border: 1px solid #e2e8df;
+  border-radius: 16px;
+  padding: 18px 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex: 1;
+  box-sizing: border-box;
+}
+
+.analytics-group-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #16231a;
+  margin: 0 0 12px;
+}
+
+.kpi-2x2-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.kpi-card-box {
+  background: #ffffff;
+  border: 1px solid #e5e9e6;
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 3px;
+  box-sizing: border-box;
+}
+
+.kpi-card-box.lifetime-highlight {
+  background: #eaf7ee;
+  border-color: #bbf7d0;
+}
+
+.kpi-card-tag {
+  font-size: 10px;
+  font-weight: 700;
+  color: #65776a;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.lifetime-highlight .kpi-card-tag {
+  color: #047857;
+}
+
+.kpi-card-value {
+  font-size: 20px;
+  font-weight: 800;
+  color: #16231a;
+  line-height: 1.15;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.lifetime-highlight .kpi-card-value {
+  color: #047857;
+}
+
+.kpi-card-unit {
+  font-size: 10px;
+  font-weight: 700;
+  color: #65776a;
+  text-transform: uppercase;
+}
+
+.lifetime-highlight .kpi-card-unit {
+  color: #059669;
+}
+
+.kpi-card-sub {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #65776a;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.lifetime-highlight .kpi-card-sub {
+  color: #059669;
+}
+
+/* 5 stat pill columns for Energy Top Chart */
+.curve-stats-row-5 {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin-top: auto;
+}
+
+@media (max-width: 900px) {
+  .curve-stats-row-5 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .curve-stats-row-5 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* 3 stat pill columns for other charts */
+.curve-stats-row-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: auto;
+}
+
+@media (max-width: 600px) {
+  .curve-stats-row-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
 
 
