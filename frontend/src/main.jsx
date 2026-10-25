@@ -769,10 +769,12 @@ function LoginPage({ onSignIn, initialError }) {
       <div className="login-card">
         {/* Left Column */}
         <div className="login-card-left">
-          <h2 className="login-card-title">JakPV</h2>
-          <div className="login-logo-wrap" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "14px" }}>
-            <img src="/monas-solar-badge.png" alt="JakPV" className="login-jakarta-logo" style={{ width: "68px", height: "68px", borderRadius: "50%", boxShadow: "0 4px 14px rgba(0,0,0,0.2)" }} />
-            <img src="/jakarta-logo.png" alt="DKI Jakarta" className="login-jakarta-logo" style={{ width: "68px", height: "auto" }} />
+          <div className="login-brand-header">
+            <h2 className="login-card-title">JaksPV</h2>
+            <span className="login-card-sub">JAKARTA SOLAR PV</span>
+          </div>
+          <div className="login-logo-wrap">
+            <img src="/jakarta-logo.png" alt="DKI Jakarta" className="login-jakarta-logo" />
           </div>
           <div className="login-agency-label">
             <p>SUKU DINAS</p>
@@ -784,7 +786,7 @@ function LoginPage({ onSignIn, initialError }) {
 
         {/* Right Column */}
         <div className="login-card-right">
-          <h1 className="login-form-title">Sign in to JakPV</h1>
+          <h1 className="login-form-title">Sign in to JaksPV</h1>
           <p className="login-form-subtitle">Put your email and password below.</p>
 
           <form className="login-form" onSubmit={submit}>
@@ -1155,11 +1157,11 @@ function Dashboard({ session, onSignOut }) {
           >
             <img
               src="/monas-solar-badge.png"
-              alt="JakPV Logo"
+              alt="JaksPV Logo"
               className="brand-logo-img"
             />
             <div className="brand-text-wrap">
-              <span className="brand-title">JakPV</span>
+              <span className="brand-title">JaksPV</span>
               <span className="brand-sub">JAKARTA SOLAR PV</span>
             </div>
           </div>
@@ -1328,7 +1330,7 @@ function Dashboard({ session, onSignOut }) {
             <div className="operations-title-wrap">
               <span className="eyebrow-tag">OPERATIONS</span>
               <div className="operations-main-title">
-                <h1>JakPV - Monitoring PLTS</h1>
+                <h1>JaksPV - Monitoring PLTS</h1>
                 <span className="live-badge">
                   <span className="pulse-dot" style={{ width: "6px", height: "6px" }} />
                   Live
