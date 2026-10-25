@@ -555,6 +555,109 @@ function useMonitoringData(session, onUnauthorized) {
   return { data, error, refresh };
 }
 
+const METADATA_STORAGE_KEY = "plts_station_metadata";
+
+function readLocalMetadata() {
+  try {
+    return JSON.parse(localStorage.getItem(METADATA_STORAGE_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function useStationMetadata() {
+  const [metadata, setMetadata] = useState(() => readLocalMetadata());
+
+  useEffect(() => {
+    let active = true;
+    const fetchCloud = async () => {
+      try {
+        const { url, key } = authConfig();
+        if (!url || !key) return;
+        const res = await fetchWithTimeout(
+          `${url}/rest/v1/station_metadata?select=*`,
+          {
+            headers: {
+              apikey: key,
+              Authorization: `Bearer ${key}`,
+              Accept: "application/json",
+            },
+          },
+          4000
+        );
+        if (!res.ok) return;
+        const rows = await res.json();
+        if (Array.isArray(rows) && rows.length > 0 && active) {
+          const map = readLocalMetadata();
+          for (const r of rows) {
+            const k = r.station_key || `${r.platform}-${r.station_id}`;
+            map[k] = {
+              custom_name: r.custom_name,
+              asset_owner: r.asset_owner,
+              notes: r.notes,
+              updated_at: r.updated_at,
+            };
+          }
+          try {
+            localStorage.setItem(METADATA_STORAGE_KEY, JSON.stringify(map));
+          } catch (_) { }
+          setMetadata({ ...map });
+        }
+      } catch (_) { }
+    };
+    fetchCloud();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const updateStation = useCallback(async (stationKey, updates, stationObj = {}) => {
+    const current = readLocalMetadata();
+    const updatedRecord = {
+      ...(current[stationKey] || {}),
+      ...updates,
+      updated_at: new Date().toISOString(),
+    };
+    current[stationKey] = updatedRecord;
+    try {
+      localStorage.setItem(METADATA_STORAGE_KEY, JSON.stringify(current));
+    } catch (_) { }
+    setMetadata({ ...current });
+
+    // Try cloud save (if station_metadata table exists in Supabase)
+    try {
+      const { url, key } = authConfig();
+      if (!url || !key) return;
+      await fetchWithTimeout(
+        `${url}/rest/v1/station_metadata`,
+        {
+          method: "POST",
+          headers: {
+            apikey: key,
+            Authorization: `Bearer ${key}`,
+            "Content-Type": "application/json",
+            Prefer: "resolution=merge-duplicates",
+          },
+          body: JSON.stringify({
+            station_key: stationKey,
+            station_id: String(stationObj.id || stationKey),
+            platform: stationObj.source || stationObj.platform || "sma",
+            custom_name: updatedRecord.custom_name || null,
+            asset_owner: updatedRecord.asset_owner || null,
+            notes: updatedRecord.notes || null,
+            updated_at: updatedRecord.updated_at,
+          }),
+        },
+        5000
+      );
+    } catch (e) {
+      console.warn("Could not save to Supabase station_metadata (cached locally):", e);
+    }
+  }, []);
+
+  return { metadata, updateStation };
+}
+
 function SitePickerDropdown({
   selected,
   locations,
@@ -834,6 +937,7 @@ function LoginPage({ onSignIn, initialError }) {
 
 function Dashboard({ session, onSignOut }) {
   const { data, error, refresh } = useMonitoringData(session, onSignOut);
+  const { metadata: stationMetadata, updateStation: updateStationMetadata } = useStationMetadata();
   const [activeTab, setActiveTab] = useState(() => readUiState().activeTab);
   const [selectedId, setSelectedId] = useState(() => readUiState().selectedId);
   const [selectedRegion, setSelectedRegion] = useState(() => readUiState().selectedRegion || "all");
@@ -848,7 +952,10 @@ function Dashboard({ session, onSignOut }) {
   const allLocations = useMemo(() => {
     return sites.flatMap((site) => (site.stations || []).map((station) => {
       const id = String(station.station_id || station.station_numeric_id || station.id);
-      const name = station.station_name || station.name || `Station ${id}`;
+      const rawName = station.station_name || station.name || `Station ${id}`;
+      const uid = `${site.platform}-${id}`;
+      const meta = stationMetadata[uid] || stationMetadata[id] || {};
+      const name = meta.custom_name ? meta.custom_name : rawName;
       const hasVendorIncome = Boolean(station.daily_income || station.monthly_income || station.yearly_income || station.cumulative_income);
       const isAutoTariff = ["kehua", "sma"].includes((site.platform || "").toLowerCase()) || !hasVendorIncome;
 
@@ -1020,6 +1127,10 @@ function Dashboard({ session, onSignOut }) {
         current_power_kw: resolvedPower,
         id,
         name,
+        raw_name: rawName,
+        custom_name: meta.custom_name || "",
+        asset_owner: meta.asset_owner || "",
+        notes: meta.notes || "",
         latitude,
         longitude,
         address,
@@ -1034,7 +1145,7 @@ function Dashboard({ session, onSignOut }) {
         income_currency: station.income_currency || "IDR",
       };
     }));
-  }, [sites]);
+  }, [sites, stationMetadata]);
 
   // Filter locations based on chosen region
   const locations = useMemo(() => {
@@ -1105,6 +1216,11 @@ function Dashboard({ session, onSignOut }) {
     writeUiState({ selectedRegion: regionId });
     setRegionDropdownOpen(false);
   }, []);
+
+  const handleUpdateStation = useCallback((st, updates) => {
+    const key = st.uid || `${st.source || st.platform}-${st.id}`;
+    return updateStationMetadata(key, updates, st);
+  }, [updateStationMetadata]);
 
   const handleSyncNow = useCallback(async () => {
     if (isSyncing) return;
@@ -1405,6 +1521,7 @@ function Dashboard({ session, onSignOut }) {
             updatedAt={data?.updated_at}
             selectedRegion={selectedRegion}
             onSelectRegion={handleSelectRegion}
+            onUpdateStation={handleUpdateStation}
           />
         )}
 
@@ -1417,6 +1534,7 @@ function Dashboard({ session, onSignOut }) {
             onSelect={handleSelectSite}
             selectedRegion={selectedRegion}
             onSelectRegion={handleSelectRegion}
+            onUpdateStation={handleUpdateStation}
           />
         )}
 
@@ -1429,6 +1547,7 @@ function Dashboard({ session, onSignOut }) {
             onSelect={handleSelectSite}
             selectedRegion={selectedRegion}
             onSelectRegion={handleSelectRegion}
+            onUpdateStation={handleUpdateStation}
           />
         )}
 
@@ -1441,6 +1560,7 @@ function Dashboard({ session, onSignOut }) {
             onSelect={handleSelectSite}
             selectedRegion={selectedRegion}
             onSelectRegion={handleSelectRegion}
+            onUpdateStation={handleUpdateStation}
           />
         )}
       </main>
@@ -1473,7 +1593,8 @@ function Dashboard({ session, onSignOut }) {
   );
 }
 
-function OverviewView({ fleet, selected, locations, onSelect, updatedAt, selectedRegion, onSelectRegion, allLocations }) {
+function OverviewView({ fleet, selected, locations, onSelect, updatedAt, selectedRegion, onSelectRegion, allLocations, onUpdateStation }) {
+  const [editingStation, setEditingStation] = useState(null);
   const hasLocations = Boolean(locations && locations.length > 0);
 
   // Current live power calculations - 0 if no locations in this region
@@ -1789,7 +1910,24 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt, selecte
       <section className="grid-row-bottom">
         {/* Left: Selected Location Spec Card */}
         <div className="dashboard-card">
-          <h3 className="card-title" style={{ fontSize: "16px" }}>Selected location</h3>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+            <h3 className="card-title" style={{ fontSize: "16px", margin: 0 }}>Selected location</h3>
+            {selected && onUpdateStation && (
+              <button
+                type="button"
+                className="btn-edit-station"
+                title="Edit nama stasiun & pemilik aset"
+                onClick={() => setEditingStation(selected)}
+                style={{ padding: "4px 9px", fontSize: "11px", gap: "5px", height: "auto" }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+                <span>Edit Info</span>
+              </button>
+            )}
+          </div>
           <div className="location-spec-table">
             <div className="spec-row">
               <span className="spec-label">Station</span>
@@ -1797,6 +1935,14 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt, selecte
                 {selected?.name || "—"}
               </span>
             </div>
+            {selected?.asset_owner && (
+              <div className="spec-row">
+                <span className="spec-label">Asset Owner</span>
+                <span className="spec-val" style={{ color: "#0d4a2b", fontWeight: 700 }}>
+                  {selected.asset_owner}
+                </span>
+              </div>
+            )}
             <div className="spec-row">
               <span className="spec-label">Power</span>
               <span className="spec-val">{formatNumber(selected ? (selected?.current_power_kw ?? selected?.output_power_kw ?? selected?.pv_power_kw ?? 0) : 0, 1)} kW</span>
@@ -1871,6 +2017,18 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt, selecte
           </div>
         </div>
       </section>
+
+      {editingStation && (
+        <EditStationModal
+          station={editingStation}
+          onClose={() => setEditingStation(null)}
+          onSave={async (st, updates) => {
+            if (onUpdateStation) {
+              await onUpdateStation(st, updates);
+            }
+          }}
+        />
+      )}
     </>
   );
 }
@@ -3580,6 +3738,144 @@ function RegionDropdownPill({ value, onChange, regions = REGIONS }) {
   );
 }
 
+const ASSET_OWNER_PRESETS = [
+  "Sudin Nakertransgi Jakarta Utara",
+  "Sudin Nakertransgi Jakarta Barat",
+  "Sudin Nakertransgi Jakarta Pusat",
+  "Sudin Nakertransgi Jakarta Timur",
+  "Sudin Nakertransgi Jakarta Selatan",
+  "Dinas Tenaga Kerja, Transmigrasi dan Energi DKI Jakarta",
+  "Dinas Pendidikan DKI Jakarta",
+  "Biro Umum & ASD Setda DKI Jakarta",
+  "Dinas Kesehatan DKI Jakarta",
+  "Dinas Lingkungan Hidup DKI Jakarta",
+];
+
+function EditStationModal({ station, onClose, onSave }) {
+  const [customName, setCustomName] = useState(station.custom_name || station.name || "");
+  const [assetOwner, setAssetOwner] = useState(station.asset_owner || "");
+  const [notes, setNotes] = useState(station.notes || "");
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSaving(true);
+    try {
+      await onSave(station, {
+        custom_name: customName.trim(),
+        asset_owner: assetOwner.trim(),
+        notes: notes.trim(),
+      });
+      onClose();
+    } catch (err) {
+      alert("Gagal menyimpan perubahan: " + (err.message || err));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="station-modal-overlay" onClick={onClose}>
+      <div className="station-modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="station-modal-header">
+          <div>
+            <h3 className="station-modal-title">Edit Informasi PLTS</h3>
+            <span style={{ fontSize: "11px", color: "#6e8074" }}>
+              ID: {station.id || station.uid} · Vendor: {(station.source || "sma").toUpperCase()}
+            </span>
+          </div>
+          <button type="button" className="station-modal-close" onClick={onClose} title="Tutup">
+            ✕
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="station-modal-body">
+            <div className="station-modal-field">
+              <label className="station-modal-label">Nama Asli dari Vendor (Readonly)</label>
+              <input
+                type="text"
+                className="station-modal-input"
+                style={{ background: "#f3f4f6", color: "#6b7280", cursor: "not-allowed" }}
+                value={station.raw_name || station.name || ""}
+                disabled
+              />
+            </div>
+
+            <div className="station-modal-field">
+              <label className="station-modal-label">Nama Baru PLTS (Custom Name)</label>
+              <input
+                type="text"
+                className="station-modal-input"
+                placeholder="Contoh: SMKN 2 Jakarta Pusat - Gedung A"
+                value={customName}
+                onChange={(e) => setCustomName(e.target.value)}
+                required
+              />
+              <span style={{ fontSize: "10.5px", color: "#6e8074" }}>
+                Nama ini yang akan ditampilkan di seluruh dashboard & grafik.
+              </span>
+            </div>
+
+            <div className="station-modal-field">
+              <label className="station-modal-label">Pemilik Aset (Asset Owner)</label>
+              <input
+                type="text"
+                className="station-modal-input"
+                placeholder="Pilih dari pilihan cepat atau ketik sendiri..."
+                value={assetOwner}
+                onChange={(e) => setAssetOwner(e.target.value)}
+              />
+              <div style={{ marginTop: "6px" }}>
+                <span style={{ fontSize: "10px", color: "#6e8074", fontWeight: 700 }}>Pilihan cepat:</span>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", marginTop: "4px" }}>
+                  {ASSET_OWNER_PRESETS.map((p) => {
+                    const shortLabel = p
+                      .replace("Sudin Nakertransgi ", "Sudin ")
+                      .replace("Dinas Tenaga Kerja, Transmigrasi dan Energi", "Disnakertransgi")
+                      .replace(" DKI Jakarta", "")
+                      .replace(" Setda", "");
+                    return (
+                      <button
+                        key={p}
+                        type="button"
+                        className={`asset-preset-btn ${assetOwner === p ? "active" : ""}`}
+                        onClick={() => setAssetOwner(p)}
+                      >
+                        {shortLabel}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="station-modal-field">
+              <label className="station-modal-label">Catatan Tambahan (Opsional)</label>
+              <textarea
+                className="station-modal-input"
+                rows={2}
+                placeholder="Catatan kapasitas, penanggung jawab, gedung, dll..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="station-modal-footer">
+            <button type="button" className="btn-modal-cancel" onClick={onClose}>
+              Batal
+            </button>
+            <button type="submit" className="btn-modal-save" disabled={isSaving}>
+              {isSaving ? "Menyimpan..." : "Simpan Perubahan"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function StationListDarkCard({
   locations,
   allLocations,
@@ -3587,57 +3883,189 @@ function StationListDarkCard({
   onSelect,
   selectedRegion = "all",
   onSelectRegion,
+  onUpdateStation,
 }) {
   const currentRegion = REGIONS.find((r) => r.id === selectedRegion) || REGIONS[0];
   const regionLabel = currentRegion?.shortName || currentRegion?.name || "DKI Jakarta";
+  const [searchQuery, setSearchQuery] = useState("");
+  const [editingStation, setEditingStation] = useState(null);
 
   const displayLocations = useMemo(() => {
     const base = (allLocations && allLocations.length > 0) ? allLocations : (locations || []);
-    if (!selectedRegion || selectedRegion === "all") return base;
-    return base.filter((loc) => {
-      const reg = loc.region ? String(loc.region).toLowerCase() : getStationRegion(loc);
-      return reg === selectedRegion;
-    });
-  }, [allLocations, locations, selectedRegion]);
+    let filtered = base;
+    if (selectedRegion && selectedRegion !== "all") {
+      filtered = filtered.filter((loc) => {
+        const reg = loc.region ? String(loc.region).toLowerCase() : getStationRegion(loc);
+        return reg === selectedRegion;
+      });
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter((loc) => {
+        const n = (loc.name || "").toLowerCase();
+        const raw = (loc.raw_name || "").toLowerCase();
+        const owner = (loc.asset_owner || "").toLowerCase();
+        const vendor = (loc.source || "").toLowerCase();
+        return n.includes(q) || raw.includes(q) || owner.includes(q) || vendor.includes(q);
+      });
+    }
+    return filtered;
+  }, [allLocations, locations, selectedRegion, searchQuery]);
 
   return (
     <div className="analytics-station-list-card">
       <div className="station-list-header">
-        <span className="station-list-title">DAFTAR PLTS ({regionLabel.toUpperCase()})</span>
-        <span className="station-list-count">{displayLocations.length}</span>
+        <div className="station-list-title-wrap">
+          <span className="station-list-title">DAFTAR PLTS ({regionLabel.toUpperCase()})</span>
+          <span className="station-list-count">{displayLocations.length} stasiun</span>
+        </div>
       </div>
-      <div className="station-list-body">
-        {displayLocations.length === 0 ? (
-          <div style={{ padding: "24px 16px", color: "#6e8074", fontSize: "12px", textAlign: "center" }}>
-            Belum ada PLTS di wilayah {regionLabel}
-          </div>
-        ) : (
-          displayLocations.map((loc) => {
-            const isSelected = (loc.uid && activeStation?.uid && loc.uid === activeStation.uid) ||
-              (loc.id && activeStation?.id && loc.id === activeStation.id) ||
-              (loc.name && activeStation?.name && loc.name === activeStation.name);
-            const powerVal = Number(loc.current_power_kw ?? loc.output_power_kw ?? loc.pv_power_kw ?? loc.power_kw ?? 0);
-            const dailyVal = Number(loc.daily_energy_kwh ?? loc.today_energy_kwh ?? 0);
-            const isOffline = loc.status === "offline" || loc.status === "disconnected" || (powerVal === 0 && dailyVal === 0);
 
-            return (
-              <button
-                key={loc.uid || loc.id || loc.name}
-                type="button"
-                className={`station-list-item ${isSelected ? "selected" : ""}`}
-                onClick={() => onSelect && onSelect(loc.uid || loc.id)}
-                title={loc.name}
-              >
-                <div className="station-item-left">
-                  <span className={`station-status-dot ${isOffline ? "offline" : "online"}`} />
-                  <span className="station-item-name">{loc.name}</span>
-                </div>
-                <span className="station-vendor-tag">{loc.source || "sma"}</span>
-              </button>
-            );
-          })
+      {/* Search Input */}
+      <div className="station-search-box">
+        <svg
+          className="station-search-icon"
+          width="13"
+          height="13"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <circle cx="11" cy="11" r="8" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+        <input
+          type="text"
+          className="station-search-input"
+          placeholder="Cari stasiun atau pemilik aset..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+        {searchQuery && (
+          <button
+            type="button"
+            className="station-search-clear"
+            onClick={() => setSearchQuery("")}
+            title="Hapus pencarian"
+          >
+            ✕
+          </button>
         )}
       </div>
+
+      <div className="station-table-wrap">
+        <table className="station-table">
+          <thead>
+            <tr>
+              <th style={{ width: "32px", textAlign: "center" }}>Status</th>
+              <th>Nama PLTS</th>
+              <th>Pemilik Aset</th>
+              <th style={{ width: "64px", textAlign: "center" }}>Vendor</th>
+              <th style={{ width: "42px", textAlign: "center" }}>Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            {displayLocations.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="station-table-empty">
+                  {searchQuery ? `Tidak ada stasiun yang cocok dengan "${searchQuery}"` : `Belum ada PLTS di wilayah ${regionLabel}`}
+                </td>
+              </tr>
+            ) : (
+              displayLocations.map((loc) => {
+                const isSelected =
+                  (loc.uid && activeStation?.uid && loc.uid === activeStation.uid) ||
+                  (loc.id && activeStation?.id && loc.id === activeStation.id) ||
+                  (loc.name && activeStation?.name && loc.name === activeStation.name);
+                const powerVal = Number(loc.current_power_kw ?? loc.output_power_kw ?? loc.pv_power_kw ?? loc.power_kw ?? 0);
+                const dailyVal = Number(loc.daily_energy_kwh ?? loc.today_energy_kwh ?? 0);
+                const isOffline = loc.status === "offline" || loc.status === "disconnected" || (powerVal === 0 && dailyVal === 0);
+                const vendor = (loc.source || "sma").toLowerCase();
+
+                return (
+                  <tr
+                    key={loc.uid || loc.id || loc.name}
+                    className={`station-table-row ${isSelected ? "selected" : ""}`}
+                    onClick={() => onSelect && onSelect(loc.uid || loc.id)}
+                    title={`Klik untuk melihat detail ${loc.name}`}
+                  >
+                    <td style={{ textAlign: "center" }}>
+                      <span
+                        className={`station-status-dot ${isOffline ? "offline" : "online"}`}
+                        title={isOffline ? "Offline / 0 kW" : "Online"}
+                      />
+                    </td>
+                    <td>
+                      <div className="station-name-cell">
+                        <span className="station-primary-name">{loc.custom_name || loc.name}</span>
+                        {loc.custom_name && loc.raw_name && loc.custom_name !== loc.raw_name && (
+                          <span className="station-raw-name" title={`Nama asli vendor: ${loc.raw_name}`}>
+                            Asli: {loc.raw_name}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      {loc.asset_owner ? (
+                        <span className="asset-owner-pill" title={`Pemilik Aset: ${loc.asset_owner}`}>
+                          {loc.asset_owner}
+                        </span>
+                      ) : (
+                        <span
+                          className="asset-owner-empty"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingStation(loc);
+                          }}
+                          title="Klik untuk menambahkan pemilik aset"
+                        >
+                          + Set Aset
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ textAlign: "center" }}>
+                      <span className={`station-vendor-badge vendor-${vendor}`}>
+                        {vendor.toUpperCase()}
+                      </span>
+                    </td>
+                    <td style={{ textAlign: "center" }}>
+                      <button
+                        type="button"
+                        className="btn-edit-station"
+                        title="Edit nama stasiun & pemilik aset"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingStation(loc);
+                        }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                        </svg>
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {editingStation && (
+        <EditStationModal
+          station={editingStation}
+          onClose={() => setEditingStation(null)}
+          onSave={async (st, updates) => {
+            if (onUpdateStation) {
+              await onUpdateStation(st, updates);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -3936,7 +4364,7 @@ function buildAggregatedFleetSeries({
   };
 }
 
-function EnergyView({ location, fleet, locations, allLocations, onSelect, selectedRegion = "all", onSelectRegion }) {
+function EnergyView({ location, fleet, locations, allLocations, onSelect, selectedRegion = "all", onSelectRegion, onUpdateStation }) {
   // Station curve controls
   const [period, setPeriod] = useState("day");
   const [selectedDate, setSelectedDate] = useState(getTodayDateStr);
@@ -4354,6 +4782,7 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
             onSelect={handleSelectStation}
             selectedRegion={selectedRegion || "all"}
             onSelectRegion={onSelectRegion}
+            onUpdateStation={onUpdateStation}
           />
         </div>
       </div>
@@ -4730,7 +5159,7 @@ function RevenueProductionChart({ series, period, isKehua }) {
   );
 }
 
-function RevenueView({ location, fleet, locations, allLocations, onSelect, selectedRegion = "all", onSelectRegion }) {
+function RevenueView({ location, fleet, locations, allLocations, onSelect, selectedRegion = "all", onSelectRegion, onUpdateStation }) {
   // Station curve controls
   const [period, setPeriod] = useState("day");
   const [selectedDate, setSelectedDate] = useState(getTodayDateStr);
@@ -5152,6 +5581,7 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
             onSelect={handleSelectStation}
             selectedRegion={selectedRegion || "all"}
             onSelectRegion={onSelectRegion}
+            onUpdateStation={onUpdateStation}
           />
         </div>
       </div>
@@ -5537,7 +5967,7 @@ function EmissionProductionChart({ series, period }) {
   );
 }
 
-function EmissionView({ location, fleet, locations, allLocations, onSelect, selectedRegion = "all", onSelectRegion }) {
+function EmissionView({ location, fleet, locations, allLocations, onSelect, selectedRegion = "all", onSelectRegion, onUpdateStation }) {
   const [period, setPeriod] = useState("day");
   const [selectedDate, setSelectedDate] = useState(getTodayDateStr);
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth());
@@ -5984,6 +6414,7 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
             onSelect={handleSelectStation}
             selectedRegion={selectedRegion || "all"}
             onSelectRegion={onSelectRegion}
+            onUpdateStation={onUpdateStation}
           />
         </div>
       </div>
