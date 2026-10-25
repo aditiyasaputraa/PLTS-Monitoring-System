@@ -3795,7 +3795,11 @@ const MONTH_NAMES = [
   "July", "August", "September", "October", "November", "December"
 ];
 
-const AVAILABLE_YEARS = [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026];
+const CURRENT_YEAR = new Date().getFullYear();
+const AVAILABLE_YEARS = Array.from(
+  { length: Math.max(1, CURRENT_YEAR - 2019 + 1) },
+  (_, i) => 2019 + i
+);
 
 function MonthDropdownPill({ value, onChange }) {
   const currentMonthName = MONTH_NAMES[value] || MONTH_NAMES[new Date().getMonth()];
@@ -4612,7 +4616,9 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
 
   const series = useMemo(() => {
     if (!activeStation || !(activeStation.id || activeStation.station_id || activeStation.uid || activeStation.name)) {
-      const count = (period === "day" || period === "today") ? 24 : (period === "week" ? 7 : (period === "month" ? 31 : (period === "year" ? 12 : 5)));
+      const currentYear = new Date().getFullYear();
+      const fallbackYears = Array.from({ length: Math.max(1, currentYear - 2022 + 1) }, (_, i) => String(2022 + i));
+      const count = (period === "day" || period === "today") ? 24 : (period === "week" ? 7 : (period === "month" ? 31 : (period === "year" ? 12 : fallbackYears.length)));
       const labels = (period === "day" || period === "today")
         ? Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`)
         : (period === "week"
@@ -4621,7 +4627,7 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
             ? Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0"))
             : (period === "year"
               ? ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
-              : ["2022", "2023", "2024", "2025", "2026"])));
+              : fallbackYears)));
       return {
         available: true,
         labels,
@@ -5408,7 +5414,9 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
 
   const series = useMemo(() => {
     if (!activeStation || !(activeStation.id || activeStation.station_id || activeStation.uid || activeStation.name)) {
-      const count = (period === "day" || period === "today") ? 24 : (period === "week" ? 7 : (period === "month" ? 31 : (period === "year" ? 12 : 5)));
+      const currentYear = new Date().getFullYear();
+      const fallbackYears = Array.from({ length: Math.max(1, currentYear - 2022 + 1) }, (_, i) => String(2022 + i));
+      const count = (period === "day" || period === "today") ? 24 : (period === "week" ? 7 : (period === "month" ? 31 : (period === "year" ? 12 : fallbackYears.length)));
       const labels = (period === "day" || period === "today")
         ? Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`)
         : (period === "week"
@@ -5417,7 +5425,7 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
             ? Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0"))
             : (period === "year"
               ? ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
-              : ["2022", "2023", "2024", "2025", "2026"])));
+              : fallbackYears)));
       return {
         available: true,
         labels,
@@ -6246,7 +6254,9 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
 
   const series = useMemo(() => {
     if (!activeStation || !(activeStation.id || activeStation.station_id || activeStation.uid || activeStation.name)) {
-      const count = (period === "day" || period === "today") ? 24 : (period === "week" ? 7 : (period === "month" ? 31 : (period === "year" ? 12 : 5)));
+      const currentYear = new Date().getFullYear();
+      const fallbackYears = Array.from({ length: Math.max(1, currentYear - 2022 + 1) }, (_, i) => String(2022 + i));
+      const count = (period === "day" || period === "today") ? 24 : (period === "week" ? 7 : (period === "month" ? 31 : (period === "year" ? 12 : fallbackYears.length)));
       const labels = (period === "day" || period === "today")
         ? Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`)
         : (period === "week"
@@ -6255,7 +6265,7 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
             ? Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0"))
             : (period === "year"
               ? ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
-              : ["2022", "2023", "2024", "2025", "2026"])));
+              : fallbackYears)));
       return {
         available: true,
         labels,
