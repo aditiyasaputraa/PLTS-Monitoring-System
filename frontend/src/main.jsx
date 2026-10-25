@@ -809,6 +809,35 @@ function SitePickerDropdown({
   );
 }
 
+function AppFooter() {
+  const currentYear = new Date().getFullYear();
+  return (
+    <footer className="app-footer">
+      <div className="app-footer-inner">
+        <div className="app-footer-top">
+          <div className="app-footer-brand">
+            <span className="app-footer-logo-text">JaksPV</span>
+            <span className="app-footer-divider">•</span>
+            <span className="app-footer-tagline">Jakarta Solar PV Monitoring System</span>
+          </div>
+          <div className="app-footer-credits">
+            <p className="app-footer-credit-line">
+              Inisiasi &amp; Konsep Awal oleh <strong>Mahasiswa Politeknik Negeri Jakarta (PNJ)</strong>
+            </p>
+            <p className="app-footer-credit-line">
+              Dikembangkan &amp; Disempurnakan oleh <strong>Aditiya Saputra (Mahasiswa UBSI Kaliabang)</strong>
+            </p>
+          </div>
+        </div>
+        <div className="app-footer-bottom">
+          <span className="app-footer-copy">© {currentYear} JaksPV. All rights reserved.</span>
+          <span className="app-footer-badge">DKI Jakarta Solar Monitoring</span>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
 export default function App() {
   const auth = useAuthSession();
 
@@ -931,6 +960,20 @@ function LoginPage({ onSignIn, initialError }) {
           </form>
         </div>
       </div>
+
+      <footer className="login-footer">
+        <div className="login-footer-brand">
+          JaksPV • Jakarta Solar PV Monitoring System
+        </div>
+        <div className="login-footer-credits">
+          Inisiasi &amp; Konsep Awal oleh <strong>Mahasiswa Politeknik Negeri Jakarta (PNJ)</strong>
+          <br />
+          Dikembangkan &amp; Disempurnakan oleh <strong>Aditiya Saputra (Mahasiswa UBSI Kaliabang)</strong>
+        </div>
+        <div className="login-footer-copy">
+          © {new Date().getFullYear()} JaksPV. All rights reserved.
+        </div>
+      </footer>
     </div>
   );
 }
@@ -1564,6 +1607,8 @@ function Dashboard({ session, onSignOut }) {
           />
         )}
       </main>
+
+      <AppFooter />
 
       {/* Sync Toast */}
       {syncNotice && (

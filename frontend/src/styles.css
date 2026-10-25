@@ -54,6 +54,7 @@ button {
   display: flex;
   flex-direction: column;
   gap: 24px;
+  flex: 1;
 }
 
 /* Top Navigation Bar */
@@ -1655,11 +1656,13 @@ button {
   position: relative;
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 24px 16px;
   background: linear-gradient(rgba(15, 23, 20, 0.42), rgba(15, 23, 20, 0.55)), url('/login-bg.jpg') no-repeat center center / cover;
   box-sizing: border-box;
+  gap: 20px;
 }
 
 .login-card {
@@ -2530,6 +2533,165 @@ button {
     grid-template-columns: 1fr;
   }
 }
+
+/* ==================== FOOTER STYLES ==================== */
+.app-footer {
+  margin-top: auto;
+  background: rgba(10, 16, 13, 0.96);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 24px 20px 28px;
+  box-sizing: border-box;
+}
+
+.app-footer-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.app-footer-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.app-footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-footer-logo-text {
+  font-size: 15px;
+  font-weight: 800;
+  color: #34d399;
+  letter-spacing: 0.5px;
+}
+
+.app-footer-divider {
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 12px;
+}
+
+.app-footer-tagline {
+  font-size: 13px;
+  font-weight: 500;
+  color: #9ca3af;
+}
+
+.app-footer-credits {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: right;
+}
+
+.app-footer-credit-line {
+  font-size: 12.5px;
+  color: #9ca3af;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.app-footer-credit-line strong {
+  color: #f3f4f6;
+  font-weight: 600;
+}
+
+.app-footer-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.app-footer-copy {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.app-footer-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .app-footer-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .app-footer-credits {
+    text-align: left;
+  }
+  .app-footer-bottom {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
+
+/* Login Footer */
+.login-footer {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+  line-height: 1.6;
+  max-width: 760px;
+  width: 100%;
+  background: rgba(10, 16, 13, 0.72);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 14px 20px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.login-footer-brand {
+  font-size: 13px;
+  font-weight: 700;
+  color: #34d399;
+  letter-spacing: 0.3px;
+}
+
+.login-footer-credits {
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.78);
+  margin: 2px 0;
+  line-height: 1.5;
+}
+
+.login-footer-credits strong {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.login-footer-copy {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.48);
+  margin-top: 2px;
+}
+
 
 
 
