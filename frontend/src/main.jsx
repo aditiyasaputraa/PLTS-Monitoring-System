@@ -3879,7 +3879,6 @@ const ASSET_OWNER_PRESETS = [
 function EditStationModal({ station, onClose, onSave }) {
   const [customName, setCustomName] = useState(station.custom_name || station.name || "");
   const [assetOwner, setAssetOwner] = useState(station.asset_owner || "");
-  const [notes, setNotes] = useState(station.notes || "");
   const [isSaving, setIsSaving] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -3889,7 +3888,7 @@ function EditStationModal({ station, onClose, onSave }) {
       await onSave(station, {
         custom_name: customName.trim(),
         asset_owner: assetOwner.trim(),
-        notes: notes.trim(),
+        notes: station.notes || "",
       });
       onClose();
     } catch (err) {
@@ -3973,17 +3972,6 @@ function EditStationModal({ station, onClose, onSave }) {
                   })}
                 </div>
               </div>
-            </div>
-
-            <div className="station-modal-field">
-              <label className="station-modal-label">Catatan Tambahan (Opsional)</label>
-              <textarea
-                className="station-modal-input"
-                rows={2}
-                placeholder="Catatan kapasitas, penanggung jawab, gedung, dll..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
             </div>
           </div>
 
