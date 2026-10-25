@@ -925,6 +925,7 @@ def huawei_energy_balance_calls(
         ("daily", "2", today),
         ("monthly", "4", today.replace(day=1)),
         ("yearly", "5", today.replace(month=1, day=1)),
+        ("lifetime", "6", today),
     )
 
     calls = []
@@ -1644,7 +1645,11 @@ def huawei_energy_balance_by_station(grouped: dict[str, list[dict[str, Any]]]) -
                 "discharge_power_kw": numeric_series(data.get("dischargePower")),
             })
 
-    for call_name, chart_key in (("energy-balance-monthly", "daily"), ("energy-balance-yearly", "monthly")):
+    for call_name, chart_key in (
+        ("energy-balance-monthly", "daily"),
+        ("energy-balance-yearly", "monthly"),
+        ("energy-balance-lifetime", "yearly"),
+    ):
         for call in grouped.get(call_name) or []:
             parsed = urlparse(call.get("url") or "")
             query = parse_qs(parsed.query)

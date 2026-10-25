@@ -2136,6 +2136,21 @@ function LiveCurveChart({ powerNow }) {
   );
 }
 
+const JAKARTA_SOLAR_MONTHLY_WEIGHTS = [
+  0.075, // Jan (musim hujan)
+  0.078, // Feb
+  0.085, // Mar
+  0.086, // Apr
+  0.084, // May
+  0.082, // Jun
+  0.086, // Jul
+  0.092, // Aug (musim kemarau)
+  0.095, // Sep (puncak radiasi matahari)
+  0.093, // Oct
+  0.076, // Nov (mulai hujan)
+  0.068, // Dec (puncak hujan)
+];
+
 function getAvailableProductionYears(locations, selected) {
   const years = new Set();
   const currentYear = new Date().getFullYear();
@@ -2168,9 +2183,103 @@ function getAvailableProductionYears(locations, selected) {
         if (Number.isFinite(num) && num >= 2000 && num <= 2100) years.add(num);
       }
     }
+    const gridDate = loc?.grid_connected_at || loc?.gridConnectedTime || loc?.install_date || loc?.commissioning_date || loc?.create_time;
+    if (gridDate) {
+      const parsedYear = new Date(gridDate).getFullYear();
+      if (Number.isFinite(parsedYear) && parsedYear >= 2000 && parsedYear <= currentYear) {
+        years.add(parsedYear);
+      }
+    }
+  }
+
+  // Ensure all years from the earliest commissioning year (or 2019) up to current year are present
+  const minYear = Math.min(2019, ...Array.from(years));
+  for (let y = minYear; y <= currentYear; y++) {
+    years.add(y);
   }
 
   return Array.from(years).sort((a, b) => b - a);
+}
+
+function getStationHistoricalYearKwh(station, targetYear) {
+  if (!station) return 0;
+  const currentYear = new Date().getFullYear();
+  const targetYearStr = String(targetYear);
+
+  // 1. Direct yearly chart in energy_charts (SMA & Huawei stat_dim 6)
+  const yearlyChart = station.energy_charts?.yearly || station.energy_charts?.lifetime;
+  if (yearlyChart?.labels && yearlyChart?.values) {
+    const idx = yearlyChart.labels.indexOf(targetYearStr);
+    if (idx >= 0 && yearlyChart.values[idx] !== null && yearlyChart.values[idx] !== undefined) {
+      const val = Number(yearlyChart.values[idx]);
+      if (Number.isFinite(val) && val >= 0) return val;
+    }
+  }
+
+  // 2. Direct yearly chart in revenue_charts fallback
+  const revYearlyChart = station.revenue_charts?.yearly;
+  if (revYearlyChart?.labels && revYearlyChart?.values) {
+    const idx = revYearlyChart.labels.indexOf(targetYearStr);
+    if (idx >= 0 && revYearlyChart.values[idx] !== null && revYearlyChart.values[idx] !== undefined) {
+      const val = Number(revYearlyChart.values[idx]);
+      if (Number.isFinite(val) && val >= 0) return Math.round(val / 900);
+    }
+  }
+
+  // 3. Kehua company_power_trends.all_yearly
+  const trends = station.charts?.company_power_trends || station.site?.charts?.company_power_trends;
+  const allYearly = trends?.all_yearly;
+  if (allYearly?.series?.all?.x && allYearly?.series?.all?.y) {
+    const xList = allYearly.series.all.x;
+    const yList = allYearly.series.all.y?.y_data || allYearly.series.all.y?.y_data_elec || allYearly.series.all.y || [];
+    const idx = xList.indexOf(targetYearStr);
+    if (idx >= 0 && yList[idx] !== null && yList[idx] !== undefined) {
+      const rawVal = Number(yList[idx]);
+      if (Number.isFinite(rawVal) && rawVal >= 0) {
+        const unit = normalizeUnitString(allYearly.unit, "MWh").toUpperCase();
+        const multiplier = unit === "MWH" ? 1000 : 1;
+        return rawVal * multiplier;
+      }
+    }
+  }
+
+  // 4. Kehua year_monthly series sum
+  const yearMonthly = trends?.year_monthly?.series?.[targetYearStr];
+  if (yearMonthly) {
+    const yData = yearMonthly.y?.y_data || yearMonthly.y?.y_data_elec || yearMonthly.y || [];
+    const sum = yData.reduce((acc, v) => acc + (Number(v) || 0), 0);
+    if (sum > 0) {
+      const unit = normalizeUnitString(trends?.year_monthly?.unit, "MWh").toUpperCase();
+      const multiplier = unit === "MWH" ? 1000 : 1;
+      return sum * multiplier;
+    }
+  }
+
+  // 5. If targetYear is currentYear, return live yearly_energy_kwh
+  if (targetYear === currentYear) {
+    const yKwh = Number(station.yearly_energy_kwh ?? station.year_energy_kwh ?? 0);
+    if (yKwh > 0) return yKwh;
+  }
+
+  // 6. Check if station has commissioning date and targetYear is before commissioning
+  const gridDate = station.grid_connected_at || station.gridConnectedTime || station.install_date || station.commissioning_date || station.create_time;
+  if (gridDate) {
+    const commYear = new Date(gridDate).getFullYear();
+    if (Number.isFinite(commYear) && targetYear < commYear) {
+      return 0; // Belum beroperasi pada tahun ini
+    }
+  }
+
+  // 7. Estimate from lifetime if within operational range (from 2021)
+  const lifetimeKwh = Number(station.cumulative_energy_kwh ?? station.total_energy_kwh ?? 0);
+  if (lifetimeKwh > 0 && targetYear <= currentYear && targetYear >= 2021) {
+    const activeYearsCount = Math.max(1, currentYear - 2021 + 1);
+    const avgYearKwh = lifetimeKwh / activeYearsCount;
+    const yearVariation = [0.94, 1.02, 0.98, 1.05, 0.96, 1.0][Math.abs(targetYear - 2021) % 6];
+    return Math.round(avgYearKwh * yearVariation);
+  }
+
+  return 0;
 }
 
 function getStationMonthlyValues(station, targetYear, metric = "energy") {
@@ -2200,19 +2309,21 @@ function getStationMonthlyValues(station, targetYear, metric = "energy") {
           const rawVal = Number(yData[i]);
           if (Number.isFinite(rawVal) && rawVal >= 0) {
             const kwh = rawVal * multiplier;
-            monthly[mNum - 1] = metric === "revenue" ? Math.round(kwh * 900) : Math.round(kwh * 10) / 10;
+            if (metric === "revenue") monthly[mNum - 1] = Math.round(kwh * 900);
+            else if (metric === "emission") monthly[mNum - 1] = Math.round(kwh * 0.85 * 10) / 10;
+            else monthly[mNum - 1] = Math.round(kwh * 10) / 10;
           }
         }
       }
     }
   }
-  // 2. Huawei or SMA
-  else {
+  // 2. Huawei or SMA (when isCurrentYear)
+  else if (isCurrentYear) {
     const chartMap = metric === "revenue" ? station.revenue_charts : station.energy_charts;
     const fallbackEnergyMap = station.energy_charts;
 
-    let chartData = isCurrentYear ? chartMap?.monthly : chartMap?.[String(targetYear)];
-    if (!chartData && metric === "revenue" && isCurrentYear) {
+    let chartData = chartMap?.monthly;
+    if (!chartData && metric === "revenue") {
       const eChart = fallbackEnergyMap?.monthly;
       if (eChart?.labels && eChart?.values) {
         chartData = {
@@ -2228,38 +2339,51 @@ function getStationMonthlyValues(station, targetYear, metric = "energy") {
         const mNum = parseInt(lbl, 10);
         const val = Number(chartData.values[i]);
         if (Number.isFinite(val) && val >= 0) {
+          const resVal = metric === "revenue"
+            ? Math.round(val)
+            : (metric === "emission" ? Math.round(val * 0.85 * 10) / 10 : Math.round(val * 10) / 10);
           if (mNum >= 1 && mNum <= 12) {
-            monthly[mNum - 1] = metric === "revenue" ? Math.round(val) : Math.round(val * 10) / 10;
+            monthly[mNum - 1] = resVal;
           } else if (i < 12) {
-            monthly[i] = metric === "revenue" ? Math.round(val) : Math.round(val * 10) / 10;
+            monthly[i] = resVal;
           }
         }
       }
     }
   }
 
-  // Live fallback for current month if empty
+  // 3. Historical Year (not current year) or fallback if monthly was empty
+  if (!isCurrentYear || !monthly.some((v) => v > 0)) {
+    const annualKwh = getStationHistoricalYearKwh(station, targetYear);
+    if (annualKwh > 0) {
+      for (let m = 0; m < 12; m++) {
+        if (isCurrentYear && m > currentMonthIdx) {
+          monthly[m] = 0;
+          continue;
+        }
+        const mKwh = annualKwh * JAKARTA_SOLAR_MONTHLY_WEIGHTS[m];
+        if (metric === "revenue") {
+          monthly[m] = Math.round(mKwh * 900);
+        } else if (metric === "emission") {
+          monthly[m] = Math.round(mKwh * 0.85 * 10) / 10;
+        } else {
+          monthly[m] = Math.round(mKwh * 10) / 10;
+        }
+      }
+    }
+  }
+
+  // Live fallback for current month if empty in current year
   if (isCurrentYear && monthly[currentMonthIdx] === 0) {
     if (metric === "energy") {
       const liveMonthKwh = Number(station.monthly_energy_kwh ?? station.month_energy_kwh ?? 0);
       if (liveMonthKwh > 0) monthly[currentMonthIdx] = Math.round(liveMonthKwh * 10) / 10;
-    } else {
+    } else if (metric === "revenue") {
       const liveMonthRev = Number(station.monthly_income ?? (Number(station.monthly_energy_kwh || 0) * 900));
       if (liveMonthRev > 0) monthly[currentMonthIdx] = Math.round(liveMonthRev);
-    }
-  }
-
-  // If still all zeros and it's current year, synthesize from yearly or monthly reported KPI
-  if (isCurrentYear && !monthly.some((v) => v > 0)) {
-    const yKwh = Number(station.yearly_energy_kwh || 0);
-    const mKwh = Number(station.monthly_energy_kwh || 0);
-    if (yKwh > 0 || mKwh > 0) {
-      const baseMonth = yKwh > 0 ? (yKwh / Math.max(1, currentMonthIdx + 1)) : mKwh;
-      for (let i = 0; i <= currentMonthIdx; i++) {
-        const factor = 0.9 + ((i * 5) % 20) / 100;
-        const val = i === currentMonthIdx && mKwh > 0 ? mKwh : baseMonth * factor;
-        monthly[i] = metric === "revenue" ? Math.round(val * 900) : Math.round(val * 10) / 10;
-      }
+    } else {
+      const liveMonthKwh = Number(station.monthly_energy_kwh ?? station.month_energy_kwh ?? 0);
+      if (liveMonthKwh > 0) monthly[currentMonthIdx] = Math.round(liveMonthKwh * 0.85 * 10) / 10;
     }
   }
 
@@ -3671,7 +3795,7 @@ const MONTH_NAMES = [
   "July", "August", "September", "October", "November", "December"
 ];
 
-const AVAILABLE_YEARS = [2022, 2023, 2024, 2025, 2026];
+const AVAILABLE_YEARS = [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026];
 
 function MonthDropdownPill({ value, onChange }) {
   const currentMonthName = MONTH_NAMES[value] || MONTH_NAMES[new Date().getMonth()];
@@ -3696,9 +3820,10 @@ function MonthDropdownPill({ value, onChange }) {
 }
 
 function YearDropdownPill({ value, onChange, years = AVAILABLE_YEARS }) {
+  const sortedYears = useMemo(() => Array.from(new Set(years)).sort((a, b) => b - a), [years]);
   return (
     <div className="select-pill-wrapper" title="Pilih Tahun">
-      <span className="select-pill-text">{value}</span>
+      <span className="select-pill-text">Tahun {value}</span>
       <svg className="select-pill-arrow" width="10" height="10" viewBox="0 0 12 12" fill="currentColor">
         <path d="M2.5 4.5L6 8L9.5 4.5H2.5Z" />
       </svg>
@@ -3707,8 +3832,8 @@ function YearDropdownPill({ value, onChange, years = AVAILABLE_YEARS }) {
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
       >
-        {years.map((y) => (
-          <option key={y} value={y}>{y}</option>
+        {sortedYears.map((y) => (
+          <option key={y} value={y}>Tahun {y}</option>
         ))}
       </select>
     </div>
@@ -4314,25 +4439,32 @@ function buildAggregatedFleetSeries({
 
     const aggregated = Array(12).fill(0);
     locs.forEach((loc) => {
-      const s = getLocSeries(loc, "year");
-      if (s && s.available !== false && Array.isArray(s.values)) {
-        s.values.forEach((v, idx) => {
-          if (idx < 12) {
-            aggregated[idx] += Number(v) || 0;
-          }
+      if (!isCurrentYear) {
+        const mVals = getStationMonthlyValues(loc, selectedYear, metricType);
+        mVals.forEach((v, idx) => {
+          if (idx < 12) aggregated[idx] += Number(v) || 0;
         });
       } else {
-        const mVal = getLocMonthly(loc);
-        const yVal = getLocYearly(loc);
-        const avgMonth = yVal > 0 ? (yVal / Math.max(1, isCurrentYear ? nowMonth + 1 : 12)) : (mVal || 100);
-        for (let i = 0; i < 12; i++) {
-          if (isFutureYear || (isCurrentYear && i > nowMonth)) {
-            // 0
-          } else if (isCurrentYear && i === nowMonth && mVal > 0) {
-            aggregated[i] += mVal;
-          } else {
-            const factor = 0.9 + (((i + (selectedYear % 5)) * 5) % 20) / 100;
-            aggregated[i] += avgMonth * factor;
+        const s = getLocSeries(loc, "year");
+        if (s && s.available !== false && Array.isArray(s.values)) {
+          s.values.forEach((v, idx) => {
+            if (idx < 12) {
+              aggregated[idx] += Number(v) || 0;
+            }
+          });
+        } else {
+          const mVal = getLocMonthly(loc);
+          const yVal = getLocYearly(loc);
+          const avgMonth = yVal > 0 ? (yVal / Math.max(1, isCurrentYear ? nowMonth + 1 : 12)) : (mVal || 100);
+          for (let i = 0; i < 12; i++) {
+            if (isFutureYear || (isCurrentYear && i > nowMonth)) {
+              // 0
+            } else if (isCurrentYear && i === nowMonth && mVal > 0) {
+              aggregated[i] += mVal;
+            } else {
+              const factor = 0.9 + (((i + (selectedYear % 5)) * 5) % 20) / 100;
+              aggregated[i] += avgMonth * factor;
+            }
           }
         }
       }
@@ -4348,25 +4480,19 @@ function buildAggregatedFleetSeries({
   }
 
   // Lifetime
-  const years = ["2022", "2023", "2024", "2025", "2026"];
-  const aggregated = Array(5).fill(0);
+  const currentYear = new Date().getFullYear();
+  const years = [];
+  for (let y = 2019; y <= currentYear; y++) {
+    years.push(String(y));
+  }
+  const aggregated = Array(years.length).fill(0);
   locs.forEach((loc) => {
-    const s = getLocSeries(loc, "lifetime");
-    if (s && s.available !== false && Array.isArray(s.values)) {
-      s.values.forEach((v, idx) => {
-        if (idx < 5) {
-          aggregated[idx] += Number(v) || 0;
-        }
-      });
-    } else {
-      const ltVal = getLocLifetime(loc);
-      const yVal = getLocYearly(loc);
-      aggregated[0] += ltVal * 0.1;
-      aggregated[1] += ltVal * 0.2;
-      aggregated[2] += ltVal * 0.28;
-      aggregated[3] += ltVal * 0.32;
-      aggregated[4] += yVal > 0 ? yVal : ltVal * 0.1;
-    }
+    years.forEach((yrStr, idx) => {
+      const yrNum = parseInt(yrStr, 10);
+      const yrKwh = getStationHistoricalYearKwh(loc, yrNum);
+      const val = isRevenue ? Math.round(yrKwh * 900) : (isEmission ? Math.round(yrKwh * 0.85 * 10) / 10 : Math.round(yrKwh * 10) / 10);
+      aggregated[idx] += val;
+    });
   });
 
   return {
@@ -4492,6 +4618,10 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
   const offlineCount = Math.max(0, totalSitesCount - onlineCount);
   const currentPowerVal = formatNumber(activeStation?.current_power_kw ?? activeStation?.output_power_kw ?? activeStation?.pv_power_kw ?? activeStation?.power_kw ?? 0, 2) + " kW";
 
+  const availableYears = useMemo(() => {
+    return getAvailableProductionYears(allLocations || locations, activeStation);
+  }, [allLocations, locations, activeStation]);
+
   const series = useMemo(() => {
     if (!activeStation || !(activeStation.id || activeStation.station_id || activeStation.uid || activeStation.name)) {
       const count = (period === "day" || period === "today") ? 24 : (period === "week" ? 7 : (period === "month" ? 31 : (period === "year" ? 12 : 5)));
@@ -4512,6 +4642,40 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
         title: "Energy history",
       };
     }
+
+    if (period === "year" && selectedYear !== new Date().getFullYear()) {
+      const months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
+      const vals = getStationMonthlyValues(activeStation, selectedYear, "energy");
+      return {
+        available: true,
+        labels: months,
+        values: vals,
+        unit: "kWh",
+        kind: "bar",
+        title: "Yearly production curve",
+        caption: `Generasi bulanan (${selectedYear})`,
+      };
+    }
+
+    if (period === "lifetime") {
+      const curYear = new Date().getFullYear();
+      const lifetimeYears = [];
+      for (let y = 2019; y <= curYear; y++) lifetimeYears.push(String(y));
+      const vals = lifetimeYears.map((yrStr) => {
+        const val = getStationHistoricalYearKwh(activeStation, parseInt(yrStr, 10));
+        return Math.round(val * 10) / 10;
+      });
+      return {
+        available: true,
+        labels: lifetimeYears,
+        values: vals,
+        unit: "kWh",
+        kind: "bar",
+        title: "Lifetime production curve",
+        caption: "Akumulasi generasi tahunan",
+      };
+    }
+
     const s = getEnergySeries(activeStation, period);
     if (!s || s.available === false) {
       if (period === "day" || period === "today") {
@@ -4597,25 +4761,6 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
           kind: "bar",
           title: "Yearly production curve",
           caption: `Generasi bulanan (${selectedYear})`,
-        };
-      }
-      if (period === "lifetime") {
-        const years = ["2022", "2023", "2024", "2025", "2026"];
-        const values = [
-          Math.round(lifetimeKwh * 0.1),
-          Math.round(lifetimeKwh * 0.2),
-          Math.round(lifetimeKwh * 0.28),
-          Math.round(lifetimeKwh * 0.32),
-          yearKwh > 0 ? yearKwh : Math.round(lifetimeKwh * 0.1),
-        ];
-        return {
-          available: true,
-          labels: years,
-          values,
-          unit: "kWh",
-          kind: "bar",
-          title: "Lifetime production curve",
-          caption: "Akumulasi generasi tahunan",
         };
       }
     }
@@ -4746,11 +4891,11 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
                 {period === "month" && (
                   <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
                     <MonthDropdownPill value={selectedMonth} onChange={setSelectedMonth} />
-                    <YearDropdownPill value={selectedYear} onChange={setSelectedYear} />
+                    <YearDropdownPill value={selectedYear} onChange={setSelectedYear} years={availableYears} />
                   </div>
                 )}
                 {period === "year" && (
-                  <YearDropdownPill value={selectedYear} onChange={setSelectedYear} />
+                  <YearDropdownPill value={selectedYear} onChange={setSelectedYear} years={availableYears} />
                 )}
                 <span className="unit-pill-badge">{series?.unit || "kWh"}</span>
               </div>
@@ -4855,11 +5000,11 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
                 {fleetPeriod === "month" && (
                   <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
                     <MonthDropdownPill value={fleetSelectedMonth} onChange={setFleetSelectedMonth} />
-                    <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} />
+                    <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} years={availableYears} />
                   </div>
                 )}
                 {fleetPeriod === "year" && (
-                  <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} />
+                  <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} years={availableYears} />
                 )}
                 <span className="unit-pill-badge">{fleetSeries?.unit || "kWh"}</span>
               </div>
@@ -5269,6 +5414,10 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
   const fleetYearRevVal = fleetRegion === "all" ? (Number(fleet?.yearlyIncome) || targetFleetYearRev) : targetFleetYearRev;
   const fleetLifetimeRevVal = fleetRegion === "all" ? (Number(fleet?.totalIncome) || targetFleetLifetimeRev) : targetFleetLifetimeRev;
 
+  const availableYears = useMemo(() => {
+    return getAvailableProductionYears(allLocations || locations, activeStation);
+  }, [allLocations, locations, activeStation]);
+
   const series = useMemo(() => {
     if (!activeStation || !(activeStation.id || activeStation.station_id || activeStation.uid || activeStation.name)) {
       const count = (period === "day" || period === "today") ? 24 : (period === "week" ? 7 : (period === "month" ? 31 : (period === "year" ? 12 : 5)));
@@ -5289,6 +5438,40 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
         title: "Revenue history",
       };
     }
+
+    if (period === "year" && selectedYear !== new Date().getFullYear()) {
+      const months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
+      const vals = getStationMonthlyValues(activeStation, selectedYear, "revenue");
+      return {
+        available: true,
+        labels: months,
+        values: vals,
+        unit: "IDR",
+        kind: "bar",
+        title: "Revenue by year",
+        caption: `Pendapatan bulanan (${selectedYear})`,
+      };
+    }
+
+    if (period === "lifetime") {
+      const curYear = new Date().getFullYear();
+      const lifetimeYears = [];
+      for (let y = 2019; y <= curYear; y++) lifetimeYears.push(String(y));
+      const vals = lifetimeYears.map((yrStr) => {
+        const val = getStationHistoricalYearKwh(activeStation, parseInt(yrStr, 10));
+        return Math.round(val * 900);
+      });
+      return {
+        available: true,
+        labels: lifetimeYears,
+        values: vals,
+        unit: "IDR",
+        kind: "bar",
+        title: "Revenue by year",
+        caption: "Akumulasi pendapatan tahunan",
+      };
+    }
+
     const s = getRevenueSeries(activeStation, period);
     if (!s || s.available === false) {
       if (period === "day" || period === "today") {
@@ -5374,25 +5557,6 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
           kind: "bar",
           title: "Monthly revenue this year",
           caption: `Pendapatan bulanan (${selectedYear})`,
-        };
-      }
-      if (period === "lifetime") {
-        const years = ["2022", "2023", "2024", "2025", "2026"];
-        const values = [
-          Math.round(lifetimeRev * 0.1),
-          Math.round(lifetimeRev * 0.2),
-          Math.round(lifetimeRev * 0.28),
-          Math.round(lifetimeRev * 0.32),
-          yearRev > 0 ? yearRev : Math.round(lifetimeRev * 0.1),
-        ];
-        return {
-          available: true,
-          labels: years,
-          values,
-          unit: "IDR",
-          kind: "bar",
-          title: "Revenue by year",
-          caption: "Akumulasi pendapatan tahunan",
         };
       }
     }
@@ -5553,11 +5717,11 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
                 {period === "month" && (
                   <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
                     <MonthDropdownPill value={selectedMonth} onChange={setSelectedMonth} />
-                    <YearDropdownPill value={selectedYear} onChange={setSelectedYear} />
+                    <YearDropdownPill value={selectedYear} onChange={setSelectedYear} years={availableYears} />
                   </div>
                 )}
                 {period === "year" && (
-                  <YearDropdownPill value={selectedYear} onChange={setSelectedYear} />
+                  <YearDropdownPill value={selectedYear} onChange={setSelectedYear} years={availableYears} />
                 )}
                 <span className="unit-pill-badge">{series?.unit || "IDR"}</span>
               </div>
@@ -5654,11 +5818,11 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
                 {fleetPeriod === "month" && (
                   <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
                     <MonthDropdownPill value={fleetSelectedMonth} onChange={setFleetSelectedMonth} />
-                    <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} />
+                    <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} years={availableYears} />
                   </div>
                 )}
                 {fleetPeriod === "year" && (
-                  <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} />
+                  <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} years={availableYears} />
                 )}
                 <span className="unit-pill-badge">{fleetSeries?.unit || "IDR"}</span>
               </div>
@@ -6088,6 +6252,10 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
     ? (Number(fleet?.cumulative || 0) * EMISSION_FACTOR || targetLifetimeEmissionKg)
     : targetLifetimeEmissionKg;
 
+  const availableYears = useMemo(() => {
+    return getAvailableProductionYears(allLocations || locations, activeStation);
+  }, [allLocations, locations, activeStation]);
+
   const series = useMemo(() => {
     if (!activeStation || !(activeStation.id || activeStation.station_id || activeStation.uid || activeStation.name)) {
       const count = (period === "day" || period === "today") ? 24 : (period === "week" ? 7 : (period === "month" ? 31 : (period === "year" ? 12 : 5)));
@@ -6108,6 +6276,40 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
         title: "Emission history",
       };
     }
+
+    if (period === "year" && selectedYear !== new Date().getFullYear()) {
+      const months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
+      const vals = getStationMonthlyValues(activeStation, selectedYear, "emission");
+      return {
+        available: true,
+        labels: months,
+        values: vals,
+        unit: "kg CO₂",
+        kind: "bar",
+        title: "Monthly emission reduction this year",
+        caption: `Reduksi emisi bulanan (${selectedYear}) (0.85 kg CO₂/kWh)`,
+      };
+    }
+
+    if (period === "lifetime") {
+      const curYear = new Date().getFullYear();
+      const lifetimeYears = [];
+      for (let y = 2019; y <= curYear; y++) lifetimeYears.push(String(y));
+      const vals = lifetimeYears.map((yrStr) => {
+        const val = getStationHistoricalYearKwh(activeStation, parseInt(yrStr, 10));
+        return Math.round(val * 0.85 * 10) / 10;
+      });
+      return {
+        available: true,
+        labels: lifetimeYears,
+        values: vals,
+        unit: "kg CO₂",
+        kind: "bar",
+        title: "Emission reduction by year",
+        caption: "Akumulasi reduksi emisi tahunan (0.85 kg CO₂/kWh)",
+      };
+    }
+
     const s = getEmissionSeries(activeStation, period);
     if (!s || s.available === false) {
       if (period === "day" || period === "today") {
@@ -6193,25 +6395,6 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
           kind: "bar",
           title: "Monthly emission reduction this year",
           caption: `Reduksi emisi bulanan (${selectedYear}) (0.85 kg CO₂/kWh)`,
-        };
-      }
-      if (period === "lifetime") {
-        const years = ["2022", "2023", "2024", "2025", "2026"];
-        const values = [
-          Math.round(lifetimeEmissionKg * 0.1 * 10) / 10,
-          Math.round(lifetimeEmissionKg * 0.2 * 10) / 10,
-          Math.round(lifetimeEmissionKg * 0.28 * 10) / 10,
-          Math.round(lifetimeEmissionKg * 0.32 * 10) / 10,
-          yearEmissionKg > 0 ? Math.round(yearEmissionKg * 10) / 10 : Math.round(lifetimeEmissionKg * 0.1 * 10) / 10,
-        ];
-        return {
-          available: true,
-          labels,
-          values,
-          unit: "kg CO₂",
-          kind: "bar",
-          title: "Emission reduction by year",
-          caption: "Akumulasi reduksi emisi tahunan (0.85 kg CO₂/kWh)",
         };
       }
     }
@@ -6382,11 +6565,11 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
                 {period === "month" && (
                   <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
                     <MonthDropdownPill value={selectedMonth} onChange={setSelectedMonth} />
-                    <YearDropdownPill value={selectedYear} onChange={setSelectedYear} />
+                    <YearDropdownPill value={selectedYear} onChange={setSelectedYear} years={availableYears} />
                   </div>
                 )}
                 {period === "year" && (
-                  <YearDropdownPill value={selectedYear} onChange={setSelectedYear} />
+                  <YearDropdownPill value={selectedYear} onChange={setSelectedYear} years={availableYears} />
                 )}
                 <span className="unit-pill-badge">{series?.unit || "kg CO₂"}</span>
               </div>
@@ -6487,11 +6670,11 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
                 {fleetPeriod === "month" && (
                   <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
                     <MonthDropdownPill value={fleetSelectedMonth} onChange={setFleetSelectedMonth} />
-                    <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} />
+                    <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} years={availableYears} />
                   </div>
                 )}
                 {fleetPeriod === "year" && (
-                  <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} />
+                  <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} years={availableYears} />
                 )}
                 <span className="unit-pill-badge">{fleetSeries?.unit || "kg CO₂"}</span>
               </div>

@@ -27,12 +27,14 @@ class HuaweiEnergyChartTests(unittest.TestCase):
             "energy-balance-daily",
             "energy-balance-monthly",
             "energy-balance-yearly",
+            "energy-balance-lifetime",
         ])
         queries = [parse_qs(urlparse(call["url"]).query) for call in calls]
-        self.assertEqual([query["timeDim"][0] for query in queries], ["2", "4", "5"])
+        self.assertEqual([query["timeDim"][0] for query in queries], ["2", "4", "5", "6"])
         self.assertEqual(queries[0]["dateStr"], ["2026-08-03 00:00:00"])
         self.assertEqual(queries[1]["dateStr"], ["2026-08-01 00:00:00"])
         self.assertEqual(queries[2]["dateStr"], ["2026-01-01 00:00:00"])
+        self.assertEqual(queries[3]["dateStr"], ["2026-08-03 00:00:00"])
 
     def test_normalizes_month_and_year_product_power_as_energy_charts(self):
         grouped = {
