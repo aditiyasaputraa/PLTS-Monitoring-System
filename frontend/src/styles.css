@@ -1900,7 +1900,7 @@ button {
 
 .analytics-grid-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.62fr) minmax(320px, 1fr);
+  grid-template-columns: minmax(0, 1.45fr) minmax(340px, 1fr);
   gap: 20px;
   align-items: stretch;
 }
@@ -2028,7 +2028,7 @@ button {
 .station-table-wrap {
   flex: 1;
   overflow-y: auto;
-  overflow-x: auto;
+  overflow-x: hidden;
   border: 1px solid #edf1ec;
   border-radius: 10px;
   background: #ffffff;
@@ -2038,7 +2038,7 @@ button {
 
 .station-table-wrap::-webkit-scrollbar {
   width: 5px;
-  height: 5px;
+  height: 0px;
 }
 .station-table-wrap::-webkit-scrollbar-track {
   background: #f8faf8;
@@ -2053,6 +2053,7 @@ button {
 
 .station-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 11px;
   text-align: left;
@@ -2063,21 +2064,24 @@ button {
   top: 0;
   background: #f5f8f5;
   color: #4b5a50;
-  font-size: 9.5px;
+  font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  padding: 7px 8px;
+  padding: 7px 4px;
   border-bottom: 1px solid #e2e8df;
   z-index: 2;
   white-space: nowrap;
+  box-sizing: border-box;
 }
 
 .station-table td {
-  padding: 7px 8px;
+  padding: 6px 4px;
   border-bottom: 1px solid #f1f4f1;
   color: #1f2937;
   vertical-align: middle;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .station-table-row {
@@ -2109,17 +2113,19 @@ button {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  min-width: 120px;
-  max-width: 180px;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
 }
 
 .station-primary-name {
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 700;
   color: #0f1912;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  display: block;
 }
 
 .station-table-row.selected .station-primary-name {
@@ -2127,11 +2133,12 @@ button {
 }
 
 .station-raw-name {
-  font-size: 9.5px;
+  font-size: 9px;
   color: #7c8d82;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  display: block;
 }
 
 .station-status-dot {
@@ -2153,26 +2160,27 @@ button {
 }
 
 .asset-owner-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 6px;
-  border-radius: 6px;
-  font-size: 9.5px;
+  display: inline-block;
+  padding: 2px 5px;
+  border-radius: 5px;
+  font-size: 9px;
   font-weight: 600;
   background: #eef5f0;
   color: #14532d;
   border: 1px solid #d4e5d8;
   white-space: nowrap;
-  max-width: 130px;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+  vertical-align: middle;
+  box-sizing: border-box;
 }
 
 .asset-owner-empty {
-  font-size: 10px;
+  font-size: 9px;
   color: #8a998f;
   cursor: pointer;
-  padding: 1px 5px;
+  padding: 1px 4px;
   border-radius: 4px;
   border: 1px dashed #cbd5cb;
   display: inline-block;
@@ -2187,12 +2195,12 @@ button {
 }
 
 .station-vendor-badge {
-  font-size: 9.5px;
+  font-size: 8.5px;
   font-weight: 700;
-  padding: 1px 6px;
-  border-radius: 5px;
+  padding: 1px 4px;
+  border-radius: 4px;
   display: inline-block;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
   white-space: nowrap;
 }
 

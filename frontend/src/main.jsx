@@ -3876,6 +3876,20 @@ function EditStationModal({ station, onClose, onSave }) {
   );
 }
 
+function formatShortOwner(owner) {
+  if (!owner) return "";
+  return owner
+    .replace("Sudin Nakertransgi Jakarta Utara", "Sudin Jakut")
+    .replace("Sudin Nakertransgi Jakarta Barat", "Sudin Jakbar")
+    .replace("Sudin Nakertransgi Jakarta Pusat", "Sudin Jakpus")
+    .replace("Sudin Nakertransgi Jakarta Timur", "Sudin Jaktim")
+    .replace("Sudin Nakertransgi Jakarta Selatan", "Sudin Jaksel")
+    .replace("Sudin Nakertransgi ", "Sudin ")
+    .replace("Dinas Tenaga Kerja, Transmigrasi dan Energi", "Disnakertransgi")
+    .replace(" DKI Jakarta", "")
+    .replace(" Setda", "");
+}
+
 function StationListDarkCard({
   locations,
   allLocations,
@@ -3960,11 +3974,11 @@ function StationListDarkCard({
         <table className="station-table">
           <thead>
             <tr>
-              <th style={{ width: "32px", textAlign: "center" }}>Status</th>
+              <th style={{ width: "22px", textAlign: "center" }}>Status</th>
               <th>Nama PLTS</th>
-              <th>Pemilik Aset</th>
-              <th style={{ width: "64px", textAlign: "center" }}>Vendor</th>
-              <th style={{ width: "42px", textAlign: "center" }}>Aksi</th>
+              <th style={{ width: "88px" }}>Pemilik Aset</th>
+              <th style={{ width: "46px", textAlign: "center" }}>Vendor</th>
+              <th style={{ width: "30px", textAlign: "center" }}>Aksi</th>
             </tr>
           </thead>
           <tbody>
@@ -4011,7 +4025,7 @@ function StationListDarkCard({
                     <td>
                       {loc.asset_owner ? (
                         <span className="asset-owner-pill" title={`Pemilik Aset: ${loc.asset_owner}`}>
-                          {loc.asset_owner}
+                          {formatShortOwner(loc.asset_owner)}
                         </span>
                       ) : (
                         <span
@@ -4022,7 +4036,7 @@ function StationListDarkCard({
                           }}
                           title="Klik untuk menambahkan pemilik aset"
                         >
-                          + Set Aset
+                          + Set
                         </span>
                       )}
                     </td>
