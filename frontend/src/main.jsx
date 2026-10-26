@@ -4605,6 +4605,9 @@ function buildAggregatedFleetSeries({
 }
 
 function EnergyView({ location, fleet, locations, allLocations, onSelect, selectedRegion = "all", onSelectRegion, onUpdateStation }) {
+  const pool = (allLocations && allLocations.length > 0) ? allLocations : (locations || []);
+  const [localStationUid, setLocalStationUid] = useState(location?.uid || null);
+
   // Station curve controls
   const [period, setPeriod] = useState("day");
   const [selectedDate, setSelectedDate] = useState(getTodayDateStr);
@@ -4619,6 +4622,12 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
   const [fleetSelectedYear, setFleetSelectedYear] = useState(() => new Date().getFullYear());
 
   useEffect(() => {
+    if (location?.uid) {
+      setLocalStationUid(location.uid);
+    }
+  }, [location?.uid]);
+
+  useEffect(() => {
     if (selectedRegion) {
       setFleetRegion(selectedRegion);
       if (selectedRegion !== "all") {
@@ -4631,16 +4640,6 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
       }
     }
   }, [selectedRegion, pool]);
-
-  const pool = (allLocations && allLocations.length > 0) ? allLocations : (locations || []);
-
-  const [localStationUid, setLocalStationUid] = useState(location?.uid || null);
-
-  useEffect(() => {
-    if (location?.uid) {
-      setLocalStationUid(location.uid);
-    }
-  }, [location?.uid]);
 
   // Fleet pool & target locations for selected region
   const targetLocations = useMemo(() => {
@@ -5434,6 +5433,9 @@ function RevenueProductionChart({ series, period, isKehua }) {
 }
 
 function RevenueView({ location, fleet, locations, allLocations, onSelect, selectedRegion = "all", onSelectRegion, onUpdateStation }) {
+  const pool = (allLocations && allLocations.length > 0) ? allLocations : (locations || []);
+  const [localStationUid, setLocalStationUid] = useState(location?.uid || null);
+
   // Station curve controls
   const [period, setPeriod] = useState("day");
   const [selectedDate, setSelectedDate] = useState(getTodayDateStr);
@@ -5448,6 +5450,12 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
   const [fleetSelectedYear, setFleetSelectedYear] = useState(() => new Date().getFullYear());
 
   useEffect(() => {
+    if (location?.uid) {
+      setLocalStationUid(location.uid);
+    }
+  }, [location?.uid]);
+
+  useEffect(() => {
     if (selectedRegion) {
       setFleetRegion(selectedRegion);
       if (selectedRegion !== "all") {
@@ -5460,16 +5468,6 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
       }
     }
   }, [selectedRegion, pool]);
-
-  const pool = (allLocations && allLocations.length > 0) ? allLocations : (locations || []);
-
-  const [localStationUid, setLocalStationUid] = useState(location?.uid || null);
-
-  useEffect(() => {
-    if (location?.uid) {
-      setLocalStationUid(location.uid);
-    }
-  }, [location?.uid]);
 
   // Fleet calculations & target locations
   const targetLocations = useMemo(() => {
@@ -6335,6 +6333,9 @@ function EmissionProductionChart({ series, period }) {
 }
 
 function EmissionView({ location, fleet, locations, allLocations, onSelect, selectedRegion = "all", onSelectRegion, onUpdateStation }) {
+  const pool = (allLocations && allLocations.length > 0) ? allLocations : (locations || []);
+  const [localStationUid, setLocalStationUid] = useState(location?.uid || null);
+
   const [period, setPeriod] = useState("day");
   const [selectedDate, setSelectedDate] = useState(getTodayDateStr);
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth());
@@ -6346,6 +6347,12 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
   const [fleetSelectedDate, setFleetSelectedDate] = useState(getTodayDateStr);
   const [fleetSelectedMonth, setFleetSelectedMonth] = useState(() => new Date().getMonth());
   const [fleetSelectedYear, setFleetSelectedYear] = useState(() => new Date().getFullYear());
+
+  useEffect(() => {
+    if (location?.uid) {
+      setLocalStationUid(location.uid);
+    }
+  }, [location?.uid]);
 
   useEffect(() => {
     if (selectedRegion) {
@@ -6360,16 +6367,6 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
       }
     }
   }, [selectedRegion, pool]);
-
-  const pool = (allLocations && allLocations.length > 0) ? allLocations : (locations || []);
-
-  const [localStationUid, setLocalStationUid] = useState(location?.uid || null);
-
-  useEffect(() => {
-    if (location?.uid) {
-      setLocalStationUid(location.uid);
-    }
-  }, [location?.uid]);
 
   const targetLocations = useMemo(() => {
     if (fleetRegion === "all") return pool;
