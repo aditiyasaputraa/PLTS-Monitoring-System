@@ -482,9 +482,12 @@ button {
 }
 
 .kpi-tile-val {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 800;
   color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .kpi-tile-val small {

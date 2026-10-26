@@ -455,8 +455,8 @@ function formatNumber(value, digits = 1) {
 function formatMoney(value) {
   if (!value || Number.isNaN(Number(value))) return "0";
   const num = Number(value);
-  if (num >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(2)}B`;
-  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(2)}M`;
+  if (num >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(2)} Miliar`;
+  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(2)} Juta`;
   return new Intl.NumberFormat("id-ID").format(Math.round(num));
 }
 
@@ -2509,9 +2509,9 @@ function calculateMaxVal(maxNum) {
 function formatYTick(val, metric) {
   if (val === 0) return "0";
   if (metric === "revenue") {
-    if (val >= 1_000_000_000) return `${(val / 1e9).toFixed(1)}M`;
-    if (val >= 1_000_000) return `${(val / 1e6).toFixed(val % 1e6 === 0 ? 0 : 1)}jt`;
-    if (val >= 1000) return `${(val / 1e3).toFixed(0)}k`;
+    if (val >= 1_000_000_000) return `${(val / 1e9).toFixed(1)} Miliar`;
+    if (val >= 1_000_000) return `${(val / 1e6).toFixed(val % 1e6 === 0 ? 0 : 1)} Juta`;
+    if (val >= 1000) return `${(val / 1e3).toFixed(0)} Ribu`;
     return String(Math.round(val));
   }
   if (metric === "emission") {
@@ -5268,9 +5268,9 @@ function RevenueProductionChart({ series, period, isKehua }) {
 
   const formatTick = (val) => {
     if (val === 0) return "0";
-    if (val >= 1_000_000_000) return `${(val / 1_000_000_000).toFixed(2)}B`;
-    if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(2)}M`;
-    if (val >= 1_000) return `${(val / 1_000).toFixed(2)}K`;
+    if (val >= 1_000_000_000) return `${(val / 1_000_000_000).toFixed(val % 1_000_000_000 === 0 ? 0 : 1)} Miliar`;
+    if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(val % 1_000_000 === 0 ? 0 : 1)} Juta`;
+    if (val >= 1_000) return `${(val / 1_000).toFixed(val % 1_000 === 0 ? 0 : 1)} Ribu`;
     return String(val);
   };
 
