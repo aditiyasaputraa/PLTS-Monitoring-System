@@ -4424,9 +4424,14 @@ function buildAggregatedFleetSeries({
 
     const totalAgg = aggregated.reduce((a, b) => a + b, 0);
     const fallbackDaily = Number(fleetTotalVals.daily) || 0;
-    const finalVals = (totalAgg === 0 && fallbackDaily > 0)
+    let finalVals = (totalAgg === 0 && fallbackDaily > 0)
       ? solarWeights.map((w) => isRevenue ? Math.round(w * fallbackDaily) : Math.round(w * fallbackDaily * 10) / 10)
       : aggregated.map((v) => isRevenue ? Math.round(v) : Math.round(v * 10) / 10);
+
+    if (isRevenue && fallbackDaily > 0 && totalAgg > 0 && Math.abs(totalAgg - fallbackDaily) > 50) {
+      const scale = fallbackDaily / totalAgg;
+      finalVals = aggregated.map((v) => Math.round(v * scale));
+    }
 
     return {
       available: true,
@@ -5216,8 +5221,10 @@ function RevenueProductionChart({ series, period, isKehua }) {
   const effectiveLabels = labels.length > 0 ? labels : ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
   const effectiveValues = values.length > 0 ? values : Array.from({ length: effectiveLabels.length }, () => 0);
 
-  const rawMax = Math.max(...effectiveValues.map((v) => Number(v) || 0), 100_000);
-  const yMax = rawMax;
+  const calculatedMax = Math.max(...effectiveValues.map((v) => Number(v) || 0), 0);
+  const yMax = calculatedMax > 0
+    ? calculateMaxVal(calculatedMax)
+    : ((period === "day" || period === "today") ? 5_000 : 100_000);
   const yTicks = [
     0,
     Math.round(yMax * 0.25),
@@ -5268,10 +5275,10 @@ function RevenueProductionChart({ series, period, isKehua }) {
 
   const formatTick = (val) => {
     if (val === 0) return "0";
-    if (val >= 1_000_000_000) return `${(val / 1_000_000_000).toFixed(val % 1_000_000_000 === 0 ? 0 : 1)} Miliar`;
-    if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(val % 1_000_000 === 0 ? 0 : 1)} Juta`;
-    if (val >= 1_000) return `${(val / 1_000).toFixed(val % 1_000 === 0 ? 0 : 1)} Ribu`;
-    return String(val);
+    if (val >= 1_000_000_000) return `${Number((val / 1_000_000_000).toFixed(val % 1_000_000_000 === 0 ? 0 : 1)).toLocaleString("id-ID")} Miliar`;
+    if (val >= 1_000_000) return `${Number((val / 1_000_000).toFixed(val % 1_000_000 === 0 ? 0 : 1)).toLocaleString("id-ID")} Juta`;
+    if (val >= 1_000) return `${Number((val / 1_000).toFixed(val % 1_000 === 0 ? 0 : 1)).toLocaleString("id-ID")} Ribu`;
+    return String(Math.round(val));
   };
 
   return (
@@ -5565,21 +5572,82 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
       };
     }
 
-    const s = getRevenueSeries(activeStation, period);
-    if (!s || s.available === false) {
-      if (period === "day" || period === "today") {
-        const hourlyLabels = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`);
-        const solarWeights = [0, 0, 0, 0, 0, 0, 0.02, 0.05, 0.09, 0.13, 0.16, 0.18, 0.16, 0.11, 0.06, 0.03, 0.01, 0, 0, 0, 0, 0, 0, 0];
+    if (period === "day" || period === "today") {
+      const isToday = !selectedDate || selectedDate === getTodayDateStr();
+      let targetDayRev = todayRev;
+      if (!isToday && selectedDate) {
+        const selDate = new Date(selectedDate + "T12:00:00");
+        const selDay = selDate.getDate();
+        const selDayStr = String(selDay).padStart(2, "0");
+        const revDaily = activeStation?.revenue_charts?.daily;
+        const energyDaily = activeStation?.energy_charts?.daily;
+        const kehuaMonthly = activeStation?.site?.charts?.monthly_generation || activeStation?.charts?.monthly_generation;
+
+        let foundVal = null;
+        if (revDaily?.labels?.length) {
+          const idx = revDaily.labels.indexOf(selDayStr);
+          if (idx >= 0 && revDaily.values?.[idx] !== null && revDaily.values?.[idx] !== undefined) {
+            foundVal = Number(revDaily.values[idx]);
+          }
+        }
+        if (foundVal === null && energyDaily?.labels?.length) {
+          const idx = energyDaily.labels.indexOf(selDayStr);
+          if (idx >= 0 && energyDaily.values?.[idx] !== null && energyDaily.values?.[idx] !== undefined) {
+            foundVal = Math.round(Number(energyDaily.values[idx]) * 900);
+          }
+        }
+        if (foundVal === null && kehuaMonthly?.x?.length) {
+          const idx = kehuaMonthly.x.findIndex((x) => parseInt(x, 10) === selDay);
+          if (idx >= 0 && kehuaMonthly.y?.[idx] !== null && kehuaMonthly.y?.[idx] !== undefined) {
+            foundVal = Math.round(Number(kehuaMonthly.y[idx]) * 900);
+          }
+        }
+        if (foundVal !== null) {
+          targetDayRev = foundVal;
+        }
+      }
+
+      const hourlyLabels = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`);
+      const solarWeights = [0, 0, 0, 0, 0, 0, 0.02, 0.05, 0.09, 0.13, 0.16, 0.18, 0.16, 0.11, 0.06, 0.03, 0.01, 0, 0, 0, 0, 0, 0, 0];
+
+      if (!isToday) {
         return {
           available: true,
           labels: hourlyLabels,
-          values: solarWeights.map((w) => Math.round(w * todayRev)),
+          values: solarWeights.map((w) => Math.round(w * targetDayRev)),
           unit: "IDR",
           kind: "bar",
           title: "Daily revenue curve",
-          caption: "Estimasi pendapatan per jam",
+          caption: `Pendapatan per jam (${formatToDisplayDate(selectedDate)})`,
         };
       }
+
+      const s = getRevenueSeries(activeStation, "day");
+      if (s && s.available !== false && Array.isArray(s.values) && s.values.length === 24) {
+        const sumVal = s.values.reduce((acc, v) => acc + (Number(v) || 0), 0);
+        if (todayRev > 0 && sumVal > 0 && Math.abs(sumVal - todayRev) > 10) {
+          const scale = todayRev / sumVal;
+          return {
+            ...s,
+            values: s.values.map((v) => Math.round((Number(v) || 0) * scale)),
+          };
+        }
+        return s;
+      }
+
+      return {
+        available: true,
+        labels: hourlyLabels,
+        values: solarWeights.map((w) => Math.round(w * todayRev)),
+        unit: "IDR",
+        kind: "bar",
+        title: "Daily revenue curve",
+        caption: "Estimasi pendapatan per jam",
+      };
+    }
+
+    const s = getRevenueSeries(activeStation, period);
+    if (!s || s.available === false) {
       if (period === "week") {
         const days = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"];
         const now = selectedDate ? new Date(selectedDate + "T12:00:00") : new Date();

@@ -411,23 +411,48 @@ export function getEnergySeries(location, period) {
       if (Array.isArray(p5?.x) && Array.isArray(p5?.generation_power_kw) && p5.generation_power_kw.length >= 24) {
         const hourlyLabels = [];
         const hourlyValues = [];
-        const step = Math.floor(p5.generation_power_kw.length / 24);
+        const hourKwSum = Array(24).fill(0);
+        const hourCount = Array(24).fill(0);
+
+        const hasTimeLabels = typeof p5.x[0] === "string" && p5.x[0].includes(":");
+
+        p5.generation_power_kw.forEach((rawKw, idx) => {
+          const kw = Number(rawKw);
+          if (!Number.isFinite(kw)) return;
+
+          let h = -1;
+          if (hasTimeLabels && p5.x[idx]) {
+            const timePart = String(p5.x[idx]).includes(" ") ? String(p5.x[idx]).split(" ")[1] : String(p5.x[idx]);
+            const hourPart = parseInt(timePart.split(":")[0], 10);
+            if (Number.isFinite(hourPart) && hourPart >= 0 && hourPart <= 23) {
+              h = hourPart;
+            }
+          }
+          if (h < 0) {
+            h = Math.floor(idx / 12);
+          }
+          if (h >= 0 && h < 24) {
+            hourKwSum[h] += kw;
+            hourCount[h] += 1;
+          }
+        });
+
         for (let h = 0; h < 24; h++) {
           const hourStr = String(h).padStart(2, "0");
           hourlyLabels.push(`${hourStr}:00`);
-          let sum = 0;
-          let count = 0;
-          for (let m = 0; m < step; m++) {
-            const idx = h * step + m;
-            const kw = Number(p5.generation_power_kw[idx]);
-            if (Number.isFinite(kw)) {
-              sum += kw;
-              count += 1;
-            }
-          }
-          const kwh = count > 0 ? (sum / step) : 0;
+          const kwh = hourCount[h] > 0 ? (hourKwSum[h] / 12) : 0;
           hourlyValues.push(Math.round(kwh * 100) / 100);
         }
+
+        const sumCalculated = hourlyValues.reduce((a, b) => a + b, 0);
+        const todayKwh = Number(location?.today_energy_kwh ?? location?.daily_energy_kwh ?? 0);
+        if (todayKwh > 0 && sumCalculated > 0) {
+          const scale = todayKwh / sumCalculated;
+          for (let h = 0; h < 24; h++) {
+            hourlyValues[h] = Math.round(hourlyValues[h] * scale * 100) / 100;
+          }
+        }
+
         return makeSeries({
           labels: hourlyLabels,
           values: hourlyValues,
