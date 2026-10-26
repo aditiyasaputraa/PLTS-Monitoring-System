@@ -2477,6 +2477,11 @@ function getAggregateMonthlyValues(locations, activeStation, targetYear, metric 
       if (expectedRev > 0 && aggregate[currentMonthIdx] < expectedRev) {
         aggregate[currentMonthIdx] = expectedRev;
       }
+    } else if (metric === "emission") {
+      const expectedEmission = fleet.monthly > 0 ? Math.round(fleet.monthly * 0.85 * 10) / 10 : 0;
+      if (expectedEmission > 0 && aggregate[currentMonthIdx] < expectedEmission) {
+        aggregate[currentMonthIdx] = Math.round(expectedEmission * 10) / 10;
+      }
     }
   }
 
@@ -2507,6 +2512,11 @@ function formatYTick(val, metric) {
     if (val >= 1_000_000_000) return `${(val / 1e9).toFixed(1)}M`;
     if (val >= 1_000_000) return `${(val / 1e6).toFixed(val % 1e6 === 0 ? 0 : 1)}jt`;
     if (val >= 1000) return `${(val / 1e3).toFixed(0)}k`;
+    return String(Math.round(val));
+  }
+  if (metric === "emission") {
+    if (val >= 1_000_000) return `${(val / 1e6).toFixed(1)}M`;
+    if (val >= 1000) return `${(val / 1000).toFixed(val % 1000 === 0 ? 0 : 1)}k`;
     return String(Math.round(val));
   }
   if (val >= 1_000_000) return `${(val / 1e6).toFixed(1)}M`;
@@ -2557,6 +2567,9 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
     if (metric === "revenue") {
       return `Rp ${new Intl.NumberFormat("id-ID").format(Math.round(val))} IDR`;
     }
+    if (metric === "emission") {
+      return `${new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 }).format(val)} kg CO₂`;
+    }
     return `${new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 }).format(val)} kWh`;
   };
 
@@ -2565,10 +2578,14 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
       <div className="card-header-row" style={{ flexWrap: "wrap", gap: "10px" }}>
         <div>
           <span className="card-eyebrow">
-            {metric === "revenue" ? `REVENUE TREND · ${selectedYear}` : `ENERGY TREND · ${selectedYear}`}
+            {metric === "revenue"
+              ? `REVENUE TREND · ${selectedYear}`
+              : (metric === "emission" ? `EMISSION TREND · ${selectedYear}` : `ENERGY TREND · ${selectedYear}`)}
           </span>
           <h3 className="card-title">
-            {metric === "revenue" ? "Monthly revenue" : "Monthly production"}
+            {metric === "revenue"
+              ? "Monthly revenue"
+              : (metric === "emission" ? "Monthly emission" : "Monthly production")}
           </h3>
         </div>
 
@@ -2616,7 +2633,7 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
             </span>
           </div>
 
-          {/* Metric Clickable Buttons: Energy vs Revenue */}
+          {/* Metric Clickable Buttons: Energy vs Revenue vs Emission */}
           <div
             style={{
               display: "inline-flex",
@@ -2689,6 +2706,37 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
               />
               Revenue
             </button>
+
+            <button
+              type="button"
+              onClick={() => setMetric("emission")}
+              title="Klik untuk melihat grafik reduksi emisi karbon (kg CO₂)"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "4px 10px",
+                borderRadius: "6px",
+                border: "none",
+                fontSize: "11px",
+                fontWeight: 700,
+                cursor: "pointer",
+                background: metric === "emission" ? "#059669" : "transparent",
+                color: metric === "emission" ? "#ffffff" : "#4f6254",
+                boxShadow: metric === "emission" ? "0 2px 4px rgba(5,150,105,0.25)" : "none",
+                transition: "all 0.15s ease",
+              }}
+            >
+              <span
+                style={{
+                  width: "7px",
+                  height: "7px",
+                  borderRadius: "50%",
+                  background: metric === "emission" ? "#ffffff" : "#059669",
+                }}
+              />
+              Emission
+            </button>
           </div>
         </div>
       </div>
@@ -2717,7 +2765,7 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
           }}
         >
           <span style={{ color: "#a3b8aa" }}>{months[hoveredIdx]} {selectedYear}:</span>
-          <span style={{ color: metric === "revenue" ? "#a3e635" : "#34d399", fontWeight: 700 }}>
+          <span style={{ color: metric === "revenue" ? "#a3e635" : (metric === "emission" ? "#34d399" : "#34d399"), fontWeight: 700 }}>
             {formatTooltip(monthlyValues[hoveredIdx] || 0)}
           </span>
         </div>
@@ -2744,7 +2792,7 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
           <span style={{ fontSize: "22px", marginBottom: "4px" }}>📊</span>
           <strong style={{ color: "#2d3d32" }}>Belum Ada Data Tercatat ({selectedYear})</strong>
           <span style={{ fontSize: "11px", color: "#8a9e90" }}>
-            Tidak ada catatan {metric === "revenue" ? "pendapatan" : "produksi energi"} untuk tahun {selectedYear}
+            Tidak ada catatan {metric === "revenue" ? "pendapatan" : (metric === "emission" ? "reduksi emisi" : "produksi energi")} untuk tahun {selectedYear}
           </span>
         </div>
       ) : (
@@ -2776,10 +2824,14 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
                 barFill = isHovered
                   ? "#08331d"
                   : (isSelected ? "#0d4a2b" : (val > 0 ? "#d7edd9" : "#edf4ee"));
-              } else {
+              } else if (metric === "revenue") {
                 barFill = isHovered
                   ? "#65a30d"
                   : (isSelected ? "#84cc16" : (val > 0 ? "#e4f2cb" : "#f2f6ea"));
+              } else {
+                barFill = isHovered
+                  ? "#065f46"
+                  : (isSelected ? "#059669" : (val > 0 ? "#d1fae5" : "#edf7f2"));
               }
 
               return (
@@ -2807,7 +2859,7 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
                   <text
                     x={x + 11}
                     y={154}
-                    fill={isSelected ? (metric === "revenue" ? "#4d7c0f" : "#0d4a2b") : "#7c8e81"}
+                    fill={isSelected ? (metric === "revenue" ? "#4d7c0f" : (metric === "emission" ? "#047857" : "#0d4a2b")) : "#7c8e81"}
                     fontSize="9"
                     fontWeight={isSelected ? "800" : "600"}
                     textAnchor="middle"
@@ -2831,7 +2883,7 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
                   })
                   .join(" ")}
                 fill="none"
-                stroke={metric === "revenue" ? "#0d4a2b" : "#84cc16"}
+                stroke={metric === "revenue" ? "#0d4a2b" : (metric === "emission" ? "#059669" : "#84cc16")}
                 strokeWidth="2.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -2845,7 +2897,7 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
                 const val = Number(monthlyValues[idx]) || 0;
                 const y = 140 - (val / (maxVal || 1)) * 120;
                 const isSelected = (isCurrentYear && idx === currentMonthIdx) || idx === hoveredIdx;
-                const strokeColor = metric === "revenue" ? "#0d4a2b" : "#84cc16";
+                const strokeColor = metric === "revenue" ? "#0d4a2b" : (metric === "emission" ? "#059669" : "#84cc16");
 
                 return (
                   <circle
