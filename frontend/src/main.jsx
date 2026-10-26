@@ -4615,8 +4615,16 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
   useEffect(() => {
     if (selectedRegion) {
       setFleetRegion(selectedRegion);
+      if (selectedRegion !== "all") {
+        setLocalStationUid((prevUid) => {
+          if (!prevUid) return null;
+          const found = pool.find((l) => l.uid === prevUid || l.id === prevUid);
+          const reg = found?.region ? String(found.region).toLowerCase() : getStationRegion(found);
+          return reg === selectedRegion ? prevUid : null;
+        });
+      }
     }
-  }, [selectedRegion]);
+  }, [selectedRegion, pool]);
 
   const pool = (allLocations && allLocations.length > 0) ? allLocations : (locations || []);
 
@@ -4628,42 +4636,7 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
     }
   }, [location?.uid]);
 
-  const activeStation = useMemo(() => {
-    if (localStationUid) {
-      const match = pool.find((l) => l.uid === localStationUid || l.id === localStationUid);
-      if (match) return match;
-    }
-    if (location) return location;
-    return (locations && locations.length > 0) ? locations[0] : (pool[0] || null);
-  }, [localStationUid, location, locations, pool]);
-
-  const handleSelectStation = useCallback((uid) => {
-    setLocalStationUid(uid);
-    if (onSelect) onSelect(uid);
-  }, [onSelect]);
-
-  const handleFleetRegionChange = useCallback((regId) => {
-    setFleetRegion(regId);
-    if (onSelectRegion) onSelectRegion(regId);
-  }, [onSelectRegion]);
-
-  const hasLocations = Boolean(pool && pool.length > 0);
-  const stationName = activeStation?.name || ((locations && locations.length > 0) ? "Pilih PLTS" : "Tidak Ada PLTS");
-  const platformName = activeStation?.source
-    ? (activeStation.source.charAt(0).toUpperCase() + activeStation.source.slice(1))
-    : "—";
-
-  const todayKwh = Number(activeStation?.today_energy_kwh ?? activeStation?.daily_energy_kwh ?? 0);
-  const monthKwh = Number(activeStation?.monthly_energy_kwh ?? activeStation?.month_energy_kwh ?? 0);
-  const yearKwh = Number(activeStation?.yearly_energy_kwh ?? activeStation?.year_energy_kwh ?? 0);
-  const lifetimeKwh = Number(activeStation?.total_energy_kwh ?? activeStation?.cumulative_energy_kwh ?? 0);
-
-  const todayMwh = (todayKwh / 1000).toFixed(3);
-  const monthMwh = (monthKwh / 1000).toFixed(3);
-  const yearMwh = (yearKwh / 1000).toFixed(2);
-  const lifetimeMwh = (lifetimeKwh / 1000).toFixed(2);
-
-  // Fleet pool & target locations
+  // Fleet pool & target locations for selected region
   const targetLocations = useMemo(() => {
     if (fleetRegion === "all") return pool;
     return pool.filter((loc) => {
@@ -4677,6 +4650,43 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
   }, [fleetRegion]);
 
   const regionLabel = fleetRegion === "all" ? "Semua PLTS" : currentRegObj.name;
+
+  const activeStation = useMemo(() => {
+    if (localStationUid) {
+      const match = targetLocations.find((l) => l.uid === localStationUid || l.id === localStationUid);
+      if (match) return match;
+    }
+    if (location && targetLocations.some((l) => l.uid === location.uid || l.id === location.id)) {
+      return location;
+    }
+    return (targetLocations && targetLocations.length > 0) ? targetLocations[0] : (pool[0] || null);
+  }, [localStationUid, location, targetLocations, pool]);
+
+  const handleSelectStation = useCallback((uid) => {
+    setLocalStationUid(uid);
+    if (onSelect) onSelect(uid);
+  }, [onSelect]);
+
+  const handleFleetRegionChange = useCallback((regId) => {
+    setFleetRegion(regId);
+    if (onSelectRegion) onSelectRegion(regId);
+  }, [onSelectRegion]);
+
+  const hasLocations = Boolean(targetLocations && targetLocations.length > 0);
+  const stationName = activeStation?.name || ((targetLocations && targetLocations.length > 0) ? "Pilih PLTS" : "Tidak Ada PLTS");
+  const platformName = activeStation?.source
+    ? (activeStation.source.charAt(0).toUpperCase() + activeStation.source.slice(1))
+    : "—";
+
+  const todayKwh = Number(activeStation?.today_energy_kwh ?? activeStation?.daily_energy_kwh ?? 0);
+  const monthKwh = Number(activeStation?.monthly_energy_kwh ?? activeStation?.month_energy_kwh ?? 0);
+  const yearKwh = Number(activeStation?.yearly_energy_kwh ?? activeStation?.year_energy_kwh ?? 0);
+  const lifetimeKwh = Number(activeStation?.total_energy_kwh ?? activeStation?.cumulative_energy_kwh ?? 0);
+
+  const todayMwh = (todayKwh / 1000).toFixed(3);
+  const monthMwh = (monthKwh / 1000).toFixed(3);
+  const yearMwh = (yearKwh / 1000).toFixed(2);
+  const lifetimeMwh = (lifetimeKwh / 1000).toFixed(2);
 
   // Fleet totals for target locations
   const targetFleetTodayKwh = useMemo(() => {
@@ -4700,15 +4710,15 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
   const fleetYearKwhVal = fleetRegion === "all" ? (Number(fleet?.yearly || 0) || targetFleetYearKwh) : targetFleetYearKwh;
   const fleetLifetimeKwhVal = fleetRegion === "all" ? (Number(fleet?.cumulative || fleet?.lifetime || 0) || targetFleetLifetimeKwh) : targetFleetLifetimeKwh;
 
-  // 5 Top stats for Energy Top Chart
-  const totalSitesCount = pool.length || targetLocations.length;
+  // 5 Top stats for Energy Top Chart (dynamically reflects selected region targetLocations)
+  const totalSitesCount = targetLocations.length;
   const platformsCount = useMemo(() => {
-    const s = new Set(pool.map((l) => l.source).filter(Boolean));
-    return s.size > 0 ? s.size : 3;
-  }, [pool]);
+    const s = new Set(targetLocations.map((l) => l.source).filter(Boolean));
+    return s.size > 0 ? s.size : (targetLocations.length > 0 ? 1 : 0);
+  }, [targetLocations]);
   const onlineCount = useMemo(() => {
-    return pool.filter((l) => l.status === "online" || (Number(l.current_power_kw ?? l.output_power_kw ?? l.pv_power_kw ?? l.power_kw ?? 0) > 0)).length;
-  }, [pool]);
+    return targetLocations.filter((l) => l.status === "online" || (Number(l.current_power_kw ?? l.output_power_kw ?? l.pv_power_kw ?? l.power_kw ?? 0) > 0)).length;
+  }, [targetLocations]);
   const offlineCount = Math.max(0, totalSitesCount - onlineCount);
   const currentPowerVal = formatNumber(activeStation?.current_power_kw ?? activeStation?.output_power_kw ?? activeStation?.pv_power_kw ?? activeStation?.power_kw ?? 0, 2) + " kW";
 
@@ -5433,8 +5443,16 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
   useEffect(() => {
     if (selectedRegion) {
       setFleetRegion(selectedRegion);
+      if (selectedRegion !== "all") {
+        setLocalStationUid((prevUid) => {
+          if (!prevUid) return null;
+          const found = pool.find((l) => l.uid === prevUid || l.id === prevUid);
+          const reg = found?.region ? String(found.region).toLowerCase() : getStationRegion(found);
+          return reg === selectedRegion ? prevUid : null;
+        });
+      }
     }
-  }, [selectedRegion]);
+  }, [selectedRegion, pool]);
 
   const pool = (allLocations && allLocations.length > 0) ? allLocations : (locations || []);
 
@@ -5446,39 +5464,7 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
     }
   }, [location?.uid]);
 
-  const activeStation = useMemo(() => {
-    if (localStationUid) {
-      const match = pool.find((l) => l.uid === localStationUid || l.id === localStationUid);
-      if (match) return match;
-    }
-    if (location) return location;
-    return (locations && locations.length > 0) ? locations[0] : (pool[0] || null);
-  }, [localStationUid, location, locations, pool]);
-
-  const handleSelectStation = useCallback((uid) => {
-    setLocalStationUid(uid);
-    if (onSelect) onSelect(uid);
-  }, [onSelect]);
-
-  const handleFleetRegionChange = useCallback((regId) => {
-    setFleetRegion(regId);
-    if (onSelectRegion) onSelectRegion(regId);
-  }, [onSelectRegion]);
-
-  const hasLocations = Boolean(pool && pool.length > 0);
-  const stationName = activeStation?.name || ((locations && locations.length > 0) ? "Pilih PLTS" : "Tidak Ada PLTS");
-  const platformName = activeStation?.source
-    ? (activeStation.source.charAt(0).toUpperCase() + activeStation.source.slice(1))
-    : "—";
-  const hasVendorIncome = Boolean(activeStation?.daily_income || activeStation?.monthly_income || activeStation?.yearly_income || activeStation?.cumulative_income);
-  const isAutoTariff = ["kehua", "sma"].includes((activeStation?.source || "").toLowerCase()) || !hasVendorIncome;
-
-  const todayRev = Number(activeStation?.daily_income) || Math.round(Number(activeStation?.daily_energy_kwh || activeStation?.today_energy_kwh || 0) * 900);
-  const monthRev = Number(activeStation?.monthly_income) || Math.round(Number(activeStation?.monthly_energy_kwh || 0) * 900);
-  const yearRev = Number(activeStation?.yearly_income) || Math.round(Number(activeStation?.yearly_energy_kwh || 0) * 900);
-  const lifetimeRev = Number(activeStation?.cumulative_income ?? activeStation?.total_income) || Math.round(Number(activeStation?.cumulative_energy_kwh || 0) * 900);
-
-  // Fleet calculations
+  // Fleet calculations & target locations
   const targetLocations = useMemo(() => {
     if (fleetRegion === "all") return pool;
     return pool.filter((loc) => {
@@ -5490,6 +5476,40 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
   const currentRegObj = useMemo(() => {
     return REGIONS.find((r) => r.id === fleetRegion) || REGIONS[0];
   }, [fleetRegion]);
+
+  const activeStation = useMemo(() => {
+    if (localStationUid) {
+      const match = targetLocations.find((l) => l.uid === localStationUid || l.id === localStationUid);
+      if (match) return match;
+    }
+    if (location && targetLocations.some((l) => l.uid === location.uid || l.id === location.id)) {
+      return location;
+    }
+    return (targetLocations && targetLocations.length > 0) ? targetLocations[0] : (pool[0] || null);
+  }, [localStationUid, location, targetLocations, pool]);
+
+  const handleSelectStation = useCallback((uid) => {
+    setLocalStationUid(uid);
+    if (onSelect) onSelect(uid);
+  }, [onSelect]);
+
+  const handleFleetRegionChange = useCallback((regId) => {
+    setFleetRegion(regId);
+    if (onSelectRegion) onSelectRegion(regId);
+  }, [onSelectRegion]);
+
+  const hasLocations = Boolean(targetLocations && targetLocations.length > 0);
+  const stationName = activeStation?.name || ((targetLocations && targetLocations.length > 0) ? "Pilih PLTS" : "Tidak Ada PLTS");
+  const platformName = activeStation?.source
+    ? (activeStation.source.charAt(0).toUpperCase() + activeStation.source.slice(1))
+    : "—";
+  const hasVendorIncome = Boolean(activeStation?.daily_income || activeStation?.monthly_income || activeStation?.yearly_income || activeStation?.cumulative_income);
+  const isAutoTariff = ["kehua", "sma"].includes((activeStation?.source || "").toLowerCase()) || !hasVendorIncome;
+
+  const todayRev = Number(activeStation?.daily_income) || Math.round(Number(activeStation?.daily_energy_kwh || activeStation?.today_energy_kwh || 0) * 900);
+  const monthRev = Number(activeStation?.monthly_income) || Math.round(Number(activeStation?.monthly_energy_kwh || 0) * 900);
+  const yearRev = Number(activeStation?.yearly_income) || Math.round(Number(activeStation?.yearly_energy_kwh || 0) * 900);
+  const lifetimeRev = Number(activeStation?.cumulative_income ?? activeStation?.total_income) || Math.round(Number(activeStation?.cumulative_energy_kwh || 0) * 900);
 
   const targetFleetTodayRev = useMemo(() => {
     return targetLocations.reduce((sum, loc) => sum + (Number(loc?.daily_income) || Math.round((Number(loc?.daily_energy_kwh ?? loc?.today_energy_kwh) || 0) * 900)), 0);
@@ -6322,8 +6342,16 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
   useEffect(() => {
     if (selectedRegion) {
       setFleetRegion(selectedRegion);
+      if (selectedRegion !== "all") {
+        setLocalStationUid((prevUid) => {
+          if (!prevUid) return null;
+          const found = pool.find((l) => l.uid === prevUid || l.id === prevUid);
+          const reg = found?.region ? String(found.region).toLowerCase() : getStationRegion(found);
+          return reg === selectedRegion ? prevUid : null;
+        });
+      }
     }
-  }, [selectedRegion]);
+  }, [selectedRegion, pool]);
 
   const pool = (allLocations && allLocations.length > 0) ? allLocations : (locations || []);
 
@@ -6335,14 +6363,28 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
     }
   }, [location?.uid]);
 
+  const targetLocations = useMemo(() => {
+    if (fleetRegion === "all") return pool;
+    return pool.filter((loc) => {
+      const reg = loc.region ? String(loc.region).toLowerCase() : getStationRegion(loc);
+      return reg === fleetRegion;
+    });
+  }, [pool, fleetRegion]);
+
+  const currentRegObj = useMemo(() => {
+    return REGIONS.find((r) => r.id === fleetRegion) || REGIONS[0];
+  }, [fleetRegion]);
+
   const activeStation = useMemo(() => {
     if (localStationUid) {
-      const match = pool.find((l) => l.uid === localStationUid || l.id === localStationUid);
+      const match = targetLocations.find((l) => l.uid === localStationUid || l.id === localStationUid);
       if (match) return match;
     }
-    if (location) return location;
-    return (locations && locations.length > 0) ? locations[0] : (pool[0] || null);
-  }, [localStationUid, location, locations, pool]);
+    if (location && targetLocations.some((l) => l.uid === location.uid || l.id === location.id)) {
+      return location;
+    }
+    return (targetLocations && targetLocations.length > 0) ? targetLocations[0] : (pool[0] || null);
+  }, [localStationUid, location, targetLocations, pool]);
 
   const handleSelectStation = useCallback((uid) => {
     setLocalStationUid(uid);
@@ -6354,8 +6396,8 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
     if (onSelectRegion) onSelectRegion(regId);
   }, [onSelectRegion]);
 
-  const hasLocations = Boolean(pool && pool.length > 0);
-  const stationName = activeStation?.name || ((locations && locations.length > 0) ? "Pilih PLTS" : "Tidak Ada PLTS");
+  const hasLocations = Boolean(targetLocations && targetLocations.length > 0);
+  const stationName = activeStation?.name || ((targetLocations && targetLocations.length > 0) ? "Pilih PLTS" : "Tidak Ada PLTS");
   const platformName = activeStation?.source
     ? (activeStation.source.charAt(0).toUpperCase() + activeStation.source.slice(1))
     : "—";
@@ -6371,18 +6413,6 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
   const monthEmissionKg = monthKwh * EMISSION_FACTOR;
   const yearEmissionKg = yearKwh * EMISSION_FACTOR;
   const lifetimeEmissionKg = lifetimeKwh * EMISSION_FACTOR;
-
-  const targetLocations = useMemo(() => {
-    if (fleetRegion === "all") return pool;
-    return pool.filter((loc) => {
-      const reg = loc.region ? String(loc.region).toLowerCase() : getStationRegion(loc);
-      return reg === fleetRegion;
-    });
-  }, [pool, fleetRegion]);
-
-  const currentRegObj = useMemo(() => {
-    return REGIONS.find((r) => r.id === fleetRegion) || REGIONS[0];
-  }, [fleetRegion]);
 
   const targetTodayEmissionKg = useMemo(() => {
     return targetLocations.reduce((sum, loc) => sum + (Number(loc?.daily_energy_kwh ?? loc?.today_energy_kwh) || 0), 0) * EMISSION_FACTOR;
