@@ -4147,12 +4147,6 @@ function StationListDarkCard({
           <span className="station-list-title">DAFTAR PLTS ({regionLabel.toUpperCase()})</span>
           <span className="station-list-count">{displayLocations.length} stasiun</span>
         </div>
-        {onSelectRegion && (
-          <RegionDropdownPill
-            value={selectedRegion || "all"}
-            onChange={onSelectRegion}
-          />
-        )}
       </div>
 
       {/* Search Input */}
@@ -5068,7 +5062,6 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
                 <p className="curve-subtitle">{fleetCurveSubtitle}</p>
               </div>
               <div className="curve-controls">
-                <RegionDropdownPill value={fleetRegion} onChange={handleFleetRegionChange} />
                 <div className="period-toggle-pill">
                   <button
                     type="button"
@@ -5961,7 +5954,6 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
                 <p className="curve-subtitle">{fleetCurveSubtitle}</p>
               </div>
               <div className="curve-controls">
-                <RegionDropdownPill value={fleetRegion} onChange={handleFleetRegionChange} />
                 <div className="period-toggle-pill">
                   <button
                     type="button"
@@ -6825,7 +6817,6 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
                 <p className="curve-subtitle">{fleetCurveSubtitle}</p>
               </div>
               <div className="curve-controls">
-                <RegionDropdownPill value={fleetRegion} onChange={handleFleetRegionChange} />
                 <div className="period-toggle-pill">
                   <button
                     type="button"
