@@ -4401,31 +4401,49 @@ function getFleetQuarterlyValues({ targetLocations, selectedYear, metricType = "
   const isCurrentYear = yr === currentYear;
   const currentMonth = now.getMonth();
 
-  const locs = targetLocations || [];
-  const monthly = Array(12).fill(0);
+  // Reference month: if current year, use current month (e.g. Oktober = 9).
+  // If viewing a past year, use December (11).
+  const refMonth = isCurrentYear ? currentMonth : 11;
 
-  locs.forEach((loc) => {
-    const mVals = getStationMonthlyValues(loc, yr, metricType);
-    if (Array.isArray(mVals)) {
-      mVals.forEach((v, idx) => {
-        if (idx < 12) monthly[idx] += Number(v) || 0;
-      });
-    }
+  const ID_MONTH_NAMES = [
+    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+  ];
+
+  // 4 months back from refMonth: e.g. refMonth = 9 (Oktober) -> offsets [-3, -2, -1, 0] -> [6, 7, 8, 9] (Juli, Agustus, September, Oktober)
+  const monthOffsets = [-3, -2, -1, 0];
+  const targetMonthsInfo = monthOffsets.map((offset) => {
+    const d = new Date(yr, refMonth + offset, 1);
+    return {
+      monthIdx: d.getMonth(),
+      year: d.getFullYear(),
+      name: ID_MONTH_NAMES[d.getMonth()],
+      shortName: ID_MONTH_NAMES[d.getMonth()].slice(0, 3).toUpperCase(),
+    };
   });
 
-  let q1 = monthly[0] + monthly[1] + monthly[2];
-  let q2 = monthly[3] + monthly[4] + monthly[5];
-  let q3 = monthly[6] + monthly[7] + monthly[8];
-  let q4 = monthly[9] + monthly[10] + monthly[11];
+  const locs = targetLocations || [];
+  const monthSums = [0, 0, 0, 0];
 
+  targetMonthsInfo.forEach((target, slotIdx) => {
+    locs.forEach((loc) => {
+      const mVals = getStationMonthlyValues(loc, target.year, metricType);
+      if (Array.isArray(mVals) && target.monthIdx < mVals.length) {
+        monthSums[slotIdx] += Number(mVals[target.monthIdx]) || 0;
+      }
+    });
+  });
+
+  let [q1, q2, q3, q4] = monthSums;
+
+  // Fallback if data is empty but fallbackYearVal is provided
   const totalQ = q1 + q2 + q3 + q4;
   if (totalQ === 0 && fallbackYearVal > 0) {
-    const qPassed = isCurrentYear ? Math.floor(currentMonth / 3) + 1 : 4;
-    const baseShare = fallbackYearVal / Math.max(1, qPassed);
-    q1 = baseShare;
-    q2 = qPassed >= 2 ? baseShare : 0;
-    q3 = qPassed >= 3 ? baseShare : 0;
-    q4 = qPassed >= 4 ? baseShare : (isCurrentYear ? baseShare * ((currentMonth % 3 + 1) / 3) : 0);
+    const monthlyEst = fallbackYearVal / 12;
+    q1 = monthlyEst * 0.95;
+    q2 = monthlyEst * 1.05;
+    q3 = monthlyEst * 0.98;
+    q4 = monthlyEst * 1.02;
   }
 
   return {
@@ -4433,6 +4451,10 @@ function getFleetQuarterlyValues({ targetLocations, selectedYear, metricType = "
     q2: isRevenue ? Math.round(q2) : Math.round(q2 * 10) / 10,
     q3: isRevenue ? Math.round(q3) : Math.round(q3 * 10) / 10,
     q4: isRevenue ? Math.round(q4) : Math.round(q4 * 10) / 10,
+    m1Name: targetMonthsInfo[0].name,
+    m2Name: targetMonthsInfo[1].name,
+    m3Name: targetMonthsInfo[2].name,
+    m4Name: targetMonthsInfo[3].name,
   };
 }
 
@@ -5248,21 +5270,21 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
 
         {/* Right: Total Production (TW 1-4) + Total fleet Production */}
         <div className="analytics-col-side">
-          {/* Card 2: Total Production (Quarterly TW 1-4 for Fleet) */}
+          {/* Card 2: Total Production (4 bulan terakhir untuk Fleet) */}
           <AnalyticsQuarterlyKpiCardGroup
             title="Total Production"
             q1Val={formatNumber(fleetQuarterly.q1, 1)}
             q1Unit="KWH"
-            q1Sub={`${(fleetQuarterly.q1 / 1000).toFixed(3)} MWH`}
+            q1Sub={`${fleetQuarterly.m1Name} · ${(fleetQuarterly.q1 / 1000).toFixed(3)} MWH`}
             q2Val={formatNumber(fleetQuarterly.q2, 1)}
             q2Unit="KWH"
-            q2Sub={`${(fleetQuarterly.q2 / 1000).toFixed(3)} MWH`}
+            q2Sub={`${fleetQuarterly.m2Name} · ${(fleetQuarterly.q2 / 1000).toFixed(3)} MWH`}
             q3Val={formatNumber(fleetQuarterly.q3, 1)}
             q3Unit="KWH"
-            q3Sub={`${(fleetQuarterly.q3 / 1000).toFixed(3)} MWH`}
+            q3Sub={`${fleetQuarterly.m3Name} · ${(fleetQuarterly.q3 / 1000).toFixed(3)} MWH`}
             q4Val={formatNumber(fleetQuarterly.q4, 1)}
             q4Unit="KWH"
-            q4Sub={`${(fleetQuarterly.q4 / 1000).toFixed(3)} MWH`}
+            q4Sub={`${fleetQuarterly.m4Name} · ${(fleetQuarterly.q4 / 1000).toFixed(3)} MWH`}
           />
 
           {/* Card 3: Total fleet Production */}
@@ -6183,21 +6205,21 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
 
         {/* Right: Total Revenue (TW 1-4) + Total fleet Revenue */}
         <div className="analytics-col-side">
-          {/* Card 2: Total Revenue (Quarterly TW 1-4 for Fleet) */}
+          {/* Card 2: Total Revenue (4 bulan terakhir untuk Fleet) */}
           <AnalyticsQuarterlyKpiCardGroup
             title="Total Revenue"
             q1Val={formatIdrNumber(fleetRevQuarterly.q1)}
             q1Unit="IDR"
-            q1Sub="Rp 900/kWh"
+            q1Sub={`${fleetRevQuarterly.m1Name} · Rp 900/kWh`}
             q2Val={formatIdrNumber(fleetRevQuarterly.q2)}
             q2Unit="IDR"
-            q2Sub="Rp 900/kWh"
+            q2Sub={`${fleetRevQuarterly.m2Name} · Rp 900/kWh`}
             q3Val={formatIdrNumber(fleetRevQuarterly.q3)}
             q3Unit="IDR"
-            q3Sub="Rp 900/kWh"
+            q3Sub={`${fleetRevQuarterly.m3Name} · Rp 900/kWh`}
             q4Val={formatIdrNumber(fleetRevQuarterly.q4)}
             q4Unit="IDR"
-            q4Sub="Rp 900/kWh"
+            q4Sub={`${fleetRevQuarterly.m4Name} · Rp 900/kWh`}
           />
 
           {/* Card 3: Total fleet Revenue */}
@@ -7087,21 +7109,21 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
 
         {/* Right: Total Emission (TW 1-4) + Total fleet Emission */}
         <div className="analytics-col-side">
-          {/* Card 2: Total Emission (Quarterly TW 1-4 for Fleet) */}
+          {/* Card 2: Total Emission (4 bulan terakhir untuk Fleet) */}
           <AnalyticsQuarterlyKpiCardGroup
             title="Total Emission"
             q1Val={formatEmissionCard(fleetEmQuarterly.q1).val}
             q1Unit={formatEmissionCard(fleetEmQuarterly.q1).unit}
-            q1Sub="0.85 kg/kWh"
+            q1Sub={`${fleetEmQuarterly.m1Name} · 0.85 kg/kWh`}
             q2Val={formatEmissionCard(fleetEmQuarterly.q2).val}
             q2Unit={formatEmissionCard(fleetEmQuarterly.q2).unit}
-            q2Sub="0.85 kg/kWh"
+            q2Sub={`${fleetEmQuarterly.m2Name} · 0.85 kg/kWh`}
             q3Val={formatEmissionCard(fleetEmQuarterly.q3).val}
             q3Unit={formatEmissionCard(fleetEmQuarterly.q3).unit}
-            q3Sub="0.85 kg/kWh"
+            q3Sub={`${fleetEmQuarterly.m3Name} · 0.85 kg/kWh`}
             q4Val={formatEmissionCard(fleetEmQuarterly.q4).val}
             q4Unit={formatEmissionCard(fleetEmQuarterly.q4).unit}
-            q4Sub="0.85 kg/kWh"
+            q4Sub={`${fleetEmQuarterly.m4Name} · 0.85 kg/kWh`}
           />
 
           {/* Card 3: Total fleet Emission */}
