@@ -3,6 +3,8 @@ import { createRoot } from "react-dom/client";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { getEnergySeries, getRevenueSeries, getEmissionSeries, normalizeUnitString } from "./chart_data.js";
+import { getStationTariff, useTariffSettings, detectStationCategory } from "./tariffs.js";
+import TariffSettingsModal from "./TariffSettingsModal.jsx";
 import { MOCK_MONITORING_DATA } from "./mock_data.js";
 import "./styles.css";
 
@@ -981,6 +983,14 @@ function LoginPage({ onSignIn, initialError }) {
 function Dashboard({ session, onSignOut }) {
   const { data, error, refresh } = useMonitoringData(session, onSignOut);
   const { metadata: stationMetadata, updateStation: updateStationMetadata } = useStationMetadata();
+  const {
+    tariffConfig,
+    updateCategoryRate,
+    updateStationRate,
+    resetStationRate,
+    resetAllToDefaults,
+  } = useTariffSettings();
+  const [tariffModalOpen, setTariffModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(() => readUiState().activeTab);
   const [selectedId, setSelectedId] = useState(() => readUiState().selectedId);
   const [selectedRegion, setSelectedRegion] = useState(() => readUiState().selectedRegion || "all");
@@ -999,26 +1009,17 @@ function Dashboard({ session, onSignOut }) {
       const uid = `${site.platform}-${id}`;
       const meta = stationMetadata[uid] || stationMetadata[id] || {};
       const name = meta.custom_name ? meta.custom_name : rawName;
-      const hasVendorIncome = Boolean(station.daily_income || station.monthly_income || station.yearly_income || station.cumulative_income);
-      const isAutoTariff = ["kehua", "sma"].includes((site.platform || "").toLowerCase()) || !hasVendorIncome;
+      const tariff = getStationTariff({ ...station, name, uid, id }, tariffConfig);
 
       const dailyKwh = Number(station.today_energy_kwh ?? station.daily_energy_kwh ?? 0);
       const monthlyKwh = Number(station.monthly_energy_kwh ?? station.month_energy_kwh ?? 0);
       const yearlyKwh = Number(station.yearly_energy_kwh ?? station.year_energy_kwh ?? 0);
       const cumulativeKwh = Number(station.cumulative_energy_kwh ?? station.total_energy_kwh ?? 0);
 
-      const dailyIncome = isAutoTariff
-        ? (Number(station.daily_income) || Math.round(dailyKwh * 900))
-        : station.daily_income;
-      const monthlyIncome = isAutoTariff
-        ? (Number(station.monthly_income) || Math.round(monthlyKwh * 900))
-        : station.monthly_income;
-      const yearlyIncome = isAutoTariff
-        ? (Number(station.yearly_income) || Math.round(yearlyKwh * 900))
-        : station.yearly_income;
-      const cumulativeIncome = isAutoTariff
-        ? (Number(station.cumulative_income ?? station.total_income) || Math.round(cumulativeKwh * 900))
-        : (station.cumulative_income ?? station.total_income);
+      const dailyIncome = Math.round(dailyKwh * tariff);
+      const monthlyIncome = Math.round(monthlyKwh * tariff);
+      const yearlyIncome = Math.round(yearlyKwh * tariff);
+      const cumulativeIncome = Math.round(cumulativeKwh * tariff);
 
       const region = getStationRegion(station);
 
@@ -1185,10 +1186,11 @@ function Dashboard({ session, onSignOut }) {
         monthly_income: monthlyIncome,
         yearly_income: yearlyIncome,
         cumulative_income: cumulativeIncome,
+        tariff_per_kwh: tariff,
         income_currency: station.income_currency || "IDR",
       };
     }));
-  }, [sites, stationMetadata]);
+  }, [sites, stationMetadata, tariffConfig]);
 
   // Filter locations based on chosen region
   const locations = useMemo(() => {
@@ -1591,6 +1593,8 @@ function Dashboard({ session, onSignOut }) {
             selectedRegion={selectedRegion}
             onSelectRegion={handleSelectRegion}
             onUpdateStation={handleUpdateStation}
+            tariffConfig={tariffConfig}
+            onOpenTariffModal={() => setTariffModalOpen(true)}
           />
         )}
 
@@ -1609,6 +1613,17 @@ function Dashboard({ session, onSignOut }) {
       </main>
 
       <AppFooter />
+
+      <TariffSettingsModal
+        isOpen={tariffModalOpen}
+        onClose={() => setTariffModalOpen(false)}
+        tariffConfig={tariffConfig}
+        onUpdateCategoryRate={updateCategoryRate}
+        onUpdateStationRate={updateStationRate}
+        onResetStationRate={resetStationRate}
+        onResetAllToDefaults={resetAllToDefaults}
+        allStations={allLocations}
+      />
 
       {/* Sync Toast */}
       {syncNotice && (
@@ -2312,7 +2327,7 @@ function getStationHistoricalYearKwh(station, targetYear) {
   return 0;
 }
 
-function getStationMonthlyValues(station, targetYear, metric = "energy") {
+function getStationMonthlyValues(station, targetYear, metric = "energy", customTariff = null) {
   const currentYear = new Date().getFullYear();
   const isCurrentYear = targetYear === currentYear;
   const currentMonthIdx = new Date().getMonth();
@@ -2320,6 +2335,7 @@ function getStationMonthlyValues(station, targetYear, metric = "energy") {
 
   if (!station) return monthly;
 
+  const tariff = customTariff || station.tariff_per_kwh || 900;
   const source = (station.source || station.site?.platform || "").toLowerCase();
 
   // 1. Kehua
@@ -2339,7 +2355,7 @@ function getStationMonthlyValues(station, targetYear, metric = "energy") {
           const rawVal = Number(yData[i]);
           if (Number.isFinite(rawVal) && rawVal >= 0) {
             const kwh = rawVal * multiplier;
-            if (metric === "revenue") monthly[mNum - 1] = Math.round(kwh * 900);
+            if (metric === "revenue") monthly[mNum - 1] = Math.round(kwh * tariff);
             else if (metric === "emission") monthly[mNum - 1] = Math.round(kwh * 0.85 * 10) / 10;
             else monthly[mNum - 1] = Math.round(kwh * 10) / 10;
           }
@@ -2352,13 +2368,13 @@ function getStationMonthlyValues(station, targetYear, metric = "energy") {
     const chartMap = metric === "revenue" ? station.revenue_charts : station.energy_charts;
     const fallbackEnergyMap = station.energy_charts;
 
-    let chartData = chartMap?.monthly;
-    if (!chartData && metric === "revenue") {
+    let chartData = (metric === "revenue" && tariff === 900) ? chartMap?.monthly : null;
+    if (!chartData) {
       const eChart = fallbackEnergyMap?.monthly;
       if (eChart?.labels && eChart?.values) {
         chartData = {
           labels: eChart.labels,
-          values: eChart.values.map((v) => (v !== null && v !== undefined ? Math.round(Number(v) * 900) : null)),
+          values: eChart.values.map((v) => (v !== null && v !== undefined ? Math.round(Number(v) * (metric === "revenue" ? tariff : 1)) : null)),
         };
       }
     }
@@ -2390,7 +2406,7 @@ function getStationMonthlyValues(station, targetYear, metric = "energy") {
       for (let m = 0; m < 12; m++) {
         const mKwh = annualKwh * JAKARTA_SOLAR_MONTHLY_WEIGHTS[m];
         if (metric === "revenue") {
-          monthly[m] = Math.round(mKwh * 900);
+          monthly[m] = Math.round(mKwh * tariff);
         } else if (metric === "emission") {
           monthly[m] = Math.round(mKwh * 0.85 * 10) / 10;
         } else {
@@ -2406,7 +2422,10 @@ function getStationMonthlyValues(station, targetYear, metric = "energy") {
       const liveMonthKwh = Number(station.monthly_energy_kwh ?? station.month_energy_kwh ?? 0);
       monthly[currentMonthIdx] = Math.round(liveMonthKwh * 10) / 10;
     } else if (metric === "revenue") {
-      const liveMonthRev = Number(station.monthly_income ?? (Number(station.monthly_energy_kwh || 0) * 900));
+      const liveMonthKwh = Number(station.monthly_energy_kwh ?? station.month_energy_kwh ?? 0);
+      const liveMonthRev = liveMonthKwh > 0
+        ? Math.round(liveMonthKwh * tariff)
+        : Number(station.monthly_income || 0);
       monthly[currentMonthIdx] = Math.round(liveMonthRev);
     } else {
       const liveMonthKwh = Number(station.monthly_energy_kwh ?? station.month_energy_kwh ?? 0);
@@ -4690,7 +4709,8 @@ function buildAggregatedFleetSeries({
     years.forEach((yrStr, idx) => {
       const yrNum = parseInt(yrStr, 10);
       const yrKwh = getStationHistoricalYearKwh(loc, yrNum);
-      const val = isRevenue ? Math.round(yrKwh * 900) : (isEmission ? Math.round(yrKwh * 0.85 * 10) / 10 : Math.round(yrKwh * 10) / 10);
+      const tariff = loc?.tariff_per_kwh || 900;
+      const val = isRevenue ? Math.round(yrKwh * tariff) : (isEmission ? Math.round(yrKwh * 0.85 * 10) / 10 : Math.round(yrKwh * 10) / 10);
       aggregated[idx] += val;
     });
   });
@@ -5555,7 +5575,18 @@ function RevenueProductionChart({ series, period, isKehua }) {
   );
 }
 
-function RevenueView({ location, fleet, locations, allLocations, onSelect, selectedRegion = "all", onSelectRegion, onUpdateStation }) {
+function RevenueView({
+  location,
+  fleet,
+  locations,
+  allLocations,
+  onSelect,
+  selectedRegion = "all",
+  onSelectRegion,
+  onUpdateStation,
+  tariffConfig,
+  onOpenTariffModal,
+}) {
   const pool = (allLocations && allLocations.length > 0) ? allLocations : (locations || []);
   const [localStationUid, setLocalStationUid] = useState(location?.uid || null);
 
@@ -5616,6 +5647,17 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
     return (targetLocations && targetLocations.length > 0) ? targetLocations[0] : (pool[0] || null);
   }, [localStationUid, location, targetLocations, pool]);
 
+  const stationTariff = useMemo(() => {
+    if (!activeStation) return 900;
+    return activeStation.tariff_per_kwh || getStationTariff(activeStation, tariffConfig);
+  }, [activeStation, tariffConfig]);
+
+  const isSingleStation = Boolean(activeStation && (activeStation.id || activeStation.station_id || activeStation.uid));
+
+  const customCount = useMemo(() => {
+    return Object.keys(tariffConfig?.customTariffs || {}).length;
+  }, [tariffConfig]);
+
   const handleSelectStation = useCallback((uid) => {
     setLocalStationUid(uid);
     if (onSelect) onSelect(uid);
@@ -5634,26 +5676,38 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
   const hasVendorIncome = Boolean(activeStation?.daily_income || activeStation?.monthly_income || activeStation?.yearly_income || activeStation?.cumulative_income);
   const isAutoTariff = ["kehua", "sma"].includes((activeStation?.source || "").toLowerCase()) || !hasVendorIncome;
 
-  const todayRev = Number(activeStation?.daily_income) || Math.round(Number(activeStation?.daily_energy_kwh || activeStation?.today_energy_kwh || 0) * 900);
-  const monthRev = Number(activeStation?.monthly_income) || Math.round(Number(activeStation?.monthly_energy_kwh || 0) * 900);
-  const yearRev = Number(activeStation?.yearly_income) || Math.round(Number(activeStation?.yearly_energy_kwh || 0) * 900);
-  const lifetimeRev = Number(activeStation?.cumulative_income ?? activeStation?.total_income) || Math.round(Number(activeStation?.cumulative_energy_kwh || 0) * 900);
+  const todayRev = Number(activeStation?.daily_income) || Math.round(Number(activeStation?.daily_energy_kwh || activeStation?.today_energy_kwh || 0) * stationTariff);
+  const monthRev = Number(activeStation?.monthly_income) || Math.round(Number(activeStation?.monthly_energy_kwh || 0) * stationTariff);
+  const yearRev = Number(activeStation?.yearly_income) || Math.round(Number(activeStation?.yearly_energy_kwh || 0) * stationTariff);
+  const lifetimeRev = Number(activeStation?.cumulative_income ?? activeStation?.total_income) || Math.round(Number(activeStation?.cumulative_energy_kwh || 0) * stationTariff);
 
   const targetFleetTodayRev = useMemo(() => {
-    return targetLocations.reduce((sum, loc) => sum + (Number(loc?.daily_income) || Math.round((Number(loc?.daily_energy_kwh ?? loc?.today_energy_kwh) || 0) * 900)), 0);
-  }, [targetLocations]);
+    return targetLocations.reduce((sum, loc) => {
+      const tariff = loc?.tariff_per_kwh || getStationTariff(loc, tariffConfig);
+      return sum + (Number(loc?.daily_income) || Math.round((Number(loc?.daily_energy_kwh ?? loc?.today_energy_kwh) || 0) * tariff));
+    }, 0);
+  }, [targetLocations, tariffConfig]);
 
   const targetFleetMonthRev = useMemo(() => {
-    return targetLocations.reduce((sum, loc) => sum + (Number(loc?.monthly_income) || Math.round((Number(loc?.monthly_energy_kwh ?? loc?.month_energy_kwh) || 0) * 900)), 0);
-  }, [targetLocations]);
+    return targetLocations.reduce((sum, loc) => {
+      const tariff = loc?.tariff_per_kwh || getStationTariff(loc, tariffConfig);
+      return sum + (Number(loc?.monthly_income) || Math.round((Number(loc?.monthly_energy_kwh ?? loc?.month_energy_kwh) || 0) * tariff));
+    }, 0);
+  }, [targetLocations, tariffConfig]);
 
   const targetFleetYearRev = useMemo(() => {
-    return targetLocations.reduce((sum, loc) => sum + (Number(loc?.yearly_income) || Math.round((Number(loc?.yearly_energy_kwh ?? loc?.year_energy_kwh) || 0) * 900)), 0);
-  }, [targetLocations]);
+    return targetLocations.reduce((sum, loc) => {
+      const tariff = loc?.tariff_per_kwh || getStationTariff(loc, tariffConfig);
+      return sum + (Number(loc?.yearly_income) || Math.round((Number(loc?.yearly_energy_kwh ?? loc?.year_energy_kwh) || 0) * tariff));
+    }, 0);
+  }, [targetLocations, tariffConfig]);
 
   const targetFleetLifetimeRev = useMemo(() => {
-    return targetLocations.reduce((sum, loc) => sum + (Number(loc?.cumulative_income ?? loc?.total_income) || Math.round((Number(loc?.cumulative_energy_kwh ?? loc?.total_energy_kwh) || 0) * 900)), 0);
-  }, [targetLocations]);
+    return targetLocations.reduce((sum, loc) => {
+      const tariff = loc?.tariff_per_kwh || getStationTariff(loc, tariffConfig);
+      return sum + (Number(loc?.cumulative_income ?? loc?.total_income) || Math.round((Number(loc?.cumulative_energy_kwh ?? loc?.total_energy_kwh) || 0) * tariff));
+    }, 0);
+  }, [targetLocations, tariffConfig]);
 
   const fleetTodayRevVal = targetFleetTodayRev > 0 ? targetFleetTodayRev : (fleetRegion === "all" ? Number(fleet?.dailyIncome || 0) : 0);
   const fleetMonthRevVal = targetFleetMonthRev > 0 ? targetFleetMonthRev : (fleetRegion === "all" ? Number(fleet?.monthlyIncome || 0) : 0);
@@ -5689,7 +5743,7 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
 
     if (period === "year") {
       const months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
-      const vals = getStationMonthlyValues(activeStation, selectedYear, "revenue");
+      const vals = getStationMonthlyValues(activeStation, selectedYear, "revenue", stationTariff);
       return {
         available: true,
         labels: months,
@@ -5707,7 +5761,7 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
       for (let y = 2019; y <= curYear; y++) lifetimeYears.push(String(y));
       const vals = lifetimeYears.map((yrStr) => {
         const val = getStationHistoricalYearKwh(activeStation, parseInt(yrStr, 10));
-        return Math.round(val * 900);
+        return Math.round(val * stationTariff);
       });
       return {
         available: true,
@@ -5741,13 +5795,13 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
         if (foundVal === null && energyDaily?.labels?.length) {
           const idx = energyDaily.labels.indexOf(selDayStr);
           if (idx >= 0 && energyDaily.values?.[idx] !== null && energyDaily.values?.[idx] !== undefined) {
-            foundVal = Math.round(Number(energyDaily.values[idx]) * 900);
+            foundVal = Math.round(Number(energyDaily.values[idx]) * stationTariff);
           }
         }
         if (foundVal === null && kehuaMonthly?.x?.length) {
           const idx = kehuaMonthly.x.findIndex((x) => parseInt(x, 10) === selDay);
           if (idx >= 0 && kehuaMonthly.y?.[idx] !== null && kehuaMonthly.y?.[idx] !== undefined) {
-            foundVal = Math.round(Number(kehuaMonthly.y[idx]) * 900);
+            foundVal = Math.round(Number(kehuaMonthly.y[idx]) * stationTariff);
           }
         }
         if (foundVal !== null) {
@@ -5870,7 +5924,7 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
       }
     }
     return s;
-  }, [activeStation, period, selectedDate, selectedMonth, selectedYear, todayRev, monthRev, yearRev, lifetimeRev]);
+  }, [activeStation, period, selectedDate, selectedMonth, selectedYear, todayRev, monthRev, yearRev, lifetimeRev, stationTariff]);
 
   const fleetSeries = useMemo(() => {
     return buildAggregatedFleetSeries({
@@ -5919,10 +5973,10 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
     const prefix = fleetRegion === "all"
       ? `Semua PLTS (${count} Stasiun)`
       : `Wilayah ${currentRegObj?.name || "DKI Jakarta"} (${count} Stasiun)`;
-    if (fleetPeriod === "day" || fleetPeriod === "today") return `${prefix} · Total revenue (${formatToDisplayDate(fleetSelectedDate)}) · Rp 900/kWh`;
-    if (fleetPeriod === "week") return `${prefix} · Total revenue 7 hari (${formatToDisplayDate(fleetSelectedDate)}) · Rp 900/kWh`;
-    if (fleetPeriod === "month") return `${prefix} · Total revenue harian (${MONTH_NAMES[fleetSelectedMonth]} ${fleetSelectedYear}) · Rp 900/kWh`;
-    if (fleetPeriod === "year") return `${prefix} · Total revenue bulanan (${fleetSelectedYear}) · Rp 900/kWh`;
+    if (fleetPeriod === "day" || fleetPeriod === "today") return `${prefix} · Total revenue (${formatToDisplayDate(fleetSelectedDate)}) · Tarif gedung`;
+    if (fleetPeriod === "week") return `${prefix} · Total revenue 7 hari (${formatToDisplayDate(fleetSelectedDate)}) · Tarif gedung`;
+    if (fleetPeriod === "month") return `${prefix} · Total revenue harian (${MONTH_NAMES[fleetSelectedMonth]} ${fleetSelectedYear}) · Tarif gedung`;
+    if (fleetPeriod === "year") return `${prefix} · Total revenue bulanan (${fleetSelectedYear}) · Tarif gedung`;
     return `${prefix} · Histori akumulasi total revenue IDR per tahun`;
   }, [targetLocations, fleetRegion, currentRegObj, fleetPeriod, fleetSelectedDate, fleetSelectedMonth, fleetSelectedYear]);
 
@@ -6005,6 +6059,15 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
                 <p className="curve-subtitle">{curveSubtitle}</p>
               </div>
               <div className="curve-controls">
+                <button
+                  type="button"
+                  className="tariff-settings-trigger-btn"
+                  onClick={onOpenTariffModal}
+                  title="Atur tarif dasar listrik PLN per kategori gedung atau kustom per stasiun"
+                >
+                  <span>⚙️ Atur Tarif Listrik</span>
+                  {customCount > 0 && <span className="tariff-badge-custom-count">{customCount}</span>}
+                </button>
                 <div className="period-toggle-pill">
                   <button
                     type="button"
@@ -6105,16 +6168,16 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
             title="Revenue"
             todayVal={formatIdrNumber(todayRev)}
             todayUnit="IDR"
-            todaySub="Rp 900/kWh"
+            todaySub={isSingleStation ? `Tarif: Rp ${formatIdrNumber(stationTariff)}/kWh` : "Dihitung per tarif gedung"}
             monthVal={formatIdrNumber(monthRev)}
             monthUnit="IDR"
-            monthSub="Rp 900/kWh"
+            monthSub={isSingleStation ? `Tarif: Rp ${formatIdrNumber(stationTariff)}/kWh` : "Dihitung per tarif gedung"}
             yearVal={formatIdrNumber(yearRev)}
             yearUnit="IDR"
-            yearSub="Rp 900/kWh"
+            yearSub={isSingleStation ? `Tarif: Rp ${formatIdrNumber(stationTariff)}/kWh` : "Dihitung per tarif gedung"}
             lifetimeVal={formatIdrNumber(lifetimeRev)}
             lifetimeUnit="IDR"
-            lifetimeSub="Rp 900/kWh"
+            lifetimeSub={isSingleStation ? `Tarif: Rp ${formatIdrNumber(stationTariff)}/kWh` : "Dihitung per tarif gedung"}
           />
         </div>
       </div>
@@ -6130,6 +6193,15 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
                 <p className="curve-subtitle">{fleetCurveSubtitle}</p>
               </div>
               <div className="curve-controls">
+                <button
+                  type="button"
+                  className="tariff-settings-trigger-btn"
+                  onClick={onOpenTariffModal}
+                  title="Atur tarif dasar listrik PLN per kategori gedung atau kustom per stasiun"
+                >
+                  <span>⚙️ Atur Tarif Listrik</span>
+                  {customCount > 0 && <span className="tariff-badge-custom-count">{customCount}</span>}
+                </button>
                 <div className="period-toggle-pill">
                   <button
                     type="button"
@@ -6213,16 +6285,16 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
             title="Total Revenue"
             q1Val={formatIdrNumber(fleetRevQuarterly.q1)}
             q1Unit="IDR"
-            q1Sub={`${fleetRevQuarterly.m1Name} · Rp 900/kWh`}
+            q1Sub={`${fleetRevQuarterly.m1Name} · Tarif gedung`}
             q2Val={formatIdrNumber(fleetRevQuarterly.q2)}
             q2Unit="IDR"
-            q2Sub={`${fleetRevQuarterly.m2Name} · Rp 900/kWh`}
+            q2Sub={`${fleetRevQuarterly.m2Name} · Tarif gedung`}
             q3Val={formatIdrNumber(fleetRevQuarterly.q3)}
             q3Unit="IDR"
-            q3Sub={`${fleetRevQuarterly.m3Name} · Rp 900/kWh`}
+            q3Sub={`${fleetRevQuarterly.m3Name} · Tarif gedung`}
             q4Val={formatIdrNumber(fleetRevQuarterly.q4)}
             q4Unit="IDR"
-            q4Sub={`${fleetRevQuarterly.m4Name} · Rp 900/kWh`}
+            q4Sub={`${fleetRevQuarterly.m4Name} · Tarif gedung`}
           />
 
           {/* Card 3: Total fleet Revenue */}
@@ -6230,16 +6302,16 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
             title="Total fleet Revenue"
             todayVal={formatIdrNumber(fleetTodayRevVal)}
             todayUnit="IDR"
-            todaySub="Rp 900/kWh"
+            todaySub="Tarif gedung"
             monthVal={formatIdrNumber(fleetMonthRevVal)}
             monthUnit="IDR"
-            monthSub="Rp 900/kWh"
+            monthSub="Tarif gedung"
             yearVal={formatIdrNumber(fleetYearRevVal)}
             yearUnit="IDR"
-            yearSub="Rp 900/kWh"
+            yearSub="Tarif gedung"
             lifetimeVal={formatIdrNumber(fleetLifetimeRevVal)}
             lifetimeUnit="IDR"
-            lifetimeSub="Rp 900/kWh"
+            lifetimeSub="Tarif gedung"
           />
         </div>
       </div>
