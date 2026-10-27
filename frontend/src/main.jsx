@@ -2403,8 +2403,8 @@ function getStationMonthlyValues(station, targetYear, metric = "energy") {
     }
   }
 
-  // Live fallback for current month if empty in current year
-  if (isCurrentYear && monthly[currentMonthIdx] === 0) {
+  // Live fallback for current month in current year: sync with live monthly counter if available
+  if (isCurrentYear) {
     if (metric === "energy") {
       const liveMonthKwh = Number(station.monthly_energy_kwh ?? station.month_energy_kwh ?? 0);
       if (liveMonthKwh > 0) monthly[currentMonthIdx] = Math.round(liveMonthKwh * 10) / 10;
@@ -4638,36 +4638,32 @@ function buildAggregatedFleetSeries({
 
     const aggregated = Array(12).fill(0);
     locs.forEach((loc) => {
-      if (!isCurrentYear) {
-        const mVals = getStationMonthlyValues(loc, selectedYear, metricType);
+      const mVals = getStationMonthlyValues(loc, selectedYear, metricType);
+      if (Array.isArray(mVals)) {
         mVals.forEach((v, idx) => {
           if (idx < 12) aggregated[idx] += Number(v) || 0;
         });
-      } else {
-        const s = getLocSeries(loc, "year");
-        if (s && s.available !== false && Array.isArray(s.values)) {
-          s.values.forEach((v, idx) => {
-            if (idx < 12) {
-              aggregated[idx] += Number(v) || 0;
-            }
-          });
-        } else {
-          const mVal = getLocMonthly(loc);
-          const yVal = getLocYearly(loc);
-          const avgMonth = yVal > 0 ? (yVal / Math.max(1, isCurrentYear ? nowMonth + 1 : 12)) : (mVal || 100);
-          for (let i = 0; i < 12; i++) {
-            if (isFutureYear || (isCurrentYear && i > nowMonth)) {
-              // 0
-            } else if (isCurrentYear && i === nowMonth && mVal > 0) {
-              aggregated[i] += mVal;
-            } else {
-              const factor = 0.9 + (((i + (selectedYear % 5)) * 5) % 20) / 100;
-              aggregated[i] += avgMonth * factor;
-            }
-          }
-        }
       }
     });
+
+    for (let i = 0; i < 12; i++) {
+      if (isFutureYear || (isCurrentYear && i > nowMonth)) {
+        aggregated[i] = 0;
+      }
+    }
+
+    // Fallback if no station had data but fleetTotalVals had yearly estimate
+    if (!aggregated.some((v) => v > 0) && fleetTotalVals?.yearly > 0) {
+      const annual = fleetTotalVals.yearly;
+      for (let m = 0; m < 12; m++) {
+        if (isFutureYear || (isCurrentYear && m > nowMonth)) {
+          aggregated[m] = 0;
+        } else {
+          const mVal = annual * JAKARTA_SOLAR_MONTHLY_WEIGHTS[m];
+          aggregated[m] = isRevenue ? Math.round(mVal) : Math.round(mVal * 10) / 10;
+        }
+      }
+    }
 
     return {
       available: true,
@@ -4809,8 +4805,8 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
     return targetLocations.reduce((sum, loc) => sum + (Number(loc?.cumulative_energy_kwh ?? loc?.total_energy_kwh) || 0), 0);
   }, [targetLocations]);
 
-  const fleetTodayKwhVal = fleetRegion === "all" ? (Number(fleet?.daily || 0) || targetFleetTodayKwh) : targetFleetTodayKwh;
-  const fleetMonthKwhVal = fleetRegion === "all" ? (Number(fleet?.monthly || 0) || targetFleetMonthKwh) : targetFleetMonthKwh;
+  const fleetTodayKwhVal = targetFleetTodayKwh > 0 ? targetFleetTodayKwh : (fleetRegion === "all" ? Number(fleet?.daily || 0) : 0);
+  const fleetMonthKwhVal = targetFleetMonthKwh > 0 ? targetFleetMonthKwh : (fleetRegion === "all" ? Number(fleet?.monthly || 0) : 0);
   const fleetYearKwhVal = fleetRegion === "all" ? (Number(fleet?.yearly || 0) || targetFleetYearKwh) : targetFleetYearKwh;
   const fleetLifetimeKwhVal = fleetRegion === "all" ? (Number(fleet?.cumulative || fleet?.lifetime || 0) || targetFleetLifetimeKwh) : targetFleetLifetimeKwh;
 
@@ -4853,7 +4849,7 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
       };
     }
 
-    if (period === "year" && selectedYear !== new Date().getFullYear()) {
+    if (period === "year") {
       const months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
       const vals = getStationMonthlyValues(activeStation, selectedYear, "energy");
       return {
@@ -5653,8 +5649,8 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
     return targetLocations.reduce((sum, loc) => sum + (Number(loc?.cumulative_income ?? loc?.total_income) || Math.round((Number(loc?.cumulative_energy_kwh ?? loc?.total_energy_kwh) || 0) * 900)), 0);
   }, [targetLocations]);
 
-  const fleetTodayRevVal = fleetRegion === "all" ? (Number(fleet?.dailyIncome) || targetFleetTodayRev) : targetFleetTodayRev;
-  const fleetMonthRevVal = fleetRegion === "all" ? (Number(fleet?.monthlyIncome) || targetFleetMonthRev) : targetFleetMonthRev;
+  const fleetTodayRevVal = targetFleetTodayRev > 0 ? targetFleetTodayRev : (fleetRegion === "all" ? Number(fleet?.dailyIncome || 0) : 0);
+  const fleetMonthRevVal = targetFleetMonthRev > 0 ? targetFleetMonthRev : (fleetRegion === "all" ? Number(fleet?.monthlyIncome || 0) : 0);
   const fleetYearRevVal = fleetRegion === "all" ? (Number(fleet?.yearlyIncome) || targetFleetYearRev) : targetFleetYearRev;
   const fleetLifetimeRevVal = fleetRegion === "all" ? (Number(fleet?.totalIncome) || targetFleetLifetimeRev) : targetFleetLifetimeRev;
 
@@ -5685,7 +5681,7 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
       };
     }
 
-    if (period === "year" && selectedYear !== new Date().getFullYear()) {
+    if (period === "year") {
       const months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
       const vals = getStationMonthlyValues(activeStation, selectedYear, "revenue");
       return {
@@ -6598,12 +6594,12 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
     return targetLocations.reduce((sum, loc) => sum + (Number(loc?.cumulative_energy_kwh ?? loc?.total_energy_kwh) || 0), 0) * EMISSION_FACTOR;
   }, [targetLocations]);
 
-  const fleetTotalTodayEmissionKg = fleetRegion === "all"
-    ? (Number(fleet?.daily || 0) * EMISSION_FACTOR || targetTodayEmissionKg)
-    : targetTodayEmissionKg;
-  const fleetMonthEmissionKgCalc = fleetRegion === "all"
-    ? (Number(fleet?.monthly || 0) * EMISSION_FACTOR || targetMonthEmissionKg)
-    : targetMonthEmissionKg;
+  const fleetTotalTodayEmissionKg = targetTodayEmissionKg > 0
+    ? targetTodayEmissionKg
+    : (fleetRegion === "all" ? (Number(fleet?.daily || 0) * EMISSION_FACTOR) : 0);
+  const fleetMonthEmissionKgCalc = targetMonthEmissionKg > 0
+    ? targetMonthEmissionKg
+    : (fleetRegion === "all" ? (Number(fleet?.monthly || 0) * EMISSION_FACTOR) : 0);
   const fleetYearEmissionKgCalc = fleetRegion === "all"
     ? (Number(fleet?.yearly || 0) * EMISSION_FACTOR || targetYearEmissionKg)
     : targetYearEmissionKg;
@@ -6638,7 +6634,7 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
       };
     }
 
-    if (period === "year" && selectedYear !== new Date().getFullYear()) {
+    if (period === "year") {
       const months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
       const vals = getStationMonthlyValues(activeStation, selectedYear, "emission");
       return {
