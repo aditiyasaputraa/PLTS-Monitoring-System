@@ -1000,46 +1000,6 @@ function LoginPage({ onSignIn, initialError }) {
               {submitting ? "Memproses..." : "Sign In"}
             </button>
           </form>
-
-          {/* Quick Account Selector untuk Kemudahan Pengujian & Multi-Wilayah */}
-          <div className="login-quick-accounts-wrap">
-            <div className="login-quick-title">
-              <span>Pilihan Akun Cepat (5 Wilayah &amp; Super Admin)</span>
-            </div>
-            <p className="login-quick-hint">
-              Klik salah satu akun di bawah ini untuk mengisi kredensial secara otomatis:
-            </p>
-            <div className="login-quick-grid">
-              {REGIONAL_ACCOUNTS.map((acc) => {
-                const isSuper = acc.role === "super_admin";
-                const isCurrent = email === acc.username || email === acc.email;
-                return (
-                  <button
-                    key={acc.id}
-                    type="button"
-                    className={`login-quick-card ${isCurrent ? "is-selected" : ""} ${isSuper ? "is-superadmin" : ""}`}
-                    onClick={() => {
-                      setEmail(acc.username);
-                      setPassword(acc.passwords[0]);
-                      setError(null);
-                    }}
-                    title={`Pilih ${acc.name} (${acc.username})`}
-                  >
-                    <div className="login-quick-icon">{isSuper ? "👑" : "🏢"}</div>
-                    <div className="login-quick-info">
-                      <strong className="login-quick-name">{acc.name}</strong>
-                      <span className="login-quick-user">
-                        User: <code>{acc.username}</code> · Pass: <code>{acc.passwords[0]}</code>
-                      </span>
-                      <span className="login-quick-desc">
-                        {isSuper ? "Akses edit seluruh 107 PLTS" : `Akses edit wilayah ${acc.regionName}`}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
         </div>
       </div>
 

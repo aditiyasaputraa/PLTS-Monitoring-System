@@ -1,6 +1,11 @@
 /**
  * Modul Autentikasi dan Role-Based Access Control (RBAC) per Wilayah
- * Memfasilitasi 5 Akun Administrator Suku Dinas Wilayah + 1 Akun Super Admin Provinsi
+ * Memfasilitasi 5 Akun Administrator Suku Dinas Wilayah + 1 Akun Super Admin Provinsi.
+ *
+ * CATATAN KEAMANAN:
+ * Password akun TIDAK di-hardcode di kode sumber ini.
+ * Seluruh password dibaca secara dinamis dari Environment Variables (VITE_*)
+ * yang disimpan secara rahasia di .env lokal dan Dashboard Vercel.
  */
 
 export const REGIONAL_ACCOUNTS = [
@@ -12,7 +17,7 @@ export const REGIONAL_ACCOUNTS = [
     region: "jakpus",
     regionName: "Jakarta Pusat",
     name: "Admin Sudin Jakarta Pusat",
-    passwords: ["adminpusat123", "pusat123", "admin.pusat", "admin123"],
+    envKey: "VITE_AUTH_ADMIN_PUSAT_PASS",
   },
   {
     id: "admin_utara",
@@ -22,7 +27,7 @@ export const REGIONAL_ACCOUNTS = [
     region: "jakut",
     regionName: "Jakarta Utara",
     name: "Admin Sudin Jakarta Utara",
-    passwords: ["adminutara123", "utara123", "admin.utara", "admin123"],
+    envKey: "VITE_AUTH_ADMIN_UTARA_PASS",
   },
   {
     id: "admin_barat",
@@ -32,7 +37,7 @@ export const REGIONAL_ACCOUNTS = [
     region: "jakbar",
     regionName: "Jakarta Barat",
     name: "Admin Sudin Jakarta Barat",
-    passwords: ["adminbarat123", "barat123", "admin.barat", "admin123"],
+    envKey: "VITE_AUTH_ADMIN_BARAT_PASS",
   },
   {
     id: "admin_selatan",
@@ -42,7 +47,7 @@ export const REGIONAL_ACCOUNTS = [
     region: "jaksel",
     regionName: "Jakarta Selatan",
     name: "Admin Sudin Jakarta Selatan",
-    passwords: ["adminselatan123", "selatan123", "admin.selatan", "admin123"],
+    envKey: "VITE_AUTH_ADMIN_SELATAN_PASS",
   },
   {
     id: "admin_timur",
@@ -52,7 +57,7 @@ export const REGIONAL_ACCOUNTS = [
     region: "jaktim",
     regionName: "Jakarta Timur",
     name: "Admin Sudin Jakarta Timur",
-    passwords: ["admintimur123", "timur123", "admin.timur", "admin123"],
+    envKey: "VITE_AUTH_ADMIN_TIMUR_PASS",
   },
   {
     id: "admin_super",
@@ -62,9 +67,32 @@ export const REGIONAL_ACCOUNTS = [
     region: "all",
     regionName: "Provinsi DKI Jakarta",
     name: "Administrator Provinsi DKI Jakarta",
-    passwords: ["admin", "admin123"],
+    envKey: "VITE_AUTH_SUPERADMIN_PASS",
   },
 ];
+
+/**
+ * Mengambil password akun dari environment variable
+ */
+export function getAccountPassword(envKey) {
+  if (!envKey) return "";
+
+  // 1. Vite environment di browser
+  try {
+    if (typeof import.meta !== "undefined" && import.meta?.env && import.meta.env[envKey]) {
+      return String(import.meta.env[envKey]).trim();
+    }
+  } catch (_) {}
+
+  // 2. Node.js environment (saat unit test / SSR)
+  try {
+    if (typeof process !== "undefined" && process?.env && process.env[envKey]) {
+      return String(process.env[envKey]).trim();
+    }
+  } catch (_) {}
+
+  return "";
+}
 
 /**
  * Mencari profil akun berdasarkan input email/username dan password
@@ -81,8 +109,10 @@ export function authenticateLocalAccount(emailOrUsername, password) {
     const matchAlias = cleanInput.includes(acc.region) || (acc.username && cleanInput === acc.username.replace(".", ""));
 
     if (matchUsername || matchEmail || matchAlias) {
-      const passValid = acc.passwords.includes(cleanPass) || cleanPass === "admin123" || cleanPass === acc.username;
-      if (passValid) {
+      const configuredPass = getAccountPassword(acc.envKey);
+
+      // Verifikasi password terhadap environment variable
+      if (configuredPass && cleanPass === configuredPass) {
         return {
           id: acc.id,
           email: acc.email,
@@ -95,7 +125,7 @@ export function authenticateLocalAccount(emailOrUsername, password) {
     }
   }
 
-  // Fallback demo/operator
+  // Fallback demo/operator jika diakses sebagai demo
   if (cleanInput === "demo" || cleanInput === "operator") {
     return {
       id: "operator",
