@@ -1904,15 +1904,17 @@ button {
   width: 100%;
 }
 
-.analytics-grid-row {
+.analytics-grid-row,
+.analytics-unified-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(340px, 1fr);
+  grid-template-columns: minmax(0, 1.45fr) minmax(350px, 1fr);
   gap: 20px;
-  align-items: stretch;
+  align-items: start;
 }
 
 @media (max-width: 1100px) {
-  .analytics-grid-row {
+  .analytics-grid-row,
+  .analytics-unified-layout {
     grid-template-columns: 1fr;
   }
 }
@@ -1920,14 +1922,14 @@ button {
 .analytics-col-main {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  gap: 20px;
   min-width: 0;
 }
 
 .analytics-col-side {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  gap: 16px;
   min-width: 0;
 }
 
@@ -1940,9 +1942,8 @@ button {
   box-shadow: 0 2px 10px rgba(15, 25, 18, 0.04), 0 1px 3px rgba(15, 25, 18, 0.02);
   display: flex;
   flex-direction: column;
-  height: 100%;
-  min-height: 380px;
-  max-height: 520px;
+  height: 440px;
+  max-height: 440px;
   box-sizing: border-box;
 }
 
@@ -2408,19 +2409,18 @@ button {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  height: 100%;
+  width: 100%;
 }
 
 .analytics-kpi-group-card {
   background: #ffffff;
   border: 1px solid #e2e8df;
   border-radius: 16px;
-  padding: 18px 20px;
+  padding: 16px 18px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
   display: flex;
   flex-direction: column;
   justify-content: center;
-  flex: 1;
   box-sizing: border-box;
 }
 

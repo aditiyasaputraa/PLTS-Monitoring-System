@@ -4338,6 +4338,104 @@ function AnalyticsKpiCardGroup({
   );
 }
 
+function AnalyticsQuarterlyKpiCardGroup({
+  title,
+  q1Val,
+  q1Unit,
+  q1Sub,
+  q2Val,
+  q2Unit,
+  q2Sub,
+  q3Val,
+  q3Unit,
+  q3Sub,
+  q4Val,
+  q4Unit,
+  q4Sub,
+}) {
+  return (
+    <div className="analytics-kpi-group-card">
+      <h3 className="analytics-group-title">{title}</h3>
+      <div className="kpi-2x2-grid">
+        <div className="kpi-card-box">
+          <span className="kpi-card-tag">TW 1</span>
+          <div className="kpi-card-value">
+            {q1Val} <span className="kpi-card-unit">{q1Unit}</span>
+          </div>
+          <div className="kpi-card-sub">{q1Sub}</div>
+        </div>
+
+        <div className="kpi-card-box">
+          <span className="kpi-card-tag">TW 2</span>
+          <div className="kpi-card-value">
+            {q2Val} <span className="kpi-card-unit">{q2Unit}</span>
+          </div>
+          <div className="kpi-card-sub">{q2Sub}</div>
+        </div>
+
+        <div className="kpi-card-box">
+          <span className="kpi-card-tag">TW 3</span>
+          <div className="kpi-card-value">
+            {q3Val} <span className="kpi-card-unit">{q3Unit}</span>
+          </div>
+          <div className="kpi-card-sub">{q3Sub}</div>
+        </div>
+
+        <div className="kpi-card-box">
+          <span className="kpi-card-tag">TW 4</span>
+          <div className="kpi-card-value">
+            {q4Val} <span className="kpi-card-unit">{q4Unit}</span>
+          </div>
+          <div className="kpi-card-sub">{q4Sub}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function getFleetQuarterlyValues({ targetLocations, selectedYear, metricType = "energy", fallbackYearVal = 0 }) {
+  const isRevenue = metricType === "revenue";
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const yr = selectedYear || currentYear;
+  const isCurrentYear = yr === currentYear;
+  const currentMonth = now.getMonth();
+
+  const locs = targetLocations || [];
+  const monthly = Array(12).fill(0);
+
+  locs.forEach((loc) => {
+    const mVals = getStationMonthlyValues(loc, yr, metricType);
+    if (Array.isArray(mVals)) {
+      mVals.forEach((v, idx) => {
+        if (idx < 12) monthly[idx] += Number(v) || 0;
+      });
+    }
+  });
+
+  let q1 = monthly[0] + monthly[1] + monthly[2];
+  let q2 = monthly[3] + monthly[4] + monthly[5];
+  let q3 = monthly[6] + monthly[7] + monthly[8];
+  let q4 = monthly[9] + monthly[10] + monthly[11];
+
+  const totalQ = q1 + q2 + q3 + q4;
+  if (totalQ === 0 && fallbackYearVal > 0) {
+    const qPassed = isCurrentYear ? Math.floor(currentMonth / 3) + 1 : 4;
+    const baseShare = fallbackYearVal / Math.max(1, qPassed);
+    q1 = baseShare;
+    q2 = qPassed >= 2 ? baseShare : 0;
+    q3 = qPassed >= 3 ? baseShare : 0;
+    q4 = qPassed >= 4 ? baseShare : (isCurrentYear ? baseShare * ((currentMonth % 3 + 1) / 3) : 0);
+  }
+
+  return {
+    q1: isRevenue ? Math.round(q1) : Math.round(q1 * 10) / 10,
+    q2: isRevenue ? Math.round(q2) : Math.round(q2 * 10) / 10,
+    q3: isRevenue ? Math.round(q3) : Math.round(q3 * 10) / 10,
+    q4: isRevenue ? Math.round(q4) : Math.round(q4 * 10) / 10,
+  };
+}
+
 function buildAggregatedFleetSeries({
   targetLocations,
   period,
@@ -4925,12 +5023,21 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
     return nonZero !== undefined ? nonZero : 0;
   }, [fleetSeries]);
 
+  const fleetQuarterly = useMemo(() => {
+    return getFleetQuarterlyValues({
+      targetLocations,
+      selectedYear: fleetSelectedYear,
+      metricType: "energy",
+      fallbackYearVal: fleetYearKwhVal,
+    });
+  }, [targetLocations, fleetSelectedYear, fleetYearKwhVal]);
+
   return (
     <div className="unified-analytics-view">
-      {/* ROW 1: PRODUCTION CURVE (LEFT) + DARK DAFTAR PLTS (RIGHT) */}
-      <div className="analytics-grid-row">
-        {/* Left: Production Curve Card */}
+      <div className="analytics-unified-layout">
+        {/* Left Column: Both Curves */}
         <div className="analytics-col-main">
+          {/* Chart 1: Production Curve Card */}
           <div className="energy-curve-card">
             <div className="curve-card-header">
               <div>
@@ -5020,26 +5127,8 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Right: Dark Station List Card */}
-        <div className="analytics-col-side">
-          <StationListDarkCard
-            locations={locations}
-            allLocations={allLocations}
-            activeStation={activeStation}
-            onSelect={handleSelectStation}
-            selectedRegion={selectedRegion || "all"}
-            onSelectRegion={onSelectRegion}
-            onUpdateStation={onUpdateStation}
-          />
-        </div>
-      </div>
-
-      {/* ROW 2: TOTAL FLEET PRODUCTION CURVE (LEFT) + 2x2 KPI STACK (RIGHT) */}
-      <div className="analytics-grid-row">
-        {/* Left: Total Fleet Production Curve Card */}
-        <div className="analytics-col-main">
+          {/* Chart 2: Total Fleet Production Curve Card */}
           <div className="energy-curve-card">
             <div className="curve-card-header">
               <div>
@@ -5123,10 +5212,20 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
           </div>
         </div>
 
-        {/* Right: Stack of 2 KPI Cards */}
+        {/* Right Column: Dark Station List Card + 3 KPI Cards */}
         <div className="analytics-col-side">
+          <StationListDarkCard
+            locations={locations}
+            allLocations={allLocations}
+            activeStation={activeStation}
+            onSelect={handleSelectStation}
+            selectedRegion={selectedRegion || "all"}
+            onSelectRegion={onSelectRegion}
+            onUpdateStation={onUpdateStation}
+          />
+
           <div className="analytics-kpi-stack">
-            {/* Station Production */}
+            {/* Card 1: Station Production */}
             <AnalyticsKpiCardGroup
               title="Production"
               todayVal={formatNumber(todayKwh, 1)}
@@ -5143,7 +5242,24 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
               lifetimeSub={`${lifetimeMwh} MWH`}
             />
 
-            {/* Total fleet Production */}
+            {/* Card 2: Total Production (Quarterly TW 1-4 for Fleet) */}
+            <AnalyticsQuarterlyKpiCardGroup
+              title="Total Production"
+              q1Val={formatNumber(fleetQuarterly.q1, 1)}
+              q1Unit="KWH"
+              q1Sub={`${(fleetQuarterly.q1 / 1000).toFixed(3)} MWH`}
+              q2Val={formatNumber(fleetQuarterly.q2, 1)}
+              q2Unit="KWH"
+              q2Sub={`${(fleetQuarterly.q2 / 1000).toFixed(3)} MWH`}
+              q3Val={formatNumber(fleetQuarterly.q3, 1)}
+              q3Unit="KWH"
+              q3Sub={`${(fleetQuarterly.q3 / 1000).toFixed(3)} MWH`}
+              q4Val={formatNumber(fleetQuarterly.q4, 1)}
+              q4Unit="KWH"
+              q4Sub={`${(fleetQuarterly.q4 / 1000).toFixed(3)} MWH`}
+            />
+
+            {/* Card 3: Total fleet Production */}
             <AnalyticsKpiCardGroup
               title="Total fleet Production"
               todayVal={formatNumber(fleetTodayKwhVal, 1)}
@@ -5825,12 +5941,21 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
     return new Intl.NumberFormat("id-ID").format(Math.round(Number(num) || 0));
   };
 
+  const fleetRevQuarterly = useMemo(() => {
+    return getFleetQuarterlyValues({
+      targetLocations,
+      selectedYear: fleetSelectedYear,
+      metricType: "revenue",
+      fallbackYearVal: fleetYearRevVal,
+    });
+  }, [targetLocations, fleetSelectedYear, fleetYearRevVal]);
+
   return (
     <div className="unified-analytics-view">
-      {/* ROW 1: STATION REVENUE CURVE (LEFT) + DARK STATION LIST (RIGHT) */}
-      <div className="analytics-grid-row">
-        {/* Left: Station Revenue Curve Card */}
+      <div className="analytics-unified-layout">
+        {/* Left Column: Both Curves */}
         <div className="analytics-col-main">
+          {/* Chart 1: Station Revenue Curve Card */}
           <div className="energy-curve-card">
             <div className="curve-card-header">
               <div>
@@ -5912,26 +6037,8 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Right: Dark Station List Card */}
-        <div className="analytics-col-side">
-          <StationListDarkCard
-            locations={locations}
-            allLocations={allLocations}
-            activeStation={activeStation}
-            onSelect={handleSelectStation}
-            selectedRegion={selectedRegion || "all"}
-            onSelectRegion={onSelectRegion}
-            onUpdateStation={onUpdateStation}
-          />
-        </div>
-      </div>
-
-      {/* ROW 2: TOTAL FLEET REVENUE CURVE (LEFT) + 2x2 KPI STACK (RIGHT) */}
-      <div className="analytics-grid-row">
-        {/* Left: Total Fleet Revenue Curve Card */}
-        <div className="analytics-col-main">
+          {/* Chart 2: Total Fleet Revenue Curve Card */}
           <div className="energy-curve-card">
             <div className="curve-card-header">
               <div>
@@ -6015,10 +6122,20 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
           </div>
         </div>
 
-        {/* Right: Stack of 2 KPI Cards */}
+        {/* Right Column: Dark Station List Card + 3 KPI Cards */}
         <div className="analytics-col-side">
+          <StationListDarkCard
+            locations={locations}
+            allLocations={allLocations}
+            activeStation={activeStation}
+            onSelect={handleSelectStation}
+            selectedRegion={selectedRegion || "all"}
+            onSelectRegion={onSelectRegion}
+            onUpdateStation={onUpdateStation}
+          />
+
           <div className="analytics-kpi-stack">
-            {/* Station Revenue */}
+            {/* Card 1: Station Revenue */}
             <AnalyticsKpiCardGroup
               title="Revenue"
               todayVal={formatIdrNumber(todayRev)}
@@ -6035,7 +6152,24 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
               lifetimeSub="Rp 900/kWh"
             />
 
-            {/* Total fleet Revenue */}
+            {/* Card 2: Total Revenue (Quarterly TW 1-4 for Fleet) */}
+            <AnalyticsQuarterlyKpiCardGroup
+              title="Total Revenue"
+              q1Val={formatIdrNumber(fleetRevQuarterly.q1)}
+              q1Unit="IDR"
+              q1Sub="Rp 900/kWh"
+              q2Val={formatIdrNumber(fleetRevQuarterly.q2)}
+              q2Unit="IDR"
+              q2Sub="Rp 900/kWh"
+              q3Val={formatIdrNumber(fleetRevQuarterly.q3)}
+              q3Unit="IDR"
+              q3Sub="Rp 900/kWh"
+              q4Val={formatIdrNumber(fleetRevQuarterly.q4)}
+              q4Unit="IDR"
+              q4Sub="Rp 900/kWh"
+            />
+
+            {/* Card 3: Total fleet Revenue */}
             <AnalyticsKpiCardGroup
               title="Total fleet Revenue"
               todayVal={formatIdrNumber(fleetTodayRevVal)}
@@ -6684,12 +6818,21 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
     };
   };
 
+  const fleetEmQuarterly = useMemo(() => {
+    return getFleetQuarterlyValues({
+      targetLocations,
+      selectedYear: fleetSelectedYear,
+      metricType: "emission",
+      fallbackYearVal: fleetYearEmissionKgCalc,
+    });
+  }, [targetLocations, fleetSelectedYear, fleetYearEmissionKgCalc]);
+
   return (
     <div className="unified-analytics-view">
-      {/* ROW 1: STATION EMISSION CURVE (LEFT) + DARK STATION LIST (RIGHT) */}
-      <div className="analytics-grid-row">
-        {/* Left: Station Emission Curve Card */}
+      <div className="analytics-unified-layout">
+        {/* Left Column: Both Curves */}
         <div className="analytics-col-main">
+          {/* Chart 1: Station Emission Curve Card */}
           <div className="energy-curve-card">
             <div className="curve-card-header">
               <div>
@@ -6775,26 +6918,8 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Right: Dark Station List Card */}
-        <div className="analytics-col-side">
-          <StationListDarkCard
-            locations={locations}
-            allLocations={allLocations}
-            activeStation={activeStation}
-            onSelect={handleSelectStation}
-            selectedRegion={selectedRegion || "all"}
-            onSelectRegion={onSelectRegion}
-            onUpdateStation={onUpdateStation}
-          />
-        </div>
-      </div>
-
-      {/* ROW 2: TOTAL FLEET EMISSION CURVE (LEFT) + 2x2 KPI STACK (RIGHT) */}
-      <div className="analytics-grid-row">
-        {/* Left: Total Fleet Emission Curve Card */}
-        <div className="analytics-col-main">
+          {/* Chart 2: Total Fleet Emission Curve Card */}
           <div className="energy-curve-card">
             <div className="curve-card-header">
               <div>
@@ -6882,10 +7007,20 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
           </div>
         </div>
 
-        {/* Right: Stack of 2 KPI Cards */}
+        {/* Right Column: Dark Station List Card + 3 KPI Cards */}
         <div className="analytics-col-side">
+          <StationListDarkCard
+            locations={locations}
+            allLocations={allLocations}
+            activeStation={activeStation}
+            onSelect={handleSelectStation}
+            selectedRegion={selectedRegion || "all"}
+            onSelectRegion={onSelectRegion}
+            onUpdateStation={onUpdateStation}
+          />
+
           <div className="analytics-kpi-stack">
-            {/* Station Emission */}
+            {/* Card 1: Station Emission */}
             <AnalyticsKpiCardGroup
               title="Emission"
               todayVal={formatEmissionCard(todayEmissionKg).val}
@@ -6902,7 +7037,24 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
               lifetimeSub="0.85 kg/kWh"
             />
 
-            {/* Total fleet Emission */}
+            {/* Card 2: Total Emission (Quarterly TW 1-4 for Fleet) */}
+            <AnalyticsQuarterlyKpiCardGroup
+              title="Total Emission"
+              q1Val={formatEmissionCard(fleetEmQuarterly.q1).val}
+              q1Unit={formatEmissionCard(fleetEmQuarterly.q1).unit}
+              q1Sub="0.85 kg/kWh"
+              q2Val={formatEmissionCard(fleetEmQuarterly.q2).val}
+              q2Unit={formatEmissionCard(fleetEmQuarterly.q2).unit}
+              q2Sub="0.85 kg/kWh"
+              q3Val={formatEmissionCard(fleetEmQuarterly.q3).val}
+              q3Unit={formatEmissionCard(fleetEmQuarterly.q3).unit}
+              q3Sub="0.85 kg/kWh"
+              q4Val={formatEmissionCard(fleetEmQuarterly.q4).val}
+              q4Unit={formatEmissionCard(fleetEmQuarterly.q4).unit}
+              q4Sub="0.85 kg/kWh"
+            />
+
+            {/* Card 3: Total fleet Emission */}
             <AnalyticsKpiCardGroup
               title="Total fleet Emission"
               todayVal={formatEmissionCard(fleetTotalTodayEmissionKg).val}
