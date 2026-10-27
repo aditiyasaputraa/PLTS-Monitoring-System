@@ -2285,10 +2285,8 @@ function getStationHistoricalYearKwh(station, targetYear) {
     }
   }
 
-  // 5. If targetYear is currentYear, return live yearly_energy_kwh (or 0 if offline)
+  // 5. If targetYear is currentYear, return live yearly_energy_kwh recorded by the station
   if (targetYear === currentYear) {
-    const isOffline = station.status === "offline" || station.status === "disconnected";
-    if (isOffline) return 0;
     const yKwh = Number(station.yearly_energy_kwh ?? station.year_energy_kwh ?? 0);
     return Math.max(0, yKwh);
   }
@@ -2321,12 +2319,6 @@ function getStationMonthlyValues(station, targetYear, metric = "energy") {
   const monthly = Array(12).fill(0);
 
   if (!station) return monthly;
-
-  const isOffline = station.status === "offline" || station.status === "disconnected";
-  // Untuk tahun berjalan, jika PLTS offline, jangan ada suntikan data estimasi (tetap 0)
-  if (isCurrentYear && isOffline) {
-    return monthly;
-  }
 
   const source = (station.source || station.site?.platform || "").toLowerCase();
 
