@@ -3409,6 +3409,250 @@ button {
   }
 }
 
+/* ==========================================================================
+   USER IDENTITY & REGIONAL ROLE BADGES
+   ========================================================================== */
+
+.user-nav-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  transition: all 0.2s ease;
+  cursor: default;
+}
+
+.user-nav-badge:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.user-nav-avatar {
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.user-nav-info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+  text-align: left;
+}
+
+.user-nav-name {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #e5e7eb;
+  max-width: 150px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-nav-role-pill {
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  display: inline-block;
+  margin-top: 1px;
+}
+
+.user-nav-role-pill.role-all {
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.16);
+}
+
+.user-nav-role-pill.role-jakpus {
+  color: #60a5fa;
+  background: rgba(59, 130, 246, 0.16);
+}
+
+.user-nav-role-pill.role-jakut {
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.16);
+}
+
+.user-nav-role-pill.role-jakbar {
+  color: #c084fc;
+  background: rgba(168, 85, 247, 0.16);
+}
+
+.user-nav-role-pill.role-jaksel {
+  color: #f472b6;
+  background: rgba(236, 72, 153, 0.16);
+}
+
+.user-nav-role-pill.role-jaktim {
+  color: #fb923c;
+  background: rgba(249, 115, 22, 0.16);
+}
+
+/* ==========================================================================
+   LOGIN PAGE QUICK ACCOUNT SELECTOR
+   ========================================================================== */
+
+.login-quick-accounts-wrap {
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px dashed #e2e8f0;
+}
+
+.login-quick-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.login-quick-title span {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.login-quick-hint {
+  font-size: 11px;
+  color: #64748b;
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+
+.login-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+@media (max-width: 520px) {
+  .login-quick-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.login-quick-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.login-quick-card:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+}
+
+.login-quick-card.is-selected {
+  background: #eff6ff;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.login-quick-card.is-superadmin {
+  background: #fefce8;
+  border-color: #fef08a;
+}
+
+.login-quick-card.is-superadmin.is-selected {
+  background: #fef9c3;
+  border-color: #eab308;
+  box-shadow: 0 0 0 2px rgba(234, 179, 8, 0.25);
+}
+
+.login-quick-icon {
+  font-size: 16px;
+  margin-top: 1px;
+}
+
+.login-quick-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.login-quick-name {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.login-quick-user {
+  font-size: 10px;
+  color: #475569;
+}
+
+.login-quick-user code {
+  font-family: monospace;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 1px 3px;
+  border-radius: 3px;
+  color: #0369a1;
+}
+
+.login-quick-desc {
+  font-size: 9.5px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+/* ==========================================================================
+   STATION LIST PROTECTED/LOCKED STYLES
+   ========================================================================== */
+
+.btn-edit-station.is-locked {
+  opacity: 0.35;
+  cursor: not-allowed;
+  background: transparent;
+  border-color: transparent;
+  color: #64748b;
+}
+
+.btn-edit-station.is-locked:hover {
+  background: transparent;
+  color: #64748b;
+  transform: none;
+}
+
+.asset-owner-pill.clickable {
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.asset-owner-pill.clickable:hover {
+  filter: brightness(1.15);
+  text-decoration: underline;
+}
+
+.asset-owner-empty.is-locked {
+  cursor: not-allowed;
+  color: #475569;
+  font-weight: bold;
+}
+
+
 
 
 

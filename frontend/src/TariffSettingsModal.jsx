@@ -4,6 +4,10 @@ import {
   detectStationCategory,
   getStationTariff,
 } from "./tariffs.js";
+import {
+  canUserEditStation,
+  canUserEditCategoryTariff,
+} from "./auth_roles.js";
 
 export default function TariffSettingsModal({
   isOpen,
@@ -14,11 +18,17 @@ export default function TariffSettingsModal({
   onResetStationRate,
   onResetAllToDefaults,
   allStations = [],
+  currentUser = null,
+  getStationRegionFn = null,
 }) {
   const [activeSubTab, setActiveSubTab] = useState("category"); // "category" | "station"
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [toastMessage, setToastMessage] = useState(null);
+
+  const isSuperAdmin = canUserEditCategoryTariff(currentUser);
+  const userRegion = currentUser?.region || currentUser?.user_metadata?.region;
+  const isRegionalAdmin = !isSuperAdmin && userRegion && userRegion !== "all";
 
   // Temporary local state for editing categories
   const [localCategories, setLocalCategories] = useState(() => ({
@@ -68,13 +78,20 @@ export default function TariffSettingsModal({
     return allStations.filter((st) => {
       const name = st.name || st.station_name || "";
       const cat = detectStationCategory(name);
-      if (categoryFilter !== "all" && cat !== categoryFilter) return false;
+      const stReg = getStationRegionFn ? getStationRegionFn(st) : (st.region ? String(st.region).toLowerCase() : "");
+
+      if (categoryFilter === "my_region") {
+        if (stReg !== userRegion) return false;
+      } else if (categoryFilter !== "all" && cat !== categoryFilter) {
+        return false;
+      }
+
       if (q && !name.toLowerCase().includes(q) && !(st.region || "").toLowerCase().includes(q)) {
         return false;
       }
       return true;
     });
-  }, [allStations, searchQuery, categoryFilter]);
+  }, [allStations, searchQuery, categoryFilter, getStationRegionFn, userRegion]);
 
   const customCount = useMemo(() => {
     return Object.keys(tariffConfig?.customRates || {}).length;
@@ -115,7 +132,7 @@ export default function TariffSettingsModal({
             onClick={() => setActiveSubTab("category")}
           >
             <span>Tarif Kategori Gedung</span>
-            <span className="tariff-tab-pill">Preset Default</span>
+            <span className="tariff-tab-pill">{isSuperAdmin ? "Preset Default" : "Khusus Provinsi"}</span>
           </button>
           <button
             className={`tariff-tab-btn ${activeSubTab === "station" ? "active" : ""}`}
@@ -130,17 +147,28 @@ export default function TariffSettingsModal({
         <div className="tariff-modal-body">
           {activeSubTab === "category" && (
             <div className="tariff-category-content">
-              <div className="tariff-info-notice">
-                <span className="notice-icon">ℹ️</span>
-                <div>
-                  <strong>Informasi Golongan Tarif PLN:</strong> Setiap kelompok gedung memiliki tarif rekening listrik PLN yang berbeda. Tarif kategori sekolah dikunci tetap <strong>Rp 900/kWh</strong> (Tarif Sosial S-2/S-3), sedangkan gedung pemerintahan dan publik lainnya dapat disesuaikan.
+              {!isSuperAdmin ? (
+                <div className="tariff-info-notice" style={{ background: "#fffbeb", borderColor: "#fde68a", color: "#92400e" }}>
+                  <span className="notice-icon">🔒</span>
+                  <div>
+                    <strong>Mode Hanya Lihat:</strong> Pengaturan tarif kategori global PLN hanya dapat diubah oleh Administrator Provinsi DKI Jakarta. Sebagai <strong>{currentUser?.user_metadata?.name || currentUser?.name || "Admin Wilayah"}</strong>, Anda dapat menyesuaikan tarif stasiun di wilayah Anda pada tab <strong>"Tarif Khusus per Gedung"</strong>.
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="tariff-info-notice">
+                  <span className="notice-icon">ℹ️</span>
+                  <div>
+                    <strong>Informasi Golongan Tarif PLN:</strong> Setiap kelompok gedung memiliki tarif rekening listrik PLN yang berbeda. Tarif kategori sekolah dikunci tetap <strong>Rp 900/kWh</strong> (Tarif Sosial S-2/S-3), sedangkan gedung pemerintahan dan publik lainnya dapat disesuaikan.
+                  </div>
+                </div>
+              )}
 
               <div className="tariff-category-grid">
                 {Object.values(DEFAULT_TARIFF_CATEGORIES).map((cat) => {
-                  const isLocked = Boolean(cat.isLocked || cat.id === "school");
-                  const currentVal = isLocked ? cat.defaultRate : (localCategories[cat.id] ?? cat.defaultRate);
+                  const isLocked = Boolean(cat.isLocked || cat.id === "school" || !isSuperAdmin);
+                  const currentVal = (cat.isLocked || cat.id === "school")
+                    ? cat.defaultRate
+                    : (localCategories[cat.id] ?? cat.defaultRate);
                   return (
                     <div key={cat.id} className={`tariff-category-card ${isLocked ? "card-locked" : ""}`}>
                       <div className="tariff-category-card-header">
@@ -150,8 +178,8 @@ export default function TariffSettingsModal({
                           <span className="cat-desc">{cat.description}</span>
                         </div>
                         {isLocked && (
-                          <span className="cat-locked-badge" title="Tarif sosial sekolah dikunci tetap Rp 900/kWh">
-                            🔒 Tetap
+                          <span className="cat-locked-badge" title="Terkunci">
+                            {cat.id === "school" ? "🔒 Tetap" : "🔒 Khusus Provinsi"}
                           </span>
                         )}
                       </div>
@@ -162,7 +190,7 @@ export default function TariffSettingsModal({
                           step="0.01"
                           min="1"
                           disabled={isLocked}
-                          title={isLocked ? "Tarif sekolah dikunci tetap Rp 900/kWh (Tarif Sosial S-2/S-3 PLN)" : undefined}
+                          title={isLocked ? "Tarif tidak dapat diubah" : undefined}
                           className="tariff-number-input"
                           value={currentVal}
                           onChange={(e) => {
@@ -180,15 +208,17 @@ export default function TariffSettingsModal({
                 })}
               </div>
 
-              <div className="tariff-category-actions">
-                <button
-                  type="button"
-                  className="tariff-save-btn"
-                  onClick={handleSaveCategories}
-                >
-                  Simpan &amp; Terapkan Tarif Kategori
-                </button>
-              </div>
+              {isSuperAdmin && (
+                <div className="tariff-category-actions">
+                  <button
+                    type="button"
+                    className="tariff-save-btn"
+                    onClick={handleSaveCategories}
+                  >
+                    Simpan &amp; Terapkan Tarif Kategori
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -216,6 +246,20 @@ export default function TariffSettingsModal({
                 </div>
 
                 <div className="tariff-filter-chips">
+                  {isRegionalAdmin && (
+                    <button
+                      className={`tariff-chip ${categoryFilter === "my_region" ? "active" : ""}`}
+                      onClick={() => setCategoryFilter("my_region")}
+                      style={{
+                        background: categoryFilter === "my_region" ? "#047857" : "#ecfdf5",
+                        color: categoryFilter === "my_region" ? "#ffffff" : "#065f46",
+                        borderColor: "#6ee7b7",
+                        fontWeight: 700,
+                      }}
+                    >
+                      ⭐ Wilayah Saya ({allStations.filter((st) => (getStationRegionFn ? getStationRegionFn(st) : (st.region ? String(st.region).toLowerCase() : "")) === userRegion).length})
+                    </button>
+                  )}
                   <button
                     className={`tariff-chip ${categoryFilter === "all" ? "active" : ""}`}
                     onClick={() => setCategoryFilter("all")}
@@ -275,6 +319,7 @@ export default function TariffSettingsModal({
                         const catKey = detectStationCategory(name);
                         const catDef = DEFAULT_TARIFF_CATEGORIES[catKey];
                         const isSchool = catKey === "school";
+                        const canEditStation = canUserEditStation(currentUser, st, getStationRegionFn);
                         const isCustom = !isSchool && tariffConfig?.customRates?.[uid] !== undefined;
                         const currentRate = getStationTariff(st, tariffConfig);
 
@@ -294,18 +339,24 @@ export default function TariffSettingsModal({
                               </span>
                             </td>
                             <td>
-                              <div className={`tariff-table-input-wrap ${isSchool ? "is-locked" : ""}`}>
+                              <div className={`tariff-table-input-wrap ${isSchool || !canEditStation ? "is-locked" : ""}`}>
                                 <span className="prefix">Rp</span>
                                 <input
                                   type="number"
                                   step="0.01"
                                   min="1"
-                                  disabled={isSchool}
-                                  title={isSchool ? "Tarif sekolah dikunci tetap Rp 900/kWh (Tarif Sosial)" : undefined}
+                                  disabled={isSchool || !canEditStation}
+                                  title={
+                                    isSchool
+                                      ? "Tarif sekolah dikunci tetap Rp 900/kWh (Tarif Sosial)"
+                                      : (!canEditStation
+                                        ? "Stasiun ini di luar wilayah wewenang Anda (Mode hanya lihat)"
+                                        : undefined)
+                                  }
                                   className={`station-rate-input ${isCustom ? "is-custom" : ""}`}
                                   value={currentRate}
                                   onChange={(e) => {
-                                    if (isSchool) return;
+                                    if (isSchool || !canEditStation) return;
                                     const val = e.target.value === "" ? "" : Number(e.target.value);
                                     if (val) {
                                       onUpdateStationRate(uid, val);
@@ -319,6 +370,14 @@ export default function TariffSettingsModal({
                               {isSchool ? (
                                 <span className="tariff-locked-tag" title="Tarif sekolah dikunci tetap Rp 900/kWh">
                                   🔒 Tetap Rp 900
+                                </span>
+                              ) : !canEditStation ? (
+                                <span
+                                  className="tariff-locked-tag"
+                                  style={{ background: "#f1f5f9", color: "#64748b", borderColor: "#cbd5e1" }}
+                                  title="Stasiun di luar wilayah wewenang Anda (Hanya dapat dilihat)"
+                                >
+                                  👁️ Hanya Lihat
                                 </span>
                               ) : isCustom ? (
                                 <button
@@ -349,13 +408,19 @@ export default function TariffSettingsModal({
 
         {/* Modal Footer */}
         <div className="tariff-modal-footer">
-          <button
-            type="button"
-            className="tariff-btn-secondary"
-            onClick={handleResetDefaults}
-          >
-            ↺ Kembalikan ke Standar PLN
-          </button>
+          {isSuperAdmin ? (
+            <button
+              type="button"
+              className="tariff-btn-secondary"
+              onClick={handleResetDefaults}
+            >
+              ↺ Kembalikan ke Standar PLN
+            </button>
+          ) : (
+            <span style={{ fontSize: "12px", color: "#64748b" }}>
+              👤 Login: <strong>{currentUser?.user_metadata?.name || currentUser?.name || "Admin Wilayah"}</strong>
+            </span>
+          )}
           <button
             type="button"
             className="tariff-btn-primary"

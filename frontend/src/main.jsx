@@ -4,6 +4,12 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { getEnergySeries, getRevenueSeries, getEmissionSeries, normalizeUnitString } from "./chart_data.js";
 import { getStationTariff, useTariffSettings, detectStationCategory } from "./tariffs.js";
+import {
+  REGIONAL_ACCOUNTS,
+  authenticateLocalAccount,
+  canUserEditStation,
+  canUserEditCategoryTariff,
+} from "./auth_roles.js";
 import TariffSettingsModal from "./TariffSettingsModal.jsx";
 import { MOCK_MONITORING_DATA } from "./mock_data.js";
 import "./styles.css";
@@ -345,6 +351,34 @@ async function signInWithPassword(email, password) {
   const cleanEmail = (email || "").trim();
   const cleanPass = (password || "").trim();
 
+  // 1. Cek kredensial akun wilayah (5 Sudin) & Super Admin terlebih dahulu
+  const localAccount = authenticateLocalAccount(cleanEmail, cleanPass);
+  if (localAccount) {
+    const localSession = {
+      access_token: `local_session_${localAccount.username || localAccount.id}`,
+      refresh_token: `local_session_${localAccount.username || localAccount.id}`,
+      expires_at: Math.floor(Date.now() / 1000) + 86400 * 30,
+      user: {
+        id: localAccount.username || localAccount.id,
+        email: localAccount.email,
+        role: localAccount.role,
+        region: localAccount.region,
+        regionName: localAccount.regionName,
+        user_metadata: {
+          name: localAccount.name,
+          role: localAccount.role,
+          region: localAccount.region,
+          regionName: localAccount.regionName,
+          title: localAccount.role === "super_admin" ? "Super Admin DKI Jakarta" : `Admin Wilayah ${localAccount.regionName}`,
+        },
+      },
+      isDemo: false,
+    };
+    storeSession(localSession);
+    return localSession;
+  }
+
+  // 2. Cek Supabase Auth jika dikonfigurasi
   try {
     const payload = await authRequest("/auth/v1/token?grant_type=password", {
       email: cleanEmail,
@@ -357,7 +391,7 @@ async function signInWithPassword(email, password) {
     console.warn("Supabase auth failed or not configured, checking local credentials:", err);
   }
 
-  // Fallback local/demo credentials
+  // 3. Fallback generic local/demo credentials
   const emLower = cleanEmail.toLowerCase();
   const isAcceptedUser =
     emLower === "demo" ||
@@ -384,8 +418,14 @@ async function signInWithPassword(email, password) {
       user: {
         id: emLower.includes("admin") ? "admin" : "operator",
         email: cleanEmail.includes("@") ? cleanEmail : `${cleanEmail}@plts-monitor.go.id`,
+        role: emLower.includes("admin") ? "super_admin" : "viewer",
+        region: "all",
+        regionName: "DKI Jakarta",
         user_metadata: {
           name: emLower.includes("admin") ? "Administrator PLTS" : "Operator PLTS",
+          role: emLower.includes("admin") ? "super_admin" : "viewer",
+          region: "all",
+          regionName: "DKI Jakarta",
         },
       },
       isDemo: true,
@@ -960,6 +1000,46 @@ function LoginPage({ onSignIn, initialError }) {
               {submitting ? "Memproses..." : "Sign In"}
             </button>
           </form>
+
+          {/* Quick Account Selector untuk Kemudahan Pengujian & Multi-Wilayah */}
+          <div className="login-quick-accounts-wrap">
+            <div className="login-quick-title">
+              <span>Pilihan Akun Cepat (5 Wilayah &amp; Super Admin)</span>
+            </div>
+            <p className="login-quick-hint">
+              Klik salah satu akun di bawah ini untuk mengisi kredensial secara otomatis:
+            </p>
+            <div className="login-quick-grid">
+              {REGIONAL_ACCOUNTS.map((acc) => {
+                const isSuper = acc.role === "super_admin";
+                const isCurrent = email === acc.username || email === acc.email;
+                return (
+                  <button
+                    key={acc.id}
+                    type="button"
+                    className={`login-quick-card ${isCurrent ? "is-selected" : ""} ${isSuper ? "is-superadmin" : ""}`}
+                    onClick={() => {
+                      setEmail(acc.username);
+                      setPassword(acc.passwords[0]);
+                      setError(null);
+                    }}
+                    title={`Pilih ${acc.name} (${acc.username})`}
+                  >
+                    <div className="login-quick-icon">{isSuper ? "👑" : "🏢"}</div>
+                    <div className="login-quick-info">
+                      <strong className="login-quick-name">{acc.name}</strong>
+                      <span className="login-quick-user">
+                        User: <code>{acc.username}</code> · Pass: <code>{acc.passwords[0]}</code>
+                      </span>
+                      <span className="login-quick-desc">
+                        {isSuper ? "Akses edit seluruh 107 PLTS" : `Akses edit wilayah ${acc.regionName}`}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1263,9 +1343,13 @@ function Dashboard({ session, onSignOut }) {
   }, []);
 
   const handleUpdateStation = useCallback((st, updates) => {
+    if (!canUserEditStation(session?.user, st, getStationRegion)) {
+      alert("Akses Ditolak: Anda hanya memiliki izin mengedit PLTS di wilayah tugas Anda.");
+      return Promise.reject(new Error("Unauthorized region edit"));
+    }
     const key = st.uid || `${st.source || st.platform}-${st.id}`;
     return updateStationMetadata(key, updates, st);
-  }, [updateStationMetadata]);
+  }, [session?.user, updateStationMetadata]);
 
   const handleSyncNow = useCallback(async () => {
     if (isSyncing) return;
@@ -1475,6 +1559,26 @@ function Dashboard({ session, onSignOut }) {
             {/* Export Slot */}
             <div id="top-nav-export-slot" style={{ display: "inline-flex", alignItems: "center" }} />
 
+            {/* User Profile / Region Badge */}
+            {session?.user && (
+              <div
+                className="user-nav-badge"
+                title={`Login sebagai: ${session.user.user_metadata?.name || session.user.email} (${session.user.user_metadata?.title || 'Pengguna'})`}
+              >
+                <span className="user-nav-avatar">
+                  {session.user.role === "super_admin" ? "👑" : "🏢"}
+                </span>
+                <div className="user-nav-info">
+                  <span className="user-nav-name">
+                    {session.user.user_metadata?.name || session.user.email}
+                  </span>
+                  <span className={`user-nav-role-pill role-${session.user.region || 'all'}`}>
+                    {session.user.user_metadata?.regionName || "DKI Jakarta"}
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* Logout Icon */}
             <button type="button" className="logout-icon-btn logout-button" title="Sign Out" onClick={onSignOut}>
               <LogOutIcon style={{ width: "16px", height: "16px" }} />
@@ -1567,6 +1671,7 @@ function Dashboard({ session, onSignOut }) {
             selectedRegion={selectedRegion}
             onSelectRegion={handleSelectRegion}
             onUpdateStation={handleUpdateStation}
+            currentUser={session?.user}
           />
         )}
 
@@ -1580,6 +1685,7 @@ function Dashboard({ session, onSignOut }) {
             selectedRegion={selectedRegion}
             onSelectRegion={handleSelectRegion}
             onUpdateStation={handleUpdateStation}
+            currentUser={session?.user}
           />
         )}
 
@@ -1595,6 +1701,7 @@ function Dashboard({ session, onSignOut }) {
             onUpdateStation={handleUpdateStation}
             tariffConfig={tariffConfig}
             onOpenTariffModal={() => setTariffModalOpen(true)}
+            currentUser={session?.user}
           />
         )}
 
@@ -1608,6 +1715,7 @@ function Dashboard({ session, onSignOut }) {
             selectedRegion={selectedRegion}
             onSelectRegion={handleSelectRegion}
             onUpdateStation={handleUpdateStation}
+            currentUser={session?.user}
           />
         )}
       </main>
@@ -1623,6 +1731,8 @@ function Dashboard({ session, onSignOut }) {
         onResetStationRate={resetStationRate}
         onResetAllToDefaults={resetAllToDefaults}
         allStations={allLocations}
+        currentUser={session?.user}
+        getStationRegionFn={getStationRegion}
       />
 
       {/* Sync Toast */}
@@ -1653,7 +1763,7 @@ function Dashboard({ session, onSignOut }) {
   );
 }
 
-function OverviewView({ fleet, selected, locations, onSelect, updatedAt, selectedRegion, onSelectRegion, allLocations, onUpdateStation }) {
+function OverviewView({ fleet, selected, locations, onSelect, updatedAt, selectedRegion, onSelectRegion, allLocations, onUpdateStation, currentUser }) {
   const [editingStation, setEditingStation] = useState(null);
   const hasLocations = Boolean(locations && locations.length > 0);
 
@@ -2072,6 +2182,7 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt, selecte
               await onUpdateStation(st, updates);
             }
           }}
+          currentUser={currentUser}
         />
       )}
     </>
@@ -3974,13 +4085,22 @@ const ASSET_OWNER_PRESETS = [
   "Dinas Lingkungan Hidup DKI Jakarta",
 ];
 
-function EditStationModal({ station, onClose, onSave }) {
+function EditStationModal({ station, onClose, onSave, currentUser }) {
   const [customName, setCustomName] = useState(station.custom_name || station.name || "");
   const [assetOwner, setAssetOwner] = useState(station.asset_owner || "");
   const [isSaving, setIsSaving] = useState(false);
 
+  const stationRegion = getStationRegion(station);
+  const regionObj = REGIONS.find((r) => r.id === stationRegion);
+  const regionName = regionObj?.name || stationRegion || "DKI Jakarta";
+  const canEdit = canUserEditStation(currentUser, station, getStationRegion);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!canEdit) {
+      alert("Akses ditolak: Anda hanya dapat mengedit PLTS di wilayah tugas Anda.");
+      return;
+    }
     setIsSaving(true);
     try {
       await onSave(station, {
@@ -4003,13 +4123,28 @@ function EditStationModal({ station, onClose, onSave }) {
           <div>
             <h3 className="station-modal-title">Edit Informasi PLTS</h3>
             <span style={{ fontSize: "11px", color: "#6e8074" }}>
-              ID: {station.id || station.uid} · Vendor: {(station.source || "sma").toUpperCase()}
+              ID: {station.id || station.uid} · Wilayah: <strong>{regionName}</strong> · Vendor: {(station.source || "sma").toUpperCase()}
             </span>
           </div>
           <button type="button" className="station-modal-close" onClick={onClose} title="Tutup">
             ✕
           </button>
         </div>
+
+        {!canEdit && (
+          <div style={{
+            margin: "12px 24px 0",
+            padding: "10px 14px",
+            borderRadius: "8px",
+            background: "rgba(239, 68, 68, 0.12)",
+            border: "1px solid rgba(239, 68, 68, 0.3)",
+            color: "#fca5a5",
+            fontSize: "12px",
+            lineHeight: 1.4,
+          }}>
+            🔒 <strong>Mode Hanya Lihat:</strong> PLTS ini berada di wilayah <strong>{regionName}</strong>. Akun Anda hanya memiliki izin mengedit stasiun di wilayah tugas Anda.
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
           <div className="station-modal-body">
@@ -4077,7 +4212,7 @@ function EditStationModal({ station, onClose, onSave }) {
             <button type="button" className="btn-modal-cancel" onClick={onClose}>
               Batal
             </button>
-            <button type="submit" className="btn-modal-save" disabled={isSaving}>
+            <button type="submit" className="btn-modal-save" disabled={isSaving || !canEdit}>
               {isSaving ? "Menyimpan..." : "Simpan Perubahan"}
             </button>
           </div>
@@ -4109,6 +4244,7 @@ function StationListDarkCard({
   selectedRegion = "all",
   onSelectRegion,
   onUpdateStation,
+  currentUser,
 }) {
   const currentRegion = REGIONS.find((r) => r.id === selectedRegion) || REGIONS[0];
   const regionLabel = currentRegion?.shortName || currentRegion?.name || "DKI Jakarta";
@@ -4209,6 +4345,7 @@ function StationListDarkCard({
                 const dailyVal = Number(loc.daily_energy_kwh ?? loc.today_energy_kwh ?? 0);
                 const isOffline = loc.status === "offline" || loc.status === "disconnected" || (powerVal === 0 && dailyVal === 0);
                 const vendor = (loc.source || "sma").toLowerCase();
+                const canEditThisStation = canUserEditStation(currentUser, loc, getStationRegion);
 
                 return (
                   <tr
@@ -4235,10 +4372,18 @@ function StationListDarkCard({
                     </td>
                     <td>
                       {loc.asset_owner ? (
-                        <span className="asset-owner-pill" title={`Pemilik Aset: ${loc.asset_owner}`}>
+                        <span
+                          className={`asset-owner-pill ${canEditThisStation ? "clickable" : ""}`}
+                          title={`Pemilik Aset: ${loc.asset_owner}${canEditThisStation ? " (Klik untuk mengedit)" : ""}`}
+                          onClick={(e) => {
+                            if (!canEditThisStation) return;
+                            e.stopPropagation();
+                            setEditingStation(loc);
+                          }}
+                        >
                           {formatShortOwner(loc.asset_owner)}
                         </span>
-                      ) : (
+                      ) : canEditThisStation ? (
                         <span
                           className="asset-owner-empty"
                           onClick={(e) => {
@@ -4249,6 +4394,13 @@ function StationListDarkCard({
                         >
                           + Set
                         </span>
+                      ) : (
+                        <span
+                          className="asset-owner-empty is-locked"
+                          title="Terkunci: Hanya admin wilayah terkait yang dapat mengatur pemilik aset"
+                        >
+                          —
+                        </span>
                       )}
                     </td>
                     <td style={{ textAlign: "center" }}>
@@ -4257,20 +4409,34 @@ function StationListDarkCard({
                       </span>
                     </td>
                     <td style={{ textAlign: "center" }}>
-                      <button
-                        type="button"
-                        className="btn-edit-station"
-                        title="Edit nama stasiun & pemilik aset"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingStation(loc);
-                        }}
-                      >
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                        </svg>
-                      </button>
+                      {canEditThisStation ? (
+                        <button
+                          type="button"
+                          className="btn-edit-station"
+                          title="Edit nama stasiun & pemilik aset"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingStation(loc);
+                          }}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                          </svg>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn-edit-station is-locked"
+                          title="Terkunci: Anda hanya dapat mengedit PLTS di wilayah tugas Anda"
+                          disabled
+                        >
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                          </svg>
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -4289,6 +4455,7 @@ function StationListDarkCard({
               await onUpdateStation(st, updates);
             }
           }}
+          currentUser={currentUser}
         />
       )}
     </div>
@@ -4724,7 +4891,7 @@ function buildAggregatedFleetSeries({
   };
 }
 
-function EnergyView({ location, fleet, locations, allLocations, onSelect, selectedRegion = "all", onSelectRegion, onUpdateStation }) {
+function EnergyView({ location, fleet, locations, allLocations, onSelect, selectedRegion = "all", onSelectRegion, onUpdateStation, currentUser }) {
   const pool = (allLocations && allLocations.length > 0) ? allLocations : (locations || []);
   const [localStationUid, setLocalStationUid] = useState(location?.uid || null);
 
@@ -5183,6 +5350,7 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
             selectedRegion={selectedRegion || "all"}
             onSelectRegion={onSelectRegion}
             onUpdateStation={onUpdateStation}
+            currentUser={currentUser}
           />
 
           <AnalyticsKpiCardGroup
@@ -5586,6 +5754,7 @@ function RevenueView({
   onUpdateStation,
   tariffConfig,
   onOpenTariffModal,
+  currentUser,
 }) {
   const pool = (allLocations && allLocations.length > 0) ? allLocations : (locations || []);
   const [localStationUid, setLocalStationUid] = useState(location?.uid || null);
@@ -6162,6 +6331,7 @@ function RevenueView({
             selectedRegion={selectedRegion || "all"}
             onSelectRegion={onSelectRegion}
             onUpdateStation={onUpdateStation}
+            currentUser={currentUser}
           />
 
           <AnalyticsKpiCardGroup
@@ -6561,7 +6731,7 @@ function EmissionProductionChart({ series, period }) {
   );
 }
 
-function EmissionView({ location, fleet, locations, allLocations, onSelect, selectedRegion = "all", onSelectRegion, onUpdateStation }) {
+function EmissionView({ location, fleet, locations, allLocations, onSelect, selectedRegion = "all", onSelectRegion, onUpdateStation, currentUser }) {
   const pool = (allLocations && allLocations.length > 0) ? allLocations : (locations || []);
   const [localStationUid, setLocalStationUid] = useState(location?.uid || null);
 
@@ -7063,6 +7233,7 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
             selectedRegion={selectedRegion || "all"}
             onSelectRegion={onSelectRegion}
             onUpdateStation={onUpdateStation}
+            currentUser={currentUser}
           />
 
           <AnalyticsKpiCardGroup
