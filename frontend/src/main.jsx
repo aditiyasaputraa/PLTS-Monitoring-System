@@ -2285,10 +2285,12 @@ function getStationHistoricalYearKwh(station, targetYear) {
     }
   }
 
-  // 5. If targetYear is currentYear, return live yearly_energy_kwh
+  // 5. If targetYear is currentYear, return live yearly_energy_kwh (or 0 if offline)
   if (targetYear === currentYear) {
+    const isOffline = station.status === "offline" || station.status === "disconnected";
+    if (isOffline) return 0;
     const yKwh = Number(station.yearly_energy_kwh ?? station.year_energy_kwh ?? 0);
-    if (yKwh > 0) return yKwh;
+    return Math.max(0, yKwh);
   }
 
   // 6. Check if station has commissioning date and targetYear is before commissioning
@@ -2300,9 +2302,9 @@ function getStationHistoricalYearKwh(station, targetYear) {
     }
   }
 
-  // 7. Estimate from lifetime if within operational range (from 2021)
+  // 7. Estimate from lifetime if within operational range (from 2021) for historical years only
   const lifetimeKwh = Number(station.cumulative_energy_kwh ?? station.total_energy_kwh ?? 0);
-  if (lifetimeKwh > 0 && targetYear <= currentYear && targetYear >= 2021) {
+  if (lifetimeKwh > 0 && targetYear < currentYear && targetYear >= 2021) {
     const activeYearsCount = Math.max(1, currentYear - 2021 + 1);
     const avgYearKwh = lifetimeKwh / activeYearsCount;
     const yearVariation = [0.94, 1.02, 0.98, 1.05, 0.96, 1.0][Math.abs(targetYear - 2021) % 6];
@@ -2319,6 +2321,12 @@ function getStationMonthlyValues(station, targetYear, metric = "energy") {
   const monthly = Array(12).fill(0);
 
   if (!station) return monthly;
+
+  const isOffline = station.status === "offline" || station.status === "disconnected";
+  // Untuk tahun berjalan, jika PLTS offline, jangan ada suntikan data estimasi (tetap 0)
+  if (isCurrentYear && isOffline) {
+    return monthly;
+  }
 
   const source = (station.source || station.site?.platform || "").toLowerCase();
 
@@ -2382,15 +2390,12 @@ function getStationMonthlyValues(station, targetYear, metric = "energy") {
     }
   }
 
-  // 3. Historical Year (not current year) or fallback if monthly was empty
-  if (!isCurrentYear || !monthly.some((v) => v > 0)) {
+  // 3. Historical Year (not current year)
+  // Untuk tahun berjalan, jika data 0 atau tidak ada chart vendor, JANGAN suntik estimasi buatan
+  if (!isCurrentYear) {
     const annualKwh = getStationHistoricalYearKwh(station, targetYear);
     if (annualKwh > 0) {
       for (let m = 0; m < 12; m++) {
-        if (isCurrentYear && m > currentMonthIdx) {
-          monthly[m] = 0;
-          continue;
-        }
         const mKwh = annualKwh * JAKARTA_SOLAR_MONTHLY_WEIGHTS[m];
         if (metric === "revenue") {
           monthly[m] = Math.round(mKwh * 900);
@@ -2455,18 +2460,14 @@ function getAggregateMonthlyValues(locations, activeStation, targetYear, metric 
   }
 
   if (isCurrentYear && fleet) {
-    if (metric === "energy" && fleet.monthly > 0 && aggregate[currentMonthIdx] < fleet.monthly) {
-      aggregate[currentMonthIdx] = Math.round(fleet.monthly * 10) / 10;
+    if (metric === "energy" && Number.isFinite(Number(fleet.monthly))) {
+      aggregate[currentMonthIdx] = Math.round(Number(fleet.monthly) * 10) / 10;
     } else if (metric === "revenue") {
-      const expectedRev = fleet.monthlyIncome > 0 ? fleet.monthlyIncome : (fleet.monthly > 0 ? Math.round(fleet.monthly * 900) : 0);
-      if (expectedRev > 0 && aggregate[currentMonthIdx] < expectedRev) {
-        aggregate[currentMonthIdx] = expectedRev;
-      }
+      const expectedRev = fleet.monthlyIncome > 0 ? Number(fleet.monthlyIncome) : (Number(fleet.monthly) > 0 ? Number(fleet.monthly) * 900 : 0);
+      aggregate[currentMonthIdx] = Math.round(expectedRev);
     } else if (metric === "emission") {
-      const expectedEmission = fleet.monthly > 0 ? Math.round(fleet.monthly * 0.85 * 10) / 10 : 0;
-      if (expectedEmission > 0 && aggregate[currentMonthIdx] < expectedEmission) {
-        aggregate[currentMonthIdx] = Math.round(expectedEmission * 10) / 10;
-      }
+      const expectedEmission = Number(fleet.monthly) > 0 ? Number(fleet.monthly) * 0.85 : 0;
+      aggregate[currentMonthIdx] = Math.round(expectedEmission * 10) / 10;
     }
   }
 
