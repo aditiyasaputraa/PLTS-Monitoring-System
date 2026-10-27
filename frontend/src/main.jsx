@@ -6193,15 +6193,6 @@ function RevenueView({
                 <p className="curve-subtitle">{fleetCurveSubtitle}</p>
               </div>
               <div className="curve-controls">
-                <button
-                  type="button"
-                  className="tariff-settings-trigger-btn"
-                  onClick={onOpenTariffModal}
-                  title="Atur tarif dasar listrik PLN per kategori gedung atau kustom per stasiun"
-                >
-                  <span>⚙️ Atur Tarif Listrik</span>
-                  {customCount > 0 && <span className="tariff-badge-custom-count">{customCount}</span>}
-                </button>
                 <div className="period-toggle-pill">
                   <button
                     type="button"
