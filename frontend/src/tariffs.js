@@ -8,13 +8,16 @@ export const DEFAULT_TARIFF_CATEGORIES = {
     name: "Sekolah & Pendidikan",
     icon: "🏫",
     defaultRate: 900,
-    description: "SDN, SMPN, SMAN, SMKN, PPKD (Tarif Sosial S-2/S-3 PLN)",
+    isLocked: true,
+    lockNotice: "Tarif tetap Rp 900/kWh (Tarif Sosial S-2/S-3)",
+    description: "SDN, SMPN, SMAN, SMKN, PPKD (Tarif Sosial S-2/S-3 PLN - Terkunci)",
   },
   government: {
     id: "government",
     name: "Kantor Pemerintah & Dinas",
     icon: "🏛️",
     defaultRate: 1444.7,
+    isLocked: false,
     description: "Dinas, Kantor Camat, Lurah, Walikota, Gedung Teknis (Tarif P-1 PLN)",
   },
   health: {
@@ -22,6 +25,7 @@ export const DEFAULT_TARIFF_CATEGORIES = {
     name: "Fasilitas Kesehatan",
     icon: "🏥",
     defaultRate: 1114.74,
+    isLocked: false,
     description: "RSUD, Puskesmas, Labkesda (Tarif Pelayanan Kesehatan PLN)",
   },
   public_facility: {
@@ -29,6 +33,7 @@ export const DEFAULT_TARIFF_CATEGORIES = {
     name: "Fasilitas Olahraga & Publik",
     icon: "🏟️",
     defaultRate: 1444.7,
+    isLocked: false,
     description: "GOR, PPOP, Taman Hutan Kota, Perpustakaan, Gedung Publik (Tarif P-1)",
   },
   other: {
@@ -36,6 +41,7 @@ export const DEFAULT_TARIFF_CATEGORIES = {
     name: "Gedung Lainnya",
     icon: "🏢",
     defaultRate: 1444.7,
+    isLocked: false,
     description: "Gedung umum non-sekolah lainnya",
   },
 };
@@ -129,6 +135,7 @@ export function readTariffSettings() {
         categoryRates: {
           ...fallback.categoryRates,
           ...(parsed.categoryRates || {}),
+          school: DEFAULT_TARIFF_CATEGORIES.school.defaultRate, // Tetap 900
         },
         customRates: parsed.customRates || {},
       };
@@ -143,11 +150,18 @@ export function readTariffSettings() {
  */
 export function getStationTariff(station, tariffConfig = null) {
   if (!station) return 900;
+  const cat = detectStationCategory(station.name || station.station_name);
+
+  // 1. Gedung sekolah (SDN, SMPN, SMAN, SMKN, PPKD) dikunci tetap Rp 900/kWh (Tarif Sosial S-2/S-3)
+  if (cat === "school") {
+    return DEFAULT_TARIFF_CATEGORIES.school.defaultRate;
+  }
+
   const config = tariffConfig || readTariffSettings();
   const id = String(station.station_id || station.station_numeric_id || station.id || "");
   const uid = station.uid || `${station.source || station.platform || ""}-${id}`;
 
-  // 1. Cek custom rate spesifik untuk stasiun ini
+  // 2. Cek custom rate spesifik untuk stasiun non-sekolah ini
   if (config.customRates && config.customRates[uid] !== undefined && Number(config.customRates[uid]) > 0) {
     return Number(config.customRates[uid]);
   }
@@ -155,19 +169,18 @@ export function getStationTariff(station, tariffConfig = null) {
     return Number(config.customRates[id]);
   }
 
-  // 2. Cek apakah ada field tariff_per_kwh yang disematkan langsung
+  // 3. Cek apakah ada field tariff_per_kwh yang disematkan langsung
   if (station.tariff_per_kwh && Number(station.tariff_per_kwh) > 0) {
     return Number(station.tariff_per_kwh);
   }
 
-  // 3. Gunakan tarif kategori yang telah dikonfigurasi
-  const cat = detectStationCategory(station.name || station.station_name);
+  // 4. Gunakan tarif kategori yang telah dikonfigurasi
   if (config.categoryRates && config.categoryRates[cat] !== undefined && Number(config.categoryRates[cat]) > 0) {
     return Number(config.categoryRates[cat]);
   }
 
-  // 4. Default mutlak dari preset
-  return DEFAULT_TARIFF_CATEGORIES[cat]?.defaultRate || 900;
+  // 5. Default mutlak dari preset
+  return DEFAULT_TARIFF_CATEGORIES[cat]?.defaultRate || 1444.7;
 }
 
 /**
@@ -177,18 +190,27 @@ export function useTariffSettings() {
   const [config, setConfig] = useState(() => readTariffSettings());
 
   const saveSettings = useCallback((newConfig) => {
+    const sanitized = {
+      ...newConfig,
+      categoryRates: {
+        ...(newConfig?.categoryRates || {}),
+        school: DEFAULT_TARIFF_CATEGORIES.school.defaultRate, // Enforce locked rate
+      },
+    };
     try {
-      localStorage.setItem(TARIFF_STORAGE_KEY, JSON.stringify(newConfig));
+      localStorage.setItem(TARIFF_STORAGE_KEY, JSON.stringify(sanitized));
     } catch (_) {}
-    setConfig({ ...newConfig });
+    setConfig(sanitized);
   }, []);
 
   const updateCategoryRate = useCallback((catId, rate) => {
+    if (catId === "school") return; // Tarif sekolah terkunci tetap Rp 900/kWh
     const num = Math.max(1, Number(rate) || 0);
     const updated = {
       ...config,
       categoryRates: {
         ...config.categoryRates,
+        school: DEFAULT_TARIFF_CATEGORIES.school.defaultRate,
         [catId]: num,
       },
     };

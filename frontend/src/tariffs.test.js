@@ -41,16 +41,17 @@ test("returns correct default tariffs per category", () => {
   assert.equal(getStationTariff(gorStation), 1444.7);
 });
 
-test("respects category rate adjustments and custom per-station overrides", () => {
+test("respects category rate adjustments and custom per-station overrides while keeping schools locked at 900", () => {
   const config = {
     categoryRates: {
-      school: 950,
+      school: 950, // Should be ignored because school is locked
       government: 1699.53,
       health: 1200,
       public_facility: 1500,
       other: 1500,
     },
     customRates: {
+      "sma-1": 1100, // Should also be ignored for school station
       "huawei-4": 1800, // custom override for GOR Sekda Saefullah
     },
   };
@@ -59,7 +60,9 @@ test("respects category rate adjustments and custom per-station overrides", () =
   const govStation = { name: "Kantor Dinas PMPTSP", uid: "huawei-2" };
   const gorStation = { name: "GOR Sekda Saefullah", uid: "huawei-4" };
 
-  assert.equal(getStationTariff(schoolStation, config), 950);
+  // School tariff is kept strictly at 900
+  assert.equal(getStationTariff(schoolStation, config), 900);
   assert.equal(getStationTariff(govStation, config), 1699.53);
   assert.equal(getStationTariff(gorStation, config), 1800);
 });
+

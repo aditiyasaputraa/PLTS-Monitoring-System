@@ -49,6 +49,7 @@ export default function TariffSettingsModal({
 
   const handleSaveCategories = () => {
     Object.entries(localCategories).forEach(([catId, val]) => {
+      if (catId === "school") return; // Tetap 900
       onUpdateCategoryRate(catId, val);
     });
     showToast("Tarif kategori berhasil diperbarui & diterapkan!");
@@ -132,36 +133,45 @@ export default function TariffSettingsModal({
               <div className="tariff-info-notice">
                 <span className="notice-icon">ℹ️</span>
                 <div>
-                  <strong>Informasi Golongan Tarif PLN:</strong> Setiap kelompok gedung memiliki tarif rekening listrik PLN yang berbeda. Tarif kategori ini otomatis berlaku ke semua gedung yang belum diatur tarif khususnya.
+                  <strong>Informasi Golongan Tarif PLN:</strong> Setiap kelompok gedung memiliki tarif rekening listrik PLN yang berbeda. Tarif kategori sekolah dikunci tetap <strong>Rp 900/kWh</strong> (Tarif Sosial S-2/S-3), sedangkan gedung pemerintahan dan publik lainnya dapat disesuaikan.
                 </div>
               </div>
 
               <div className="tariff-category-grid">
                 {Object.values(DEFAULT_TARIFF_CATEGORIES).map((cat) => {
-                  const currentVal = localCategories[cat.id] ?? cat.defaultRate;
+                  const isLocked = Boolean(cat.isLocked || cat.id === "school");
+                  const currentVal = isLocked ? cat.defaultRate : (localCategories[cat.id] ?? cat.defaultRate);
                   return (
-                    <div key={cat.id} className="tariff-category-card">
+                    <div key={cat.id} className={`tariff-category-card ${isLocked ? "card-locked" : ""}`}>
                       <div className="tariff-category-card-header">
                         <span className="cat-icon">{cat.icon}</span>
                         <div className="cat-info">
                           <span className="cat-name">{cat.name}</span>
                           <span className="cat-desc">{cat.description}</span>
                         </div>
+                        {isLocked && (
+                          <span className="cat-locked-badge" title="Tarif sosial sekolah dikunci tetap Rp 900/kWh">
+                            🔒 Tetap
+                          </span>
+                        )}
                       </div>
-                      <div className="tariff-input-group">
+                      <div className={`tariff-input-group ${isLocked ? "is-locked" : ""}`}>
                         <span className="tariff-input-prefix">Rp</span>
                         <input
                           type="number"
                           step="0.01"
                           min="1"
+                          disabled={isLocked}
+                          title={isLocked ? "Tarif sekolah dikunci tetap Rp 900/kWh (Tarif Sosial S-2/S-3 PLN)" : undefined}
                           className="tariff-number-input"
                           value={currentVal}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            if (isLocked) return;
                             setLocalCategories({
                               ...localCategories,
                               [cat.id]: e.target.value === "" ? "" : Number(e.target.value),
-                            })
-                          }
+                            });
+                          }}
                         />
                         <span className="tariff-input-suffix">/ kWh</span>
                       </div>
@@ -216,7 +226,7 @@ export default function TariffSettingsModal({
                     className={`tariff-chip ${categoryFilter === "school" ? "active" : ""}`}
                     onClick={() => setCategoryFilter("school")}
                   >
-                    🏫 Sekolah
+                    🏫 Sekolah (🔒 Tetap)
                   </button>
                   <button
                     className={`tariff-chip ${categoryFilter === "government" ? "active" : ""}`}
@@ -264,11 +274,12 @@ export default function TariffSettingsModal({
                         const uid = st.uid || `${st.source || st.platform || ""}-${id}`;
                         const catKey = detectStationCategory(name);
                         const catDef = DEFAULT_TARIFF_CATEGORIES[catKey];
-                        const isCustom = tariffConfig?.customRates?.[uid] !== undefined;
+                        const isSchool = catKey === "school";
+                        const isCustom = !isSchool && tariffConfig?.customRates?.[uid] !== undefined;
                         const currentRate = getStationTariff(st, tariffConfig);
 
                         return (
-                          <tr key={uid} className={isCustom ? "custom-row" : ""}>
+                          <tr key={uid} className={isCustom ? "custom-row" : (isSchool ? "school-row" : "")}>
                             <td>
                               <div className="station-name-cell">
                                 <span className="station-title">{name}</span>
@@ -283,15 +294,18 @@ export default function TariffSettingsModal({
                               </span>
                             </td>
                             <td>
-                              <div className="tariff-table-input-wrap">
+                              <div className={`tariff-table-input-wrap ${isSchool ? "is-locked" : ""}`}>
                                 <span className="prefix">Rp</span>
                                 <input
                                   type="number"
                                   step="0.01"
                                   min="1"
+                                  disabled={isSchool}
+                                  title={isSchool ? "Tarif sekolah dikunci tetap Rp 900/kWh (Tarif Sosial)" : undefined}
                                   className={`station-rate-input ${isCustom ? "is-custom" : ""}`}
                                   value={currentRate}
                                   onChange={(e) => {
+                                    if (isSchool) return;
                                     const val = e.target.value === "" ? "" : Number(e.target.value);
                                     if (val) {
                                       onUpdateStationRate(uid, val);
@@ -302,7 +316,11 @@ export default function TariffSettingsModal({
                               </div>
                             </td>
                             <td style={{ textAlign: "center" }}>
-                              {isCustom ? (
+                              {isSchool ? (
+                                <span className="tariff-locked-tag" title="Tarif sekolah dikunci tetap Rp 900/kWh">
+                                  🔒 Tetap Rp 900
+                                </span>
+                              ) : isCustom ? (
                                 <button
                                   type="button"
                                   className="tariff-reset-btn"
