@@ -5034,10 +5034,10 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
 
   return (
     <div className="unified-analytics-view">
-      <div className="analytics-unified-layout">
-        {/* Left Column: Both Curves */}
+      {/* ROW 1: STATION PRODUCTION CURVE (LEFT) + DAFTAR PLTS & PRODUCTION (RIGHT) */}
+      <div className="analytics-grid-row">
+        {/* Left: Production Curve Card */}
         <div className="analytics-col-main">
-          {/* Chart 1: Production Curve Card */}
           <div className="energy-curve-card">
             <div className="curve-card-header">
               <div>
@@ -5127,8 +5127,42 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Chart 2: Total Fleet Production Curve Card */}
+        {/* Right: Dark Station List Card + Station Production Card */}
+        <div className="analytics-col-side">
+          <StationListDarkCard
+            locations={locations}
+            allLocations={allLocations}
+            activeStation={activeStation}
+            onSelect={handleSelectStation}
+            selectedRegion={selectedRegion || "all"}
+            onSelectRegion={onSelectRegion}
+            onUpdateStation={onUpdateStation}
+          />
+
+          <AnalyticsKpiCardGroup
+            title="Production"
+            todayVal={formatNumber(todayKwh, 1)}
+            todayUnit="KWH"
+            todaySub={`${todayMwh} MWH`}
+            monthVal={formatNumber(monthKwh, 1)}
+            monthUnit="KWH"
+            monthSub={`${monthMwh} MWH`}
+            yearVal={formatNumber(yearKwh, 0)}
+            yearUnit="KWH"
+            yearSub={`${yearMwh} MWH`}
+            lifetimeVal={formatNumber(lifetimeKwh, 0)}
+            lifetimeUnit="KWH"
+            lifetimeSub={`${lifetimeMwh} MWH`}
+          />
+        </div>
+      </div>
+
+      {/* ROW 2: TOTAL FLEET PRODUCTION CURVE (LEFT) + TOTAL PRODUCTION (TW 1-4) & TOTAL FLEET PRODUCTION (RIGHT) */}
+      <div className="analytics-grid-row">
+        {/* Left: Total Fleet Production Curve Card */}
+        <div className="analytics-col-main">
           <div className="energy-curve-card">
             <div className="curve-card-header">
               <div>
@@ -5212,70 +5246,41 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
           </div>
         </div>
 
-        {/* Right Column: Dark Station List Card + 3 KPI Cards */}
+        {/* Right: Total Production (TW 1-4) + Total fleet Production */}
         <div className="analytics-col-side">
-          <StationListDarkCard
-            locations={locations}
-            allLocations={allLocations}
-            activeStation={activeStation}
-            onSelect={handleSelectStation}
-            selectedRegion={selectedRegion || "all"}
-            onSelectRegion={onSelectRegion}
-            onUpdateStation={onUpdateStation}
+          {/* Card 2: Total Production (Quarterly TW 1-4 for Fleet) */}
+          <AnalyticsQuarterlyKpiCardGroup
+            title="Total Production"
+            q1Val={formatNumber(fleetQuarterly.q1, 1)}
+            q1Unit="KWH"
+            q1Sub={`${(fleetQuarterly.q1 / 1000).toFixed(3)} MWH`}
+            q2Val={formatNumber(fleetQuarterly.q2, 1)}
+            q2Unit="KWH"
+            q2Sub={`${(fleetQuarterly.q2 / 1000).toFixed(3)} MWH`}
+            q3Val={formatNumber(fleetQuarterly.q3, 1)}
+            q3Unit="KWH"
+            q3Sub={`${(fleetQuarterly.q3 / 1000).toFixed(3)} MWH`}
+            q4Val={formatNumber(fleetQuarterly.q4, 1)}
+            q4Unit="KWH"
+            q4Sub={`${(fleetQuarterly.q4 / 1000).toFixed(3)} MWH`}
           />
 
-          <div className="analytics-kpi-stack">
-            {/* Card 1: Station Production */}
-            <AnalyticsKpiCardGroup
-              title="Production"
-              todayVal={formatNumber(todayKwh, 1)}
-              todayUnit="KWH"
-              todaySub={`${todayMwh} MWH`}
-              monthVal={formatNumber(monthKwh, 1)}
-              monthUnit="KWH"
-              monthSub={`${monthMwh} MWH`}
-              yearVal={formatNumber(yearKwh, 0)}
-              yearUnit="KWH"
-              yearSub={`${yearMwh} MWH`}
-              lifetimeVal={formatNumber(lifetimeKwh, 0)}
-              lifetimeUnit="KWH"
-              lifetimeSub={`${lifetimeMwh} MWH`}
-            />
-
-            {/* Card 2: Total Production (Quarterly TW 1-4 for Fleet) */}
-            <AnalyticsQuarterlyKpiCardGroup
-              title="Total Production"
-              q1Val={formatNumber(fleetQuarterly.q1, 1)}
-              q1Unit="KWH"
-              q1Sub={`${(fleetQuarterly.q1 / 1000).toFixed(3)} MWH`}
-              q2Val={formatNumber(fleetQuarterly.q2, 1)}
-              q2Unit="KWH"
-              q2Sub={`${(fleetQuarterly.q2 / 1000).toFixed(3)} MWH`}
-              q3Val={formatNumber(fleetQuarterly.q3, 1)}
-              q3Unit="KWH"
-              q3Sub={`${(fleetQuarterly.q3 / 1000).toFixed(3)} MWH`}
-              q4Val={formatNumber(fleetQuarterly.q4, 1)}
-              q4Unit="KWH"
-              q4Sub={`${(fleetQuarterly.q4 / 1000).toFixed(3)} MWH`}
-            />
-
-            {/* Card 3: Total fleet Production */}
-            <AnalyticsKpiCardGroup
-              title="Total fleet Production"
-              todayVal={formatNumber(fleetTodayKwhVal, 1)}
-              todayUnit="KWH"
-              todaySub={`${(fleetTodayKwhVal / 1000).toFixed(3)} MWH`}
-              monthVal={formatNumber(fleetMonthKwhVal, 0)}
-              monthUnit="KWH"
-              monthSub={`${(fleetMonthKwhVal / 1000).toFixed(3)} MWH`}
-              yearVal={formatNumber(fleetYearKwhVal, 0)}
-              yearUnit="KWH"
-              yearSub={`${(fleetYearKwhVal / 1000).toFixed(2)} MWH`}
-              lifetimeVal={formatNumber(fleetLifetimeKwhVal, 0)}
-              lifetimeUnit="KWH"
-              lifetimeSub={`${(fleetLifetimeKwhVal / 1000).toFixed(2)} MWH`}
-            />
-          </div>
+          {/* Card 3: Total fleet Production */}
+          <AnalyticsKpiCardGroup
+            title="Total fleet Production"
+            todayVal={formatNumber(fleetTodayKwhVal, 1)}
+            todayUnit="KWH"
+            todaySub={`${(fleetTodayKwhVal / 1000).toFixed(3)} MWH`}
+            monthVal={formatNumber(fleetMonthKwhVal, 0)}
+            monthUnit="KWH"
+            monthSub={`${(fleetMonthKwhVal / 1000).toFixed(3)} MWH`}
+            yearVal={formatNumber(fleetYearKwhVal, 0)}
+            yearUnit="KWH"
+            yearSub={`${(fleetYearKwhVal / 1000).toFixed(2)} MWH`}
+            lifetimeVal={formatNumber(fleetLifetimeKwhVal, 0)}
+            lifetimeUnit="KWH"
+            lifetimeSub={`${(fleetLifetimeKwhVal / 1000).toFixed(2)} MWH`}
+          />
         </div>
       </div>
     </div>
@@ -5941,6 +5946,18 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
     return new Intl.NumberFormat("id-ID").format(Math.round(Number(num) || 0));
   };
 
+  // 5 Top stats for Station Curve (dynamically reflects selected region targetLocations)
+  const totalSitesCount = targetLocations.length;
+  const platformsCount = useMemo(() => {
+    const s = new Set(targetLocations.map((l) => l.source).filter(Boolean));
+    return s.size > 0 ? s.size : (targetLocations.length > 0 ? 1 : 0);
+  }, [targetLocations]);
+  const onlineCount = useMemo(() => {
+    return targetLocations.filter((l) => l.status === "online" || (Number(l.current_power_kw ?? l.output_power_kw ?? l.pv_power_kw ?? l.power_kw ?? 0) > 0)).length;
+  }, [targetLocations]);
+  const offlineCount = Math.max(0, totalSitesCount - onlineCount);
+  const currentPowerVal = formatNumber(activeStation?.current_power_kw ?? activeStation?.output_power_kw ?? activeStation?.pv_power_kw ?? activeStation?.power_kw ?? 0, 2) + " kW";
+
   const fleetRevQuarterly = useMemo(() => {
     return getFleetQuarterlyValues({
       targetLocations,
@@ -5952,10 +5969,10 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
 
   return (
     <div className="unified-analytics-view">
-      <div className="analytics-unified-layout">
-        {/* Left Column: Both Curves */}
+      {/* ROW 1: STATION REVENUE CURVE (LEFT) + DAFTAR PLTS & REVENUE (RIGHT) */}
+      <div className="analytics-grid-row">
+        {/* Left: Station Revenue Curve Card */}
         <div className="analytics-col-main">
-          {/* Chart 1: Station Revenue Curve Card */}
           <div className="energy-curve-card">
             <div className="curve-card-header">
               <div>
@@ -6021,24 +6038,66 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
               <RevenueProductionChart series={series} period={period} isKehua={isAutoTariff} />
             </div>
 
-            {/* 3 Stats underneath chart as shown in design */}
-            <div className="curve-stats-row-3">
+            {/* 5 Stats underneath chart as shown in design */}
+            <div className="curve-stats-row-5">
               <div className="curve-stat-box">
-                <span className="curve-stat-label">RECORDS</span>
-                <span className="curve-stat-value">{recordCount}</span>
+                <span className="curve-stat-label">TOTAL SITES</span>
+                <span className="curve-stat-value">{totalSitesCount}</span>
               </div>
               <div className="curve-stat-box">
-                <span className="curve-stat-label">HIGHEST</span>
-                <span className="curve-stat-value">{formatIdrNumber(highestVal)} IDR</span>
+                <span className="curve-stat-label">PLATFORMS</span>
+                <span className="curve-stat-value">{platformsCount}</span>
               </div>
               <div className="curve-stat-box">
-                <span className="curve-stat-label">LATEST</span>
-                <span className="curve-stat-value">{formatIdrNumber(latestVal)} IDR</span>
+                <span className="curve-stat-label">ONLINE</span>
+                <span className="curve-stat-value" style={{ color: "#10b981" }}>{onlineCount}</span>
+              </div>
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">OFFLINE</span>
+                <span className="curve-stat-value" style={{ color: offlineCount > 0 ? "#ef4444" : "#6e8074" }}>{offlineCount}</span>
+              </div>
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">CURRENT POWER</span>
+                <span className="curve-stat-value" style={{ color: "#047857" }}>{currentPowerVal}</span>
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Chart 2: Total Fleet Revenue Curve Card */}
+        {/* Right: Dark Station List Card + Station Revenue Card */}
+        <div className="analytics-col-side">
+          <StationListDarkCard
+            locations={locations}
+            allLocations={allLocations}
+            activeStation={activeStation}
+            onSelect={handleSelectStation}
+            selectedRegion={selectedRegion || "all"}
+            onSelectRegion={onSelectRegion}
+            onUpdateStation={onUpdateStation}
+          />
+
+          <AnalyticsKpiCardGroup
+            title="Revenue"
+            todayVal={formatIdrNumber(todayRev)}
+            todayUnit="IDR"
+            todaySub="Rp 900/kWh"
+            monthVal={formatIdrNumber(monthRev)}
+            monthUnit="IDR"
+            monthSub="Rp 900/kWh"
+            yearVal={formatIdrNumber(yearRev)}
+            yearUnit="IDR"
+            yearSub="Rp 900/kWh"
+            lifetimeVal={formatIdrNumber(lifetimeRev)}
+            lifetimeUnit="IDR"
+            lifetimeSub="Rp 900/kWh"
+          />
+        </div>
+      </div>
+
+      {/* ROW 2: TOTAL FLEET REVENUE CURVE (LEFT) + TOTAL REVENUE (TW 1-4) & TOTAL FLEET REVENUE (RIGHT) */}
+      <div className="analytics-grid-row">
+        {/* Left: Total Fleet Revenue Curve Card */}
+        <div className="analytics-col-main">
           <div className="energy-curve-card">
             <div className="curve-card-header">
               <div>
@@ -6122,70 +6181,41 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
           </div>
         </div>
 
-        {/* Right Column: Dark Station List Card + 3 KPI Cards */}
+        {/* Right: Total Revenue (TW 1-4) + Total fleet Revenue */}
         <div className="analytics-col-side">
-          <StationListDarkCard
-            locations={locations}
-            allLocations={allLocations}
-            activeStation={activeStation}
-            onSelect={handleSelectStation}
-            selectedRegion={selectedRegion || "all"}
-            onSelectRegion={onSelectRegion}
-            onUpdateStation={onUpdateStation}
+          {/* Card 2: Total Revenue (Quarterly TW 1-4 for Fleet) */}
+          <AnalyticsQuarterlyKpiCardGroup
+            title="Total Revenue"
+            q1Val={formatIdrNumber(fleetRevQuarterly.q1)}
+            q1Unit="IDR"
+            q1Sub="Rp 900/kWh"
+            q2Val={formatIdrNumber(fleetRevQuarterly.q2)}
+            q2Unit="IDR"
+            q2Sub="Rp 900/kWh"
+            q3Val={formatIdrNumber(fleetRevQuarterly.q3)}
+            q3Unit="IDR"
+            q3Sub="Rp 900/kWh"
+            q4Val={formatIdrNumber(fleetRevQuarterly.q4)}
+            q4Unit="IDR"
+            q4Sub="Rp 900/kWh"
           />
 
-          <div className="analytics-kpi-stack">
-            {/* Card 1: Station Revenue */}
-            <AnalyticsKpiCardGroup
-              title="Revenue"
-              todayVal={formatIdrNumber(todayRev)}
-              todayUnit="IDR"
-              todaySub="Rp 900/kWh"
-              monthVal={formatIdrNumber(monthRev)}
-              monthUnit="IDR"
-              monthSub="Rp 900/kWh"
-              yearVal={formatIdrNumber(yearRev)}
-              yearUnit="IDR"
-              yearSub="Rp 900/kWh"
-              lifetimeVal={formatIdrNumber(lifetimeRev)}
-              lifetimeUnit="IDR"
-              lifetimeSub="Rp 900/kWh"
-            />
-
-            {/* Card 2: Total Revenue (Quarterly TW 1-4 for Fleet) */}
-            <AnalyticsQuarterlyKpiCardGroup
-              title="Total Revenue"
-              q1Val={formatIdrNumber(fleetRevQuarterly.q1)}
-              q1Unit="IDR"
-              q1Sub="Rp 900/kWh"
-              q2Val={formatIdrNumber(fleetRevQuarterly.q2)}
-              q2Unit="IDR"
-              q2Sub="Rp 900/kWh"
-              q3Val={formatIdrNumber(fleetRevQuarterly.q3)}
-              q3Unit="IDR"
-              q3Sub="Rp 900/kWh"
-              q4Val={formatIdrNumber(fleetRevQuarterly.q4)}
-              q4Unit="IDR"
-              q4Sub="Rp 900/kWh"
-            />
-
-            {/* Card 3: Total fleet Revenue */}
-            <AnalyticsKpiCardGroup
-              title="Total fleet Revenue"
-              todayVal={formatIdrNumber(fleetTodayRevVal)}
-              todayUnit="IDR"
-              todaySub="Rp 900/kWh"
-              monthVal={formatIdrNumber(fleetMonthRevVal)}
-              monthUnit="IDR"
-              monthSub="Rp 900/kWh"
-              yearVal={formatIdrNumber(fleetYearRevVal)}
-              yearUnit="IDR"
-              yearSub="Rp 900/kWh"
-              lifetimeVal={formatIdrNumber(fleetLifetimeRevVal)}
-              lifetimeUnit="IDR"
-              lifetimeSub="Rp 900/kWh"
-            />
-          </div>
+          {/* Card 3: Total fleet Revenue */}
+          <AnalyticsKpiCardGroup
+            title="Total fleet Revenue"
+            todayVal={formatIdrNumber(fleetTodayRevVal)}
+            todayUnit="IDR"
+            todaySub="Rp 900/kWh"
+            monthVal={formatIdrNumber(fleetMonthRevVal)}
+            monthUnit="IDR"
+            monthSub="Rp 900/kWh"
+            yearVal={formatIdrNumber(fleetYearRevVal)}
+            yearUnit="IDR"
+            yearSub="Rp 900/kWh"
+            lifetimeVal={formatIdrNumber(fleetLifetimeRevVal)}
+            lifetimeUnit="IDR"
+            lifetimeSub="Rp 900/kWh"
+          />
         </div>
       </div>
     </div>
@@ -6816,7 +6846,17 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
       val: num.toLocaleString("id-ID", { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
       unit: "KG CO₂",
     };
-  };
+  };  // 5 Top stats for Station Curve (dynamically reflects selected region targetLocations)
+  const totalSitesCount = targetLocations.length;
+  const platformsCount = useMemo(() => {
+    const s = new Set(targetLocations.map((l) => l.source).filter(Boolean));
+    return s.size > 0 ? s.size : (targetLocations.length > 0 ? 1 : 0);
+  }, [targetLocations]);
+  const onlineCount = useMemo(() => {
+    return targetLocations.filter((l) => l.status === "online" || (Number(l.current_power_kw ?? l.output_power_kw ?? l.pv_power_kw ?? l.power_kw ?? 0) > 0)).length;
+  }, [targetLocations]);
+  const offlineCount = Math.max(0, totalSitesCount - onlineCount);
+  const currentPowerVal = formatNumber(activeStation?.current_power_kw ?? activeStation?.output_power_kw ?? activeStation?.pv_power_kw ?? activeStation?.power_kw ?? 0, 2) + " kW";
 
   const fleetEmQuarterly = useMemo(() => {
     return getFleetQuarterlyValues({
@@ -6829,10 +6869,10 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
 
   return (
     <div className="unified-analytics-view">
-      <div className="analytics-unified-layout">
-        {/* Left Column: Both Curves */}
+      {/* ROW 1: STATION EMISSION CURVE (LEFT) + DAFTAR PLTS & EMISSION (RIGHT) */}
+      <div className="analytics-grid-row">
+        {/* Left: Station Emission Curve Card */}
         <div className="analytics-col-main">
-          {/* Chart 1: Station Emission Curve Card */}
           <div className="energy-curve-card">
             <div className="curve-card-header">
               <div>
@@ -6898,28 +6938,66 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
               <EmissionProductionChart series={series} period={period} />
             </div>
 
-            {/* 3 Stats underneath chart as shown in design */}
-            <div className="curve-stats-row-3">
+            {/* 5 Stats underneath chart as shown in design */}
+            <div className="curve-stats-row-5">
               <div className="curve-stat-box">
-                <span className="curve-stat-label">RECORDS</span>
-                <span className="curve-stat-value">{recordCount}</span>
+                <span className="curve-stat-label">TOTAL SITES</span>
+                <span className="curve-stat-value">{totalSitesCount}</span>
               </div>
               <div className="curve-stat-box">
-                <span className="curve-stat-label">HIGHEST</span>
-                <span className="curve-stat-value">
-                  {formatEmissionCard(highestVal).val} {formatEmissionCard(highestVal).unit}
-                </span>
+                <span className="curve-stat-label">PLATFORMS</span>
+                <span className="curve-stat-value">{platformsCount}</span>
               </div>
               <div className="curve-stat-box">
-                <span className="curve-stat-label">LATEST</span>
-                <span className="curve-stat-value">
-                  {formatEmissionCard(latestVal).val} {formatEmissionCard(latestVal).unit}
-                </span>
+                <span className="curve-stat-label">ONLINE</span>
+                <span className="curve-stat-value" style={{ color: "#10b981" }}>{onlineCount}</span>
+              </div>
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">OFFLINE</span>
+                <span className="curve-stat-value" style={{ color: offlineCount > 0 ? "#ef4444" : "#6e8074" }}>{offlineCount}</span>
+              </div>
+              <div className="curve-stat-box">
+                <span className="curve-stat-label">CURRENT POWER</span>
+                <span className="curve-stat-value" style={{ color: "#047857" }}>{currentPowerVal}</span>
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Chart 2: Total Fleet Emission Curve Card */}
+        {/* Right: Dark Station List Card + Station Emission Card */}
+        <div className="analytics-col-side">
+          <StationListDarkCard
+            locations={locations}
+            allLocations={allLocations}
+            activeStation={activeStation}
+            onSelect={handleSelectStation}
+            selectedRegion={selectedRegion || "all"}
+            onSelectRegion={onSelectRegion}
+            onUpdateStation={onUpdateStation}
+          />
+
+          <AnalyticsKpiCardGroup
+            title="Emission"
+            todayVal={formatEmissionCard(todayEmissionKg).val}
+            todayUnit={formatEmissionCard(todayEmissionKg).unit}
+            todaySub="0.85 kg/kWh"
+            monthVal={formatEmissionCard(monthEmissionKg).val}
+            monthUnit={formatEmissionCard(monthEmissionKg).unit}
+            monthSub="0.85 kg/kWh"
+            yearVal={formatEmissionCard(yearEmissionKg).val}
+            yearUnit={formatEmissionCard(yearEmissionKg).unit}
+            yearSub="0.85 kg/kWh"
+            lifetimeVal={formatEmissionCard(lifetimeEmissionKg).val}
+            lifetimeUnit={formatEmissionCard(lifetimeEmissionKg).unit}
+            lifetimeSub="0.85 kg/kWh"
+          />
+        </div>
+      </div>
+
+      {/* ROW 2: TOTAL FLEET EMISSION CURVE (LEFT) + TOTAL EMISSION (TW 1-4) & TOTAL FLEET EMISSION (RIGHT) */}
+      <div className="analytics-grid-row">
+        {/* Left: Total Fleet Emission Curve Card */}
+        <div className="analytics-col-main">
           <div className="energy-curve-card">
             <div className="curve-card-header">
               <div>
@@ -7007,70 +7085,41 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
           </div>
         </div>
 
-        {/* Right Column: Dark Station List Card + 3 KPI Cards */}
+        {/* Right: Total Emission (TW 1-4) + Total fleet Emission */}
         <div className="analytics-col-side">
-          <StationListDarkCard
-            locations={locations}
-            allLocations={allLocations}
-            activeStation={activeStation}
-            onSelect={handleSelectStation}
-            selectedRegion={selectedRegion || "all"}
-            onSelectRegion={onSelectRegion}
-            onUpdateStation={onUpdateStation}
+          {/* Card 2: Total Emission (Quarterly TW 1-4 for Fleet) */}
+          <AnalyticsQuarterlyKpiCardGroup
+            title="Total Emission"
+            q1Val={formatEmissionCard(fleetEmQuarterly.q1).val}
+            q1Unit={formatEmissionCard(fleetEmQuarterly.q1).unit}
+            q1Sub="0.85 kg/kWh"
+            q2Val={formatEmissionCard(fleetEmQuarterly.q2).val}
+            q2Unit={formatEmissionCard(fleetEmQuarterly.q2).unit}
+            q2Sub="0.85 kg/kWh"
+            q3Val={formatEmissionCard(fleetEmQuarterly.q3).val}
+            q3Unit={formatEmissionCard(fleetEmQuarterly.q3).unit}
+            q3Sub="0.85 kg/kWh"
+            q4Val={formatEmissionCard(fleetEmQuarterly.q4).val}
+            q4Unit={formatEmissionCard(fleetEmQuarterly.q4).unit}
+            q4Sub="0.85 kg/kWh"
           />
 
-          <div className="analytics-kpi-stack">
-            {/* Card 1: Station Emission */}
-            <AnalyticsKpiCardGroup
-              title="Emission"
-              todayVal={formatEmissionCard(todayEmissionKg).val}
-              todayUnit={formatEmissionCard(todayEmissionKg).unit}
-              todaySub="0.85 kg/kWh"
-              monthVal={formatEmissionCard(monthEmissionKg).val}
-              monthUnit={formatEmissionCard(monthEmissionKg).unit}
-              monthSub="0.85 kg/kWh"
-              yearVal={formatEmissionCard(yearEmissionKg).val}
-              yearUnit={formatEmissionCard(yearEmissionKg).unit}
-              yearSub="0.85 kg/kWh"
-              lifetimeVal={formatEmissionCard(lifetimeEmissionKg).val}
-              lifetimeUnit={formatEmissionCard(lifetimeEmissionKg).unit}
-              lifetimeSub="0.85 kg/kWh"
-            />
-
-            {/* Card 2: Total Emission (Quarterly TW 1-4 for Fleet) */}
-            <AnalyticsQuarterlyKpiCardGroup
-              title="Total Emission"
-              q1Val={formatEmissionCard(fleetEmQuarterly.q1).val}
-              q1Unit={formatEmissionCard(fleetEmQuarterly.q1).unit}
-              q1Sub="0.85 kg/kWh"
-              q2Val={formatEmissionCard(fleetEmQuarterly.q2).val}
-              q2Unit={formatEmissionCard(fleetEmQuarterly.q2).unit}
-              q2Sub="0.85 kg/kWh"
-              q3Val={formatEmissionCard(fleetEmQuarterly.q3).val}
-              q3Unit={formatEmissionCard(fleetEmQuarterly.q3).unit}
-              q3Sub="0.85 kg/kWh"
-              q4Val={formatEmissionCard(fleetEmQuarterly.q4).val}
-              q4Unit={formatEmissionCard(fleetEmQuarterly.q4).unit}
-              q4Sub="0.85 kg/kWh"
-            />
-
-            {/* Card 3: Total fleet Emission */}
-            <AnalyticsKpiCardGroup
-              title="Total fleet Emission"
-              todayVal={formatEmissionCard(fleetTotalTodayEmissionKg).val}
-              todayUnit={formatEmissionCard(fleetTotalTodayEmissionKg).unit}
-              todaySub="0.85 kg/kWh"
-              monthVal={formatEmissionCard(fleetMonthEmissionKgCalc).val}
-              monthUnit={formatEmissionCard(fleetMonthEmissionKgCalc).unit}
-              monthSub="0.85 kg/kWh"
-              yearVal={formatEmissionCard(fleetYearEmissionKgCalc).val}
-              yearUnit={formatEmissionCard(fleetYearEmissionKgCalc).unit}
-              yearSub="0.85 kg/kWh"
-              lifetimeVal={formatEmissionCard(fleetTotalEmissionKgCalc).val}
-              lifetimeUnit={formatEmissionCard(fleetTotalEmissionKgCalc).unit}
-              lifetimeSub="0.85 kg/kWh"
-            />
-          </div>
+          {/* Card 3: Total fleet Emission */}
+          <AnalyticsKpiCardGroup
+            title="Total fleet Emission"
+            todayVal={formatEmissionCard(fleetTotalTodayEmissionKg).val}
+            todayUnit={formatEmissionCard(fleetTotalTodayEmissionKg).unit}
+            todaySub="0.85 kg/kWh"
+            monthVal={formatEmissionCard(fleetMonthEmissionKgCalc).val}
+            monthUnit={formatEmissionCard(fleetMonthEmissionKgCalc).unit}
+            monthSub="0.85 kg/kWh"
+            yearVal={formatEmissionCard(fleetYearEmissionKgCalc).val}
+            yearUnit={formatEmissionCard(fleetYearEmissionKgCalc).unit}
+            yearSub="0.85 kg/kWh"
+            lifetimeVal={formatEmissionCard(fleetTotalEmissionKgCalc).val}
+            lifetimeUnit={formatEmissionCard(fleetTotalEmissionKgCalc).unit}
+            lifetimeSub="0.85 kg/kWh"
+          />
         </div>
       </div>
     </div>
