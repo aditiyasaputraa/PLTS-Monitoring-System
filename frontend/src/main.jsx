@@ -2403,17 +2403,17 @@ function getStationMonthlyValues(station, targetYear, metric = "energy") {
     }
   }
 
-  // Live fallback for current month in current year: sync with live monthly counter if available
+  // Live for current month in current year: sync directly with live monthly counter
   if (isCurrentYear) {
     if (metric === "energy") {
       const liveMonthKwh = Number(station.monthly_energy_kwh ?? station.month_energy_kwh ?? 0);
-      if (liveMonthKwh > 0) monthly[currentMonthIdx] = Math.round(liveMonthKwh * 10) / 10;
+      monthly[currentMonthIdx] = Math.round(liveMonthKwh * 10) / 10;
     } else if (metric === "revenue") {
       const liveMonthRev = Number(station.monthly_income ?? (Number(station.monthly_energy_kwh || 0) * 900));
-      if (liveMonthRev > 0) monthly[currentMonthIdx] = Math.round(liveMonthRev);
+      monthly[currentMonthIdx] = Math.round(liveMonthRev);
     } else {
       const liveMonthKwh = Number(station.monthly_energy_kwh ?? station.month_energy_kwh ?? 0);
-      if (liveMonthKwh > 0) monthly[currentMonthIdx] = Math.round(liveMonthKwh * 0.85 * 10) / 10;
+      monthly[currentMonthIdx] = Math.round(liveMonthKwh * 0.85 * 10) / 10;
     }
   }
 
@@ -4393,7 +4393,7 @@ function AnalyticsQuarterlyKpiCardGroup({
   );
 }
 
-function getFleetQuarterlyValues({ targetLocations, selectedYear, metricType = "energy", fallbackYearVal = 0 }) {
+function getFleetQuarterlyValues({ targetLocations, selectedYear, metricType = "energy", fallbackYearVal = 0, currentMonthVal = null }) {
   const isRevenue = metricType === "revenue";
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -4435,6 +4435,11 @@ function getFleetQuarterlyValues({ targetLocations, selectedYear, metricType = "
   });
 
   let [q1, q2, q3, q4] = monthSums;
+
+  // In current year, the latest slot (q4) is the current month: enforce exact match with currentMonthVal
+  if (isCurrentYear && currentMonthVal !== null && currentMonthVal !== undefined && Number(currentMonthVal) >= 0) {
+    q4 = Number(currentMonthVal);
+  }
 
   // Fallback if data is empty but fallbackYearVal is provided
   const totalQ = q1 + q2 + q3 + q4;
@@ -4650,6 +4655,13 @@ function buildAggregatedFleetSeries({
       if (isFutureYear || (isCurrentYear && i > nowMonth)) {
         aggregated[i] = 0;
       }
+    }
+
+    // Ensure the current month bar in current year strictly matches fleetTotalVals.monthly (THIS MONTH)
+    if (isCurrentYear && nowMonth < 12 && fleetTotalVals?.monthly !== undefined && fleetTotalVals?.monthly !== null) {
+      aggregated[nowMonth] = isRevenue
+        ? Math.round(Number(fleetTotalVals.monthly) || 0)
+        : Math.round((Number(fleetTotalVals.monthly) || 0) * 10) / 10;
     }
 
     // Fallback if no station had data but fleetTotalVals had yearly estimate
@@ -5047,8 +5059,9 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
       selectedYear: fleetSelectedYear,
       metricType: "energy",
       fallbackYearVal: fleetYearKwhVal,
+      currentMonthVal: fleetMonthKwhVal,
     });
-  }, [targetLocations, fleetSelectedYear, fleetYearKwhVal]);
+  }, [targetLocations, fleetSelectedYear, fleetYearKwhVal, fleetMonthKwhVal]);
 
   return (
     <div className="unified-analytics-view">
@@ -5982,8 +5995,9 @@ function RevenueView({ location, fleet, locations, allLocations, onSelect, selec
       selectedYear: fleetSelectedYear,
       metricType: "revenue",
       fallbackYearVal: fleetYearRevVal,
+      currentMonthVal: fleetMonthRevVal,
     });
-  }, [targetLocations, fleetSelectedYear, fleetYearRevVal]);
+  }, [targetLocations, fleetSelectedYear, fleetYearRevVal, fleetMonthRevVal]);
 
   return (
     <div className="unified-analytics-view">
@@ -6882,8 +6896,9 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
       selectedYear: fleetSelectedYear,
       metricType: "emission",
       fallbackYearVal: fleetYearEmissionKgCalc,
+      currentMonthVal: fleetMonthEmissionKgCalc,
     });
-  }, [targetLocations, fleetSelectedYear, fleetYearEmissionKgCalc]);
+  }, [targetLocations, fleetSelectedYear, fleetYearEmissionKgCalc, fleetMonthEmissionKgCalc]);
 
   return (
     <div className="unified-analytics-view">
