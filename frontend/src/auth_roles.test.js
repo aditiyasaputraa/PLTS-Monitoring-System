@@ -8,38 +8,38 @@ import {
 } from "./auth_roles.js";
 
 // Setup environment variables for test execution
-process.env.VITE_AUTH_ADMIN_PUSAT_PASS = "adminpusat123";
-process.env.VITE_AUTH_ADMIN_UTARA_PASS = "adminutara123";
-process.env.VITE_AUTH_ADMIN_BARAT_PASS = "adminbarat123";
-process.env.VITE_AUTH_ADMIN_SELATAN_PASS = "adminselatan123";
-process.env.VITE_AUTH_ADMIN_TIMUR_PASS = "admintimur123";
+process.env.VITE_AUTH_ADMIN_PUSAT_PASS = "JaksPV!Pusat#2026";
+process.env.VITE_AUTH_ADMIN_UTARA_PASS = "JaksPV!Utara#2026";
+process.env.VITE_AUTH_ADMIN_BARAT_PASS = "JaksPV!Barat#2026";
+process.env.VITE_AUTH_ADMIN_SELATAN_PASS = "JaksPV!Selatan#2026";
+process.env.VITE_AUTH_ADMIN_TIMUR_PASS = "JaksPV!Timur#2026";
 process.env.VITE_AUTH_SUPERADMIN_PASS = "admin123";
 
 test("authenticates all 5 regional accounts and super admin from environment variables", () => {
   // 1. Jakarta Pusat
-  const pusat = authenticateLocalAccount("admin.pusat", "adminpusat123");
+  const pusat = authenticateLocalAccount("admin.pusat", "JaksPV!Pusat#2026");
   assert.ok(pusat);
   assert.equal(pusat.region, "jakpus");
   assert.equal(pusat.role, "regional_admin");
 
   // 2. Jakarta Utara
-  const utara = authenticateLocalAccount("admin.utara@jakarta.go.id", "adminutara123");
+  const utara = authenticateLocalAccount("admin.utara@jakarta.go.id", "JaksPV!Utara#2026");
   assert.ok(utara);
   assert.equal(utara.region, "jakut");
   assert.equal(utara.role, "regional_admin");
 
   // 3. Jakarta Barat
-  const barat = authenticateLocalAccount("admin.barat", "adminbarat123");
+  const barat = authenticateLocalAccount("admin.barat", "JaksPV!Barat#2026");
   assert.ok(barat);
   assert.equal(barat.region, "jakbar");
 
   // 4. Jakarta Selatan
-  const selatan = authenticateLocalAccount("admin.selatan", "adminselatan123");
+  const selatan = authenticateLocalAccount("admin.selatan", "JaksPV!Selatan#2026");
   assert.ok(selatan);
   assert.equal(selatan.region, "jaksel");
 
   // 5. Jakarta Timur
-  const timur = authenticateLocalAccount("admin.timur", "admintimur123");
+  const timur = authenticateLocalAccount("admin.timur", "JaksPV!Timur#2026");
   assert.ok(timur);
   assert.equal(timur.region, "jaktim");
 
@@ -57,8 +57,8 @@ test("rejects invalid passwords or unknown users", () => {
 });
 
 test("enforces scoped editing permissions per region", () => {
-  const adminBarat = authenticateLocalAccount("admin.barat", "adminbarat123");
-  const adminUtara = authenticateLocalAccount("admin.utara", "adminutara123");
+  const adminBarat = authenticateLocalAccount("admin.barat", "JaksPV!Barat#2026");
+  const adminUtara = authenticateLocalAccount("admin.utara", "JaksPV!Utara#2026");
   const superAdmin = authenticateLocalAccount("admin", "admin123");
 
   const stationJakbar = { name: "SMPN 190 JAKBAR", region: "jakbar" };
@@ -79,7 +79,7 @@ test("enforces scoped editing permissions per region", () => {
 });
 
 test("restricts category global tariff edits to super admin", () => {
-  const adminBarat = authenticateLocalAccount("admin.barat", "adminbarat123");
+  const adminBarat = authenticateLocalAccount("admin.barat", "JaksPV!Barat#2026");
   const superAdmin = authenticateLocalAccount("admin", "admin123");
 
   assert.equal(canUserEditCategoryTariff(adminBarat), false);
