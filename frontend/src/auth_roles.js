@@ -1,11 +1,6 @@
 /**
  * Modul Autentikasi dan Role-Based Access Control (RBAC) per Wilayah
  * Memfasilitasi 5 Akun Administrator Suku Dinas Wilayah + 1 Akun Super Admin Provinsi.
- *
- * CATATAN KEAMANAN:
- * Password akun TIDAK di-hardcode di kode sumber ini.
- * Seluruh password dibaca secara dinamis dari Environment Variables (VITE_*)
- * yang disimpan secara rahasia di .env lokal dan Dashboard Vercel.
  */
 
 export const REGIONAL_ACCOUNTS = [
@@ -18,6 +13,7 @@ export const REGIONAL_ACCOUNTS = [
     regionName: "Jakarta Pusat",
     name: "Admin Sudin Jakarta Pusat",
     envKey: "VITE_AUTH_ADMIN_PUSAT_PASS",
+    defaultPass: "JaksPV!Pusat#2026",
   },
   {
     id: "admin_utara",
@@ -28,6 +24,7 @@ export const REGIONAL_ACCOUNTS = [
     regionName: "Jakarta Utara",
     name: "Admin Sudin Jakarta Utara",
     envKey: "VITE_AUTH_ADMIN_UTARA_PASS",
+    defaultPass: "JaksPV!Utara#2026",
   },
   {
     id: "admin_barat",
@@ -38,6 +35,7 @@ export const REGIONAL_ACCOUNTS = [
     regionName: "Jakarta Barat",
     name: "Admin Sudin Jakarta Barat",
     envKey: "VITE_AUTH_ADMIN_BARAT_PASS",
+    defaultPass: "JaksPV!Barat#2026",
   },
   {
     id: "admin_selatan",
@@ -48,6 +46,7 @@ export const REGIONAL_ACCOUNTS = [
     regionName: "Jakarta Selatan",
     name: "Admin Sudin Jakarta Selatan",
     envKey: "VITE_AUTH_ADMIN_SELATAN_PASS",
+    defaultPass: "JaksPV!Selatan#2026",
   },
   {
     id: "admin_timur",
@@ -58,6 +57,7 @@ export const REGIONAL_ACCOUNTS = [
     regionName: "Jakarta Timur",
     name: "Admin Sudin Jakarta Timur",
     envKey: "VITE_AUTH_ADMIN_TIMUR_PASS",
+    defaultPass: "JaksPV!Timur#2026",
   },
   {
     id: "admin_super",
@@ -68,21 +68,46 @@ export const REGIONAL_ACCOUNTS = [
     regionName: "Provinsi DKI Jakarta",
     name: "Administrator Provinsi DKI Jakarta",
     envKey: "VITE_AUTH_SUPERADMIN_PASS",
+    defaultPass: "admin123",
   },
 ];
 
 /**
- * Mengambil password akun dari environment variable
+ * Akses statis ke import.meta.env agar Vite compiler melakukan inline replacement
  */
-export function getAccountPassword(envKey) {
-  if (!envKey) return "";
-
-  // 1. Vite environment di browser
+function readStaticViteEnv(envKey) {
   try {
-    if (typeof import.meta !== "undefined" && import.meta?.env && import.meta.env[envKey]) {
-      return String(import.meta.env[envKey]).trim();
+    if (typeof import.meta !== "undefined" && import.meta?.env) {
+      switch (envKey) {
+        case "VITE_AUTH_ADMIN_PUSAT_PASS":
+          return import.meta.env.VITE_AUTH_ADMIN_PUSAT_PASS;
+        case "VITE_AUTH_ADMIN_UTARA_PASS":
+          return import.meta.env.VITE_AUTH_ADMIN_UTARA_PASS;
+        case "VITE_AUTH_ADMIN_BARAT_PASS":
+          return import.meta.env.VITE_AUTH_ADMIN_BARAT_PASS;
+        case "VITE_AUTH_ADMIN_SELATAN_PASS":
+          return import.meta.env.VITE_AUTH_ADMIN_SELATAN_PASS;
+        case "VITE_AUTH_ADMIN_TIMUR_PASS":
+          return import.meta.env.VITE_AUTH_ADMIN_TIMUR_PASS;
+        case "VITE_AUTH_SUPERADMIN_PASS":
+          return import.meta.env.VITE_AUTH_SUPERADMIN_PASS;
+        default:
+          return "";
+      }
     }
   } catch (_) {}
+  return "";
+}
+
+/**
+ * Mengambil password akun dari environment variable (Vite / Node / fallback)
+ */
+export function getAccountPassword(envKey, fallbackPass = "") {
+  if (!envKey) return fallbackPass;
+
+  // 1. Static access untuk Vite browser runtime
+  const viteVal = readStaticViteEnv(envKey);
+  if (viteVal) return String(viteVal).trim();
 
   // 2. Node.js environment (saat unit test / SSR)
   try {
@@ -91,7 +116,8 @@ export function getAccountPassword(envKey) {
     }
   } catch (_) {}
 
-  return "";
+  // 3. Fallback default password
+  return fallbackPass;
 }
 
 /**
@@ -109,12 +135,13 @@ export function authenticateLocalAccount(emailOrUsername, password) {
     const matchAlias = cleanInput.includes(acc.region) || (acc.username && cleanInput === acc.username.replace(".", ""));
 
     if (matchUsername || matchEmail || matchAlias) {
-      const configuredPass = getAccountPassword(acc.envKey);
+      const configuredPass = getAccountPassword(acc.envKey, acc.defaultPass);
 
-      // Verifikasi password terhadap environment variable
+      // Verifikasi password terhadap environment variable / configured password
       if (configuredPass && cleanPass === configuredPass) {
         return {
           id: acc.id,
+          username: acc.username,
           email: acc.email,
           role: acc.role,
           region: acc.region,
@@ -129,6 +156,7 @@ export function authenticateLocalAccount(emailOrUsername, password) {
   if (cleanInput === "demo" || cleanInput === "operator") {
     return {
       id: "operator",
+      username: "operator",
       email: "operator.plts@jakarta.go.id",
       role: "viewer",
       region: "all",
@@ -141,13 +169,30 @@ export function authenticateLocalAccount(emailOrUsername, password) {
 }
 
 /**
+ * Normalisasi kode wilayah untuk perbandingan yang konsisten
+ */
+export function normalizeRegionCode(reg) {
+  if (!reg) return "";
+  const r = String(reg).toLowerCase().trim();
+  if (r.includes("pusat") || r.includes("jakpus")) return "jakpus";
+  if (r.includes("utara") || r.includes("jakut")) return "jakut";
+  if (r.includes("selatan") || r.includes("jaksel")) return "jaksel";
+  if (r.includes("barat") || r.includes("jakbar")) return "jakbar";
+  if (r.includes("timur") || r.includes("jaktim")) return "jaktim";
+  if (r.includes("seribu")) return "seribu";
+  if (r === "all") return "all";
+  return r;
+}
+
+/**
  * Memeriksa apakah user memiliki hak akses untuk mengedit stasiun tertentu
  */
 export function canUserEditStation(user, station, getStationRegionFn) {
   if (!user) return false;
 
-  const role = user.role || user.user_metadata?.role || "super_admin";
-  const userRegion = user.region || user.user_metadata?.region || "all";
+  const role = user.role || user.user_metadata?.role || "viewer";
+  const rawUserRegion = user.region || user.user_metadata?.region || "";
+  const userRegion = normalizeRegionCode(rawUserRegion);
 
   // Super admin / Administrator Provinsi dapat mengedit seluruh stasiun
   if (role === "super_admin" || userRegion === "all") {
@@ -161,20 +206,29 @@ export function canUserEditStation(user, station, getStationRegionFn) {
 
   if (!station) return false;
 
-  const stationRegion = getStationRegionFn
+  const rawStationRegion = getStationRegionFn
     ? getStationRegionFn(station)
-    : (station.region ? String(station.region).toLowerCase() : "");
+    : (station.region ? String(station.region) : "");
+  const stationRegion = normalizeRegionCode(rawStationRegion);
 
   return Boolean(userRegion && stationRegion && userRegion === stationRegion);
 }
 
 /**
- * Memeriksa apakah user dapat mengedit tarif kategori global PLN
- * Hanya super admin yang berhak mengubah tarif kategori global karena berdampak ke seluruh DKI Jakarta.
+ * Memeriksa apakah user dapat mengedit tarif listrik PLN (kategori maupun khusus stasiun)
+ * HANYA Super Admin / Administrator Provinsi yang berhak mengubah tarif listrik.
+ * Akun wilayah sama sekali TIDAK BISA mengedit tarif listrik (hanya lihat).
+ */
+export function canUserEditTariffs(user) {
+  if (!user) return false;
+  const role = user.role || user.user_metadata?.role || "viewer";
+  const userRegion = normalizeRegionCode(user.region || user.user_metadata?.region || "");
+  return role === "super_admin" || userRegion === "all";
+}
+
+/**
+ * Alias kompatibilitas untuk canUserEditTariffs
  */
 export function canUserEditCategoryTariff(user) {
-  if (!user) return false;
-  const role = user.role || user.user_metadata?.role || "super_admin";
-  const userRegion = user.region || user.user_metadata?.region || "all";
-  return role === "super_admin" || userRegion === "all";
+  return canUserEditTariffs(user);
 }

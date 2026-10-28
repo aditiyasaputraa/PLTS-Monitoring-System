@@ -58,6 +58,10 @@ export default function TariffSettingsModal({
   };
 
   const handleSaveCategories = () => {
+    if (!isSuperAdmin) {
+      alert("Akses Ditolak: Hanya Administrator Provinsi DKI Jakarta yang berwenang mengubah tarif listrik PLN.");
+      return;
+    }
     Object.entries(localCategories).forEach(([catId, val]) => {
       if (catId === "school") return; // Tetap 900
       onUpdateCategoryRate(catId, val);
@@ -66,6 +70,10 @@ export default function TariffSettingsModal({
   };
 
   const handleResetDefaults = () => {
+    if (!isSuperAdmin) {
+      alert("Akses Ditolak: Hanya Administrator Provinsi DKI Jakarta yang berwenang mereset tarif listrik PLN.");
+      return;
+    }
     if (window.confirm("Kembalikan semua tarif kategori dan kustom stasiun ke standar default PLN?")) {
       onResetAllToDefaults();
       showToast("Semua tarif dikembalikan ke standar PLN.");
@@ -224,6 +232,15 @@ export default function TariffSettingsModal({
 
           {activeSubTab === "station" && (
             <div className="tariff-station-content">
+              {!isSuperAdmin && (
+                <div className="tariff-info-notice" style={{ background: "#fffbeb", borderColor: "#fde68a", color: "#92400e", marginBottom: "14px" }}>
+                  <span className="notice-icon">🔒</span>
+                  <div>
+                    <strong>Mode Hanya Lihat:</strong> Pengaturan tarif rekening listrik PLN (baik kategori maupun per stasiun) hanya dapat diubah oleh <strong>Administrator Provinsi DKI Jakarta</strong>. Akun wilayah hanya memiliki izin untuk memantau data tarif.
+                  </div>
+                </div>
+              )}
+
               {/* Filter & Search Bar */}
               <div className="tariff-station-toolbar">
                 <div className="tariff-search-wrap">
@@ -319,7 +336,6 @@ export default function TariffSettingsModal({
                         const catKey = detectStationCategory(name);
                         const catDef = DEFAULT_TARIFF_CATEGORIES[catKey];
                         const isSchool = catKey === "school";
-                        const canEditStation = canUserEditStation(currentUser, st, getStationRegionFn);
                         const isCustom = !isSchool && tariffConfig?.customRates?.[uid] !== undefined;
                         const currentRate = getStationTariff(st, tariffConfig);
 
@@ -339,24 +355,24 @@ export default function TariffSettingsModal({
                               </span>
                             </td>
                             <td>
-                              <div className={`tariff-table-input-wrap ${isSchool || !canEditStation ? "is-locked" : ""}`}>
+                              <div className={`tariff-table-input-wrap ${isSchool || !isSuperAdmin ? "is-locked" : ""}`}>
                                 <span className="prefix">Rp</span>
                                 <input
                                   type="number"
                                   step="0.01"
                                   min="1"
-                                  disabled={isSchool || !canEditStation}
+                                  disabled={isSchool || !isSuperAdmin}
                                   title={
                                     isSchool
                                       ? "Tarif sekolah dikunci tetap Rp 900/kWh (Tarif Sosial)"
-                                      : (!canEditStation
-                                        ? "Stasiun ini di luar wilayah wewenang Anda (Mode hanya lihat)"
+                                      : (!isSuperAdmin
+                                        ? "Pengaturan tarif listrik hanya dapat diubah oleh Administrator Provinsi DKI Jakarta"
                                         : undefined)
                                   }
                                   className={`station-rate-input ${isCustom ? "is-custom" : ""}`}
                                   value={currentRate}
                                   onChange={(e) => {
-                                    if (isSchool || !canEditStation) return;
+                                    if (isSchool || !isSuperAdmin) return;
                                     const val = e.target.value === "" ? "" : Number(e.target.value);
                                     if (val) {
                                       onUpdateStationRate(uid, val);
@@ -371,13 +387,13 @@ export default function TariffSettingsModal({
                                 <span className="tariff-locked-tag" title="Tarif sekolah dikunci tetap Rp 900/kWh">
                                   🔒 Tetap Rp 900
                                 </span>
-                              ) : !canEditStation ? (
+                              ) : !isSuperAdmin ? (
                                 <span
                                   className="tariff-locked-tag"
                                   style={{ background: "#f1f5f9", color: "#64748b", borderColor: "#cbd5e1" }}
-                                  title="Stasiun di luar wilayah wewenang Anda (Hanya dapat dilihat)"
+                                  title="Pengaturan tarif listrik khusus Administrator Provinsi (Mode hanya lihat)"
                                 >
-                                  👁️ Hanya Lihat
+                                  🔒 Khusus Provinsi
                                 </span>
                               ) : isCustom ? (
                                 <button

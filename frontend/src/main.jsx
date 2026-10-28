@@ -8,6 +8,7 @@ import {
   REGIONAL_ACCOUNTS,
   authenticateLocalAccount,
   canUserEditStation,
+  canUserEditTariffs,
   canUserEditCategoryTariff,
 } from "./auth_roles.js";
 import TariffSettingsModal from "./TariffSettingsModal.jsx";
@@ -292,7 +293,34 @@ function normalizeSession(payload) {
 
 function readStoredSession() {
   try {
-    return normalizeSession(JSON.parse(window.localStorage.getItem(AUTH_STORAGE_KEY) || "null"));
+    const raw = JSON.parse(window.localStorage.getItem(AUTH_STORAGE_KEY) || "null");
+    if (!raw) return null;
+    const session = normalizeSession(raw);
+    if (!session || !session.user) return null;
+
+    // Sinkronisasi dengan REGIONAL_ACCOUNTS jika user id / username cocok dengan akun wilayah
+    const userIdentifier = (session.user.username || session.user.id || "").toLowerCase();
+    const userEmail = (session.user.email || "").toLowerCase();
+    const matchingAcc = REGIONAL_ACCOUNTS.find(
+      (a) =>
+        a.username.toLowerCase() === userIdentifier ||
+        a.email.toLowerCase() === userEmail ||
+        a.id.toLowerCase() === userIdentifier
+    );
+    if (matchingAcc) {
+      session.user.role = matchingAcc.role;
+      session.user.region = matchingAcc.region;
+      session.user.regionName = matchingAcc.regionName;
+      if (!session.user.user_metadata) session.user.user_metadata = {};
+      session.user.user_metadata.name = matchingAcc.name;
+      session.user.user_metadata.role = matchingAcc.role;
+      session.user.user_metadata.region = matchingAcc.region;
+      session.user.user_metadata.regionName = matchingAcc.regionName;
+      session.user.user_metadata.title = matchingAcc.role === "super_admin"
+        ? "Super Admin DKI Jakarta"
+        : `Admin Wilayah ${matchingAcc.regionName}`;
+    }
+    return session;
   } catch {
     return null;
   }
@@ -378,6 +406,16 @@ async function signInWithPassword(email, password) {
     return localSession;
   }
 
+  // Jika input cocok dengan akun wilayah namun gagal autentikasi, berarti password salah
+  const isRegionalTarget = REGIONAL_ACCOUNTS.some(
+    (acc) =>
+      acc.username.toLowerCase() === cleanEmail.toLowerCase() ||
+      acc.email.toLowerCase() === cleanEmail.toLowerCase()
+  );
+  if (isRegionalTarget) {
+    throw new Error("Password salah untuk akun " + cleanEmail + ". Silakan periksa kembali password Anda.");
+  }
+
   // 2. Cek Supabase Auth jika dikonfigurasi
   try {
     const payload = await authRequest("/auth/v1/token?grant_type=password", {
@@ -391,39 +429,49 @@ async function signInWithPassword(email, password) {
     console.warn("Supabase auth failed or not configured, checking local credentials:", err);
   }
 
-  // 3. Fallback generic local/demo credentials
+  // 3. Fallback generic local/demo credentials (hanya demo atau admin pusat)
   const emLower = cleanEmail.toLowerCase();
-  const isAcceptedUser =
-    emLower === "demo" ||
-    emLower === "admin" ||
-    emLower === "operator" ||
-    emLower === "adminplts@sudinaker.go.id" ||
-    emLower === "operator.plts@jakarta.go.id" ||
-    emLower.includes("demo") ||
-    emLower.includes("admin") ||
-    emLower.includes("operator");
+  const isStrictAdmin = emLower === "admin" || emLower === "adminplts@sudinaker.go.id";
+  const isStrictViewer = emLower === "demo" || emLower === "operator" || emLower === "operator.plts@jakarta.go.id";
 
-  const isAcceptedPass =
-    cleanPass === "admin" ||
-    cleanPass === "admin123" ||
-    cleanPass === "demo" ||
-    cleanPass === "operator" ||
-    cleanPass.length >= 3;
-
-  if (isAcceptedUser && isAcceptedPass) {
+  if (isStrictAdmin && (cleanPass === "admin" || cleanPass === "admin123")) {
     const localSession = {
-      access_token: "local_session_default",
-      refresh_token: "local_session_default",
+      access_token: "local_session_admin",
+      refresh_token: "local_session_admin",
       expires_at: Math.floor(Date.now() / 1000) + 86400 * 30,
       user: {
-        id: emLower.includes("admin") ? "admin" : "operator",
-        email: cleanEmail.includes("@") ? cleanEmail : `${cleanEmail}@plts-monitor.go.id`,
-        role: emLower.includes("admin") ? "super_admin" : "viewer",
+        id: "admin",
+        email: "adminplts@sudinaker.go.id",
+        role: "super_admin",
         region: "all",
         regionName: "DKI Jakarta",
         user_metadata: {
-          name: emLower.includes("admin") ? "Administrator PLTS" : "Operator PLTS",
-          role: emLower.includes("admin") ? "super_admin" : "viewer",
+          name: "Administrator PLTS Provinsi",
+          role: "super_admin",
+          region: "all",
+          regionName: "DKI Jakarta",
+        },
+      },
+      isDemo: true,
+    };
+    storeSession(localSession);
+    return localSession;
+  }
+
+  if (isStrictViewer && (cleanPass === "demo" || cleanPass === "operator" || cleanPass.length >= 3)) {
+    const localSession = {
+      access_token: "local_session_demo",
+      refresh_token: "local_session_demo",
+      expires_at: Math.floor(Date.now() / 1000) + 86400 * 30,
+      user: {
+        id: "operator",
+        email: "operator.plts@jakarta.go.id",
+        role: "viewer",
+        region: "all",
+        regionName: "DKI Jakarta",
+        user_metadata: {
+          name: "Operator PLTS (Demo)",
+          role: "viewer",
           region: "all",
           regionName: "DKI Jakarta",
         },
@@ -1311,6 +1359,38 @@ function Dashboard({ session, onSignOut }) {
     return updateStationMetadata(key, updates, st);
   }, [session?.user, updateStationMetadata]);
 
+  const handleUpdateCategoryRate = useCallback((catId, rate) => {
+    if (!canUserEditTariffs(session?.user)) {
+      alert("Akses Ditolak: Hanya Administrator Provinsi DKI Jakarta yang dapat mengubah tarif listrik.");
+      return;
+    }
+    updateCategoryRate(catId, rate);
+  }, [session?.user, updateCategoryRate]);
+
+  const handleUpdateStationRate = useCallback((uid, rate) => {
+    if (!canUserEditTariffs(session?.user)) {
+      alert("Akses Ditolak: Hanya Administrator Provinsi DKI Jakarta yang dapat mengubah tarif listrik.");
+      return;
+    }
+    updateStationRate(uid, rate);
+  }, [session?.user, updateStationRate]);
+
+  const handleResetStationRate = useCallback((uid) => {
+    if (!canUserEditTariffs(session?.user)) {
+      alert("Akses Ditolak: Hanya Administrator Provinsi DKI Jakarta yang dapat mereset tarif listrik.");
+      return;
+    }
+    resetStationRate(uid);
+  }, [session?.user, resetStationRate]);
+
+  const handleResetAllToDefaults = useCallback(() => {
+    if (!canUserEditTariffs(session?.user)) {
+      alert("Akses Ditolak: Hanya Administrator Provinsi DKI Jakarta yang dapat mereset tarif listrik.");
+      return;
+    }
+    resetAllToDefaults();
+  }, [session?.user, resetAllToDefaults]);
+
   const handleSyncNow = useCallback(async () => {
     if (isSyncing) return;
     setIsSyncing(true);
@@ -1686,10 +1766,10 @@ function Dashboard({ session, onSignOut }) {
         isOpen={tariffModalOpen}
         onClose={() => setTariffModalOpen(false)}
         tariffConfig={tariffConfig}
-        onUpdateCategoryRate={updateCategoryRate}
-        onUpdateStationRate={updateStationRate}
-        onResetStationRate={resetStationRate}
-        onResetAllToDefaults={resetAllToDefaults}
+        onUpdateCategoryRate={handleUpdateCategoryRate}
+        onUpdateStationRate={handleUpdateStationRate}
+        onResetStationRate={handleResetStationRate}
+        onResetAllToDefaults={handleResetAllToDefaults}
         allStations={allLocations}
         currentUser={session?.user}
         getStationRegionFn={getStationRegion}
@@ -4128,6 +4208,8 @@ function EditStationModal({ station, onClose, onSave, currentUser }) {
                 value={customName}
                 onChange={(e) => setCustomName(e.target.value)}
                 required
+                disabled={!canEdit}
+                style={!canEdit ? { background: "#1b271e", color: "#6e8074", cursor: "not-allowed" } : {}}
               />
               <span style={{ fontSize: "10.5px", color: "#6e8074" }}>
                 Nama ini yang akan ditampilkan di seluruh dashboard & grafik.
@@ -4142,6 +4224,8 @@ function EditStationModal({ station, onClose, onSave, currentUser }) {
                 placeholder="Pilih dari pilihan cepat atau ketik sendiri..."
                 value={assetOwner}
                 onChange={(e) => setAssetOwner(e.target.value)}
+                disabled={!canEdit}
+                style={!canEdit ? { background: "#1b271e", color: "#6e8074", cursor: "not-allowed" } : {}}
               />
               <div style={{ marginTop: "6px" }}>
                 <span style={{ fontSize: "10px", color: "#6e8074", fontWeight: 700 }}>Pilihan cepat:</span>
@@ -4156,8 +4240,13 @@ function EditStationModal({ station, onClose, onSave, currentUser }) {
                       <button
                         key={p}
                         type="button"
+                        disabled={!canEdit}
                         className={`asset-preset-btn ${assetOwner === p ? "active" : ""}`}
-                        onClick={() => setAssetOwner(p)}
+                        style={!canEdit ? { opacity: 0.4, cursor: "not-allowed" } : {}}
+                        onClick={() => {
+                          if (!canEdit) return;
+                          setAssetOwner(p);
+                        }}
                       >
                         {shortLabel}
                       </button>
@@ -4170,11 +4259,17 @@ function EditStationModal({ station, onClose, onSave, currentUser }) {
 
           <div className="station-modal-footer">
             <button type="button" className="btn-modal-cancel" onClick={onClose}>
-              Batal
+              {canEdit ? "Batal" : "Tutup"}
             </button>
-            <button type="submit" className="btn-modal-save" disabled={isSaving || !canEdit}>
-              {isSaving ? "Menyimpan..." : "Simpan Perubahan"}
-            </button>
+            {canEdit ? (
+              <button type="submit" className="btn-modal-save" disabled={isSaving}>
+                {isSaving ? "Menyimpan..." : "Simpan Perubahan"}
+              </button>
+            ) : (
+              <button type="button" className="btn-modal-save" disabled style={{ opacity: 0.5, cursor: "not-allowed" }}>
+                🔒 Terkunci (Wilayah {regionName})
+              </button>
+            )}
           </div>
         </form>
       </div>
@@ -6192,9 +6287,12 @@ function RevenueView({
                   type="button"
                   className="tariff-settings-trigger-btn"
                   onClick={onOpenTariffModal}
-                  title="Atur tarif dasar listrik PLN per kategori gedung atau kustom per stasiun"
+                  title={canUserEditTariffs(currentUser)
+                    ? "Atur tarif dasar listrik PLN per kategori gedung atau kustom per stasiun"
+                    : "Lihat tarif dasar listrik PLN (Mode Hanya Lihat untuk Akun Wilayah)"
+                  }
                 >
-                  <span>⚙️ Atur Tarif Listrik</span>
+                  <span>{canUserEditTariffs(currentUser) ? "⚙️ Atur Tarif Listrik" : "👁️ Lihat Tarif Listrik"}</span>
                   {customCount > 0 && <span className="tariff-badge-custom-count">{customCount}</span>}
                 </button>
                 <div className="period-toggle-pill">

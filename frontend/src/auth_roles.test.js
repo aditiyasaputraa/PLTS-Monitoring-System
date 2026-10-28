@@ -85,3 +85,22 @@ test("restricts category global tariff edits to super admin", () => {
   assert.equal(canUserEditCategoryTariff(adminBarat), false);
   assert.equal(canUserEditCategoryTariff(superAdmin), true);
 });
+
+test("restricts electricity tariffs (canUserEditTariffs) strictly to super admin", () => {
+  const pusat = authenticateLocalAccount("admin.pusat", "JaksPV!Pusat#2026");
+  const utara = authenticateLocalAccount("admin.utara", "JaksPV!Utara#2026");
+  const barat = authenticateLocalAccount("admin.barat", "JaksPV!Barat#2026");
+  const selatan = authenticateLocalAccount("admin.selatan", "JaksPV!Selatan#2026");
+  const timur = authenticateLocalAccount("admin.timur", "JaksPV!Timur#2026");
+  const superAdmin = authenticateLocalAccount("admin", "admin123");
+
+  // All 5 regional accounts must NOT be able to edit tariffs
+  assert.equal(canUserEditCategoryTariff(pusat), false);
+  assert.equal(canUserEditCategoryTariff(utara), false);
+  assert.equal(canUserEditCategoryTariff(barat), false);
+  assert.equal(canUserEditCategoryTariff(selatan), false);
+  assert.equal(canUserEditCategoryTariff(timur), false);
+
+  // Super Admin can edit tariffs
+  assert.equal(canUserEditCategoryTariff(superAdmin), true);
+});
