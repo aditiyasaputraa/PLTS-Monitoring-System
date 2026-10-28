@@ -7,15 +7,25 @@ const ID_MONTH_NAMES = [
   "Juli", "Agustus", "September", "Oktober", "November", "Desember"
 ];
 
-export function downloadExcel(filename, rows, sheetName = "Data PLTS", colWidths = null) {
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  if (colWidths && Array.isArray(colWidths)) {
-    ws["!cols"] = colWidths;
-  }
+export function downloadExcelWorkbook(filename, sheets = []) {
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  sheets.forEach(({ sheetName, rows, colWidths }) => {
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    if (colWidths && Array.isArray(colWidths)) {
+      ws["!cols"] = colWidths;
+    }
+    const cleanName = (sheetName || "Sheet")
+      .replace(/[\\/?*\[\]:]/g, "")
+      .trim()
+      .slice(0, 31);
+    XLSX.utils.book_append_sheet(wb, ws, cleanName);
+  });
   const safeFilename = filename.endsWith(".xlsx") ? filename : `${filename.replace(/\.csv$/i, "")}.xlsx`;
   XLSX.writeFile(wb, safeFilename);
+}
+
+export function downloadExcel(filename, rows, sheetName = "Data PLTS", colWidths = null) {
+  downloadExcelWorkbook(filename, [{ sheetName, rows, colWidths }]);
 }
 
 export function downloadCsv(filename, rows) {
@@ -37,6 +47,82 @@ export function downloadCsv(filename, rows) {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+}
+
+function buildMetricSheetRows(metricType, targetList, yr, monthIndices, getStationMonthlyValuesFn, getStationRegionFn) {
+  const monthHeaders = monthIndices.map((mIdx) => ID_MONTH_NAMES[mIdx]);
+  const headers = ["No", "Nama PLTS", ...monthHeaders, "Total"];
+
+  const rows = [headers];
+  const colTotals = Array(monthIndices.length).fill(0);
+  let grandTotal = 0;
+
+  targetList.forEach((st, idx) => {
+    const name = st.custom_name || st.name || st.raw_name || `PLTS ${idx + 1}`;
+    const tariff = getStationTariff(st, null, (s) => (getStationRegionFn ? getStationRegionFn(s) : "all"));
+
+    let monthlyVals = Array(12).fill(0);
+    if (getStationMonthlyValuesFn) {
+      monthlyVals = getStationMonthlyValuesFn(st, yr, metricType, tariff) || Array(12).fill(0);
+    } else {
+      const baseMonthly = Number(st.monthly_energy_kwh || st.month_energy_kwh || 0);
+      if (metricType === "revenue") {
+        monthlyVals = Array(12).fill(Math.round(baseMonthly * tariff));
+      } else if (metricType === "emission") {
+        monthlyVals = Array(12).fill(Math.round(baseMonthly * 0.85 * 10) / 10);
+      } else {
+        monthlyVals = Array(12).fill(baseMonthly);
+      }
+    }
+
+    let rowTotal = 0;
+    const rowVals = monthIndices.map((mIdx, cIdx) => {
+      let val = Number(monthlyVals[mIdx]) || 0;
+      if (metricType === "revenue") {
+        val = Math.round(val);
+      } else {
+        val = Math.round(val * 10) / 10;
+      }
+      rowTotal += val;
+      colTotals[cIdx] += val;
+      return val;
+    });
+
+    if (metricType === "revenue") {
+      rowTotal = Math.round(rowTotal);
+    } else {
+      rowTotal = Math.round(rowTotal * 10) / 10;
+    }
+    grandTotal += rowTotal;
+
+    rows.push([
+      idx + 1,
+      name,
+      ...rowVals,
+      rowTotal,
+    ]);
+  });
+
+  const formattedColTotals = colTotals.map((tot) => {
+    return metricType === "revenue" ? Math.round(tot) : Math.round(tot * 10) / 10;
+  });
+  const formattedGrandTotal = metricType === "revenue" ? Math.round(grandTotal) : Math.round(grandTotal * 10) / 10;
+
+  rows.push([
+    "",
+    "TOTAL",
+    ...formattedColTotals,
+    formattedGrandTotal,
+  ]);
+
+  const colWidths = [
+    { wch: 6 },
+    { wch: 38 },
+    ...monthIndices.map(() => ({ wch: 16 })),
+    { wch: 18 },
+  ];
+
+  return { rows, colWidths };
 }
 
 export default function ChartExportModal({
@@ -127,158 +213,34 @@ export default function ChartExportModal({
         periodLabel = `Bulan ${ID_MONTH_NAMES[mIdx]} ${yr}`;
       }
 
-      // Build CSV Headers
-      const headers = [
-        "Tahun",
-        "Bulan",
-        "No",
-        "Nama Gedung / PLTS",
-        "Pemilik Aset",
-        "Wilayah",
-        "Platform",
-        "Kapasitas Terpasang (kWp)",
-        "Tarif Listrik (Rp/kWh)",
-      ];
+      if (!includeEnergy && !includeRevenue && !includeEmission) {
+        alert("Pilih setidaknya satu parameter metrik (Energi, Penghematan, atau Emisi).");
+        setIsExporting(false);
+        return;
+      }
 
-      if (includeEnergy) headers.push("Produksi Energi (kWh)", "Produksi Energi (MWh)");
-      if (includeRevenue) headers.push("Penghematan Listrik (Rp)");
-      if (includeEmission) headers.push("Reduksi Emisi (kg CO2)", "Reduksi Emisi (Ton CO2)");
-
-      const rows = [];
-
-      // Metadata rows
-      rows.push(["LAPORAN DATA KINERJA HISTORIS PRODUKSI PLTS"]);
-      rows.push(["Pemerintah Provinsi DKI Jakarta - Dinas Tenaga Kerja, Transmigrasi dan Energi"]);
-      rows.push([`Wilayah: ${currentRegionName} | Periode: ${periodLabel} | Waktu Unduh: ${new Date().toLocaleString("id-ID")}`]);
-      rows.push([]);
-      rows.push(headers);
-
-      let grandTotalEnergyKwh = 0;
-      let grandTotalRevenueRp = 0;
-      let grandTotalEmissionKg = 0;
-
-      // Populate data rows
-      monthIndices.forEach((mIdx) => {
-        const mName = ID_MONTH_NAMES[mIdx];
-        let monthSubtotalEnergy = 0;
-        let monthSubtotalRevenue = 0;
-        let monthSubtotalEmission = 0;
-
-        targetList.forEach((st, idx) => {
-          const tariff = getStationTariff(st, null, (s) => (getStationRegionFn ? getStationRegionFn(s) : "all"));
-          const region = getStationRegionFn ? getStationRegionFn(st) : (st.region || "");
-          const platform = (st.source || st.site?.platform || "").toUpperCase();
-          const capacity = Number(st.capacity_kwp || st.rated_capacity_kw || 0);
-
-          let energyKwh = 0;
-          let revenueRp = 0;
-          let emissionKg = 0;
-
-          if (getStationMonthlyValuesFn) {
-            const eArr = getStationMonthlyValuesFn(st, yr, "energy", tariff);
-            const rArr = getStationMonthlyValuesFn(st, yr, "revenue", tariff);
-            const emArr = getStationMonthlyValuesFn(st, yr, "emission", tariff);
-            energyKwh = Number(eArr?.[mIdx] || 0);
-            revenueRp = Number(rArr?.[mIdx] || 0);
-            emissionKg = Number(emArr?.[mIdx] || 0);
-          } else {
-            // Fallback estimation
-            energyKwh = Number(st.monthly_energy_kwh || st.month_energy_kwh || 0);
-            revenueRp = Math.round(energyKwh * tariff);
-            emissionKg = Math.round(energyKwh * 0.85 * 10) / 10;
-          }
-
-          monthSubtotalEnergy += energyKwh;
-          monthSubtotalRevenue += revenueRp;
-          monthSubtotalEmission += emissionKg;
-
-          const row = [
-            yr,
-            mName,
-            idx + 1,
-            st.name || st.raw_name || "Tanpa Nama",
-            st.asset_owner || "-",
-            st.regionName || region.toUpperCase(),
-            platform || "PLTS",
-            capacity > 0 ? capacity.toFixed(2) : "-",
-            tariff,
-          ];
-
-          if (includeEnergy) {
-            row.push(energyKwh.toFixed(1), (energyKwh / 1000).toFixed(3));
-          }
-          if (includeRevenue) {
-            row.push(Math.round(revenueRp));
-          }
-          if (includeEmission) {
-            row.push(emissionKg.toFixed(1), (emissionKg / 1000).toFixed(3));
-          }
-
-          rows.push(row);
-        });
-
-        grandTotalEnergyKwh += monthSubtotalEnergy;
-        grandTotalRevenueRp += monthSubtotalRevenue;
-        grandTotalEmissionKg += monthSubtotalEmission;
-
-        // Subtotal row for month if multiple stations
-        if (targetList.length > 1 && monthIndices.length > 1) {
-          const subtotalRow = [
-            yr,
-            `${mName} (SUBTOTAL)`,
-            "-",
-            `Total Seluruh PLTS (${targetList.length} Stasiun)`,
-            "-",
-            currentRegionName,
-            "-",
-            "-",
-            "-",
-          ];
-          if (includeEnergy) {
-            subtotalRow.push(monthSubtotalEnergy.toFixed(1), (monthSubtotalEnergy / 1000).toFixed(3));
-          }
-          if (includeRevenue) {
-            subtotalRow.push(Math.round(monthSubtotalRevenue));
-          }
-          if (includeEmission) {
-            subtotalRow.push(monthSubtotalEmission.toFixed(1), (monthSubtotalEmission / 1000).toFixed(3));
-          }
-          rows.push(subtotalRow);
-        }
-      });
-
-      // Grand Total Row
-      rows.push([]);
-      const grandTotalRow = [
-        yr,
-        "TOTAL KESELURUHAN",
-        "-",
-        targetScope === "single" ? (targetList[0]?.name || "PLTS") : `Total ${targetList.length} Stasiun PLTS`,
-        "-",
-        currentRegionName,
-        "-",
-        "-",
-        "-",
-      ];
+      const sheets = [];
       if (includeEnergy) {
-        grandTotalRow.push(grandTotalEnergyKwh.toFixed(1), (grandTotalEnergyKwh / 1000).toFixed(3));
+        const energyData = buildMetricSheetRows("energy", targetList, yr, monthIndices, getStationMonthlyValuesFn, getStationRegionFn);
+        sheets.push({ sheetName: "Produksi Energi (kWh)", ...energyData });
       }
       if (includeRevenue) {
-        grandTotalRow.push(Math.round(grandTotalRevenueRp));
+        const revData = buildMetricSheetRows("revenue", targetList, yr, monthIndices, getStationMonthlyValuesFn, getStationRegionFn);
+        sheets.push({ sheetName: "Penghematan Biaya (Rp)", ...revData });
       }
       if (includeEmission) {
-        grandTotalRow.push(grandTotalEmissionKg.toFixed(1), (grandTotalEmissionKg / 1000).toFixed(3));
+        const emData = buildMetricSheetRows("emission", targetList, yr, monthIndices, getStationMonthlyValuesFn, getStationRegionFn);
+        sheets.push({ sheetName: "Reduksi Emisi (kg CO2)", ...emData });
       }
-      rows.push(grandTotalRow);
 
       // Filename construction
       const safeScope = targetScope === "single"
         ? (targetList[0]?.name || "Gedung").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 30)
         : currentRegionName.replace(/\s+/g, "_");
       const safePeriod = selectedPeriod.replace("_", "-");
-      const filename = `Laporan_PLTS_${safeScope}_${yr}_${safePeriod}.xlsx`;
+      const filename = `Kinerja_PLTS_${safeScope}_${yr}_${safePeriod}.xlsx`;
 
-      downloadExcel(filename, rows, "Kinerja PLTS");
+      downloadExcelWorkbook(filename, sheets);
       onClose();
     } catch (err) {
       console.error("Export error:", err);
