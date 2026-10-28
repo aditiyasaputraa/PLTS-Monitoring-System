@@ -14,6 +14,7 @@ import {
   canUserOpenTariffSettings,
 } from "./auth_roles.js";
 import TariffSettingsModal from "./TariffSettingsModal.jsx";
+import ChartExportModal, { downloadCsv } from "./ChartExportModal.jsx";
 import { MOCK_MONITORING_DATA } from "./mock_data.js";
 import "./styles.css";
 
@@ -1098,6 +1099,13 @@ function Dashboard({ session, onSignOut }) {
     resetAllToDefaults,
   } = useTariffSettings();
   const [tariffModalOpen, setTariffModalOpen] = useState(false);
+  const [chartExportOpen, setChartExportOpen] = useState(false);
+  const [exportInitialStationId, setExportInitialStationId] = useState("all");
+
+  const handleOpenChartExport = useCallback((stationId = "all") => {
+    setExportInitialStationId(stationId || "all");
+    setChartExportOpen(true);
+  }, []);
   const [activeTab, setActiveTab] = useState(() => readUiState().activeTab);
   const [selectedId, setSelectedId] = useState(() => readUiState().selectedId);
   const [selectedRegion, setSelectedRegion] = useState(() => readUiState().selectedRegion || "all");
@@ -1688,10 +1696,8 @@ function Dashboard({ session, onSignOut }) {
               <button
                 type="button"
                 className="action-btn-outline"
-                onClick={() => {
-                  const trigger = document.querySelector(".history-export-trigger");
-                  if (trigger) trigger.click();
-                }}
+                onClick={() => handleOpenChartExport(selectedId || "all")}
+                title="Download Data Grafik Kinerja PLTS (CSV)"
               >
                 <DownloadIcon style={{ width: "13px", height: "13px" }} />
                 <span>Export</span>
@@ -1751,6 +1757,7 @@ function Dashboard({ session, onSignOut }) {
             onSelectRegion={handleSelectRegion}
             onUpdateStation={handleUpdateStation}
             currentUser={session?.user}
+            onOpenChartExport={handleOpenChartExport}
           />
         )}
 
@@ -1767,6 +1774,7 @@ function Dashboard({ session, onSignOut }) {
             tariffConfig={tariffConfig}
             onOpenTariffModal={() => setTariffModalOpen(true)}
             currentUser={session?.user}
+            onOpenChartExport={handleOpenChartExport}
           />
         )}
 
@@ -1781,6 +1789,7 @@ function Dashboard({ session, onSignOut }) {
             onSelectRegion={handleSelectRegion}
             onUpdateStation={handleUpdateStation}
             currentUser={session?.user}
+            onOpenChartExport={handleOpenChartExport}
           />
         )}
       </main>
@@ -1798,6 +1807,19 @@ function Dashboard({ session, onSignOut }) {
         allStations={allLocations}
         currentUser={session?.user}
         getStationRegionFn={getStationRegion}
+      />
+
+      <ChartExportModal
+        isOpen={chartExportOpen}
+        onClose={() => setChartExportOpen(false)}
+        allStations={allLocations}
+        currentRegion={selectedRegion}
+        currentRegionName={REGIONS.find((r) => r.id === selectedRegion)?.name || "DKI Jakarta"}
+        currentUser={session?.user}
+        getStationRegionFn={getStationRegion}
+        initialStationId={exportInitialStationId}
+        getStationMonthlyValuesFn={getStationMonthlyValues}
+        tariffConfig={tariffConfig}
       />
 
       {/* Sync Toast */}
@@ -4316,6 +4338,97 @@ function formatShortOwner(owner) {
     .replace(" Setda", "");
 }
 
+function handleExportStationList(stations = [], regionLabel = "DKI Jakarta") {
+  if (!stations || stations.length === 0) {
+    alert("Tidak ada data stasiun PLTS untuk diekspor.");
+    return;
+  }
+
+  const rows = [];
+  rows.push([
+    "No",
+    "Nama Gedung PLTS",
+    "Pemilik Aset / Instansi",
+    "Wilayah",
+    "Platform Vendor",
+    "Kapasitas (kWp)",
+    "Status",
+    "Produksi Hari Ini (kWh)",
+    "Produksi Bulan Ini (kWh)",
+    "Total Kumulatif (kWh)",
+    "Tarif Listrik (Rp/kWh)",
+    "Total Penghematan (Rp)",
+    "Reduksi Emisi (kg CO2)",
+  ]);
+
+  let totalCap = 0;
+  let totalDaily = 0;
+  let totalMonthly = 0;
+  let totalCumulative = 0;
+  let totalRevenue = 0;
+  let totalEmission = 0;
+
+  stations.forEach((st, idx) => {
+    const name = st.name || st.raw_name || `PLTS ${idx + 1}`;
+    const owner = st.asset_owner || "-";
+    const reg = (st.region ? String(st.region).toUpperCase() : getStationRegion(st).toUpperCase());
+    const vendor = (st.source || st.site?.platform || "-").toUpperCase();
+    const cap = Number(st.installed_capacity || st.capacity_kw || 0);
+    const status = st.status || "NORMAL";
+    const dailyKwh = Number(st.today_kwh || st.today_energy || 0);
+    const monthKwh = Number(st.month_kwh || st.month_energy || 0);
+    const totalKwh = Number(st.total_kwh || st.lifetime_kwh || st.total_energy || 0);
+    const tariff = Number(st.tariff_per_kwh || 900);
+    const revenue = Math.round(totalKwh * tariff);
+    const emission = Math.round(totalKwh * 0.85 * 10) / 10;
+
+    totalCap += cap;
+    totalDaily += dailyKwh;
+    totalMonthly += monthKwh;
+    totalCumulative += totalKwh;
+    totalRevenue += revenue;
+    totalEmission += emission;
+
+    rows.push([
+      idx + 1,
+      name,
+      owner,
+      reg,
+      vendor,
+      cap > 0 ? cap.toFixed(2) : "0",
+      status,
+      dailyKwh.toFixed(2),
+      monthKwh.toFixed(2),
+      totalKwh.toFixed(2),
+      tariff,
+      revenue,
+      emission.toFixed(2),
+    ]);
+  });
+
+  rows.push([]);
+  rows.push([
+    "TOTAL",
+    `Total ${stations.length} Stasiun PLTS`,
+    "",
+    regionLabel,
+    "",
+    totalCap.toFixed(2),
+    "",
+    totalDaily.toFixed(2),
+    totalMonthly.toFixed(2),
+    totalCumulative.toFixed(2),
+    "-",
+    totalRevenue,
+    totalEmission.toFixed(2),
+  ]);
+
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const cleanReg = regionLabel.replace(/\s+/g, "_");
+  const filename = `Rekap_Daftar_PLTS_${cleanReg}_${dateStr}.csv`;
+  downloadCsv(filename, rows);
+}
+
 function StationListDarkCard({
   locations,
   allLocations,
@@ -4360,6 +4473,15 @@ function StationListDarkCard({
           <span className="station-list-title">DAFTAR PLTS ({regionLabel.toUpperCase()})</span>
           <span className="station-list-count">{displayLocations.length} stasiun</span>
         </div>
+        <button
+          type="button"
+          className="btn-export-station-list"
+          onClick={() => handleExportStationList(displayLocations, regionLabel)}
+          title="Download Rekap Daftar PLTS (CSV)"
+        >
+          <DownloadIcon style={{ width: "12px", height: "12px" }} />
+          <span>Export Rekap</span>
+        </button>
       </div>
 
       {/* Search Input */}
@@ -4965,7 +5087,7 @@ function buildAggregatedFleetSeries({
   };
 }
 
-function EnergyView({ location, fleet, locations, allLocations, onSelect, selectedRegion = "all", onSelectRegion, onUpdateStation, currentUser }) {
+function EnergyView({ location, fleet, locations, allLocations, onSelect, selectedRegion = "all", onSelectRegion, onUpdateStation, currentUser, onOpenChartExport }) {
   const pool = (allLocations && allLocations.length > 0) ? allLocations : (locations || []);
   const [localStationUid, setLocalStationUid] = useState(location?.uid || null);
 
@@ -5380,6 +5502,17 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
                   <YearDropdownPill value={selectedYear} onChange={setSelectedYear} years={availableYears} />
                 )}
                 <span className="unit-pill-badge">{series?.unit || "kWh"}</span>
+                {onOpenChartExport && (
+                  <button
+                    type="button"
+                    className="btn-curve-export"
+                    onClick={() => onOpenChartExport(activeStation?.id || activeStation?.uid || "all")}
+                    title="Export Data Grafik (CSV / Excel)"
+                  >
+                    <DownloadIcon style={{ width: "12px", height: "12px" }} />
+                    <span>Export</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -5506,6 +5639,17 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
                   <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} years={availableYears} />
                 )}
                 <span className="unit-pill-badge">{fleetSeries?.unit || "kWh"}</span>
+                {onOpenChartExport && (
+                  <button
+                    type="button"
+                    className="btn-curve-export"
+                    onClick={() => onOpenChartExport("all")}
+                    title="Export Data Grafik (CSV / Excel)"
+                  >
+                    <DownloadIcon style={{ width: "12px", height: "12px" }} />
+                    <span>Export</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -5829,6 +5973,7 @@ function RevenueView({
   tariffConfig,
   onOpenTariffModal,
   currentUser,
+  onOpenChartExport,
 }) {
   const pool = (allLocations && allLocations.length > 0) ? allLocations : (locations || []);
   const [localStationUid, setLocalStationUid] = useState(location?.uid || null);
@@ -6364,6 +6509,17 @@ function RevenueView({
                   <YearDropdownPill value={selectedYear} onChange={setSelectedYear} years={availableYears} />
                 )}
                 <span className="unit-pill-badge">{series?.unit || "IDR"}</span>
+                {onOpenChartExport && (
+                  <button
+                    type="button"
+                    className="btn-curve-export"
+                    onClick={() => onOpenChartExport(activeStation?.id || activeStation?.uid || "all")}
+                    title="Export Data Grafik (CSV / Excel)"
+                  >
+                    <DownloadIcon style={{ width: "12px", height: "12px" }} />
+                    <span>Export</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -6490,6 +6646,17 @@ function RevenueView({
                   <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} years={availableYears} />
                 )}
                 <span className="unit-pill-badge">{fleetSeries?.unit || "IDR"}</span>
+                {onOpenChartExport && (
+                  <button
+                    type="button"
+                    className="btn-curve-export"
+                    onClick={() => onOpenChartExport("all")}
+                    title="Export Data Grafik (CSV / Excel)"
+                  >
+                    <DownloadIcon style={{ width: "12px", height: "12px" }} />
+                    <span>Export</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -6808,7 +6975,7 @@ function EmissionProductionChart({ series, period }) {
   );
 }
 
-function EmissionView({ location, fleet, locations, allLocations, onSelect, selectedRegion = "all", onSelectRegion, onUpdateStation, currentUser }) {
+function EmissionView({ location, fleet, locations, allLocations, onSelect, selectedRegion = "all", onSelectRegion, onUpdateStation, currentUser, onOpenChartExport }) {
   const pool = (allLocations && allLocations.length > 0) ? allLocations : (locations || []);
   const [localStationUid, setLocalStationUid] = useState(location?.uid || null);
 
@@ -7266,6 +7433,17 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
                   <YearDropdownPill value={selectedYear} onChange={setSelectedYear} years={availableYears} />
                 )}
                 <span className="unit-pill-badge">{series?.unit || "kg CO₂"}</span>
+                {onOpenChartExport && (
+                  <button
+                    type="button"
+                    className="btn-curve-export"
+                    onClick={() => onOpenChartExport(activeStation?.id || activeStation?.uid || "all")}
+                    title="Export Data Grafik (CSV / Excel)"
+                  >
+                    <DownloadIcon style={{ width: "12px", height: "12px" }} />
+                    <span>Export</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -7392,6 +7570,17 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
                   <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} years={availableYears} />
                 )}
                 <span className="unit-pill-badge">{fleetSeries?.unit || "kg CO₂"}</span>
+                {onOpenChartExport && (
+                  <button
+                    type="button"
+                    className="btn-curve-export"
+                    onClick={() => onOpenChartExport("all")}
+                    title="Export Data Grafik (CSV / Excel)"
+                  >
+                    <DownloadIcon style={{ width: "12px", height: "12px" }} />
+                    <span>Export</span>
+                  </button>
+                )}
               </div>
             </div>
 
