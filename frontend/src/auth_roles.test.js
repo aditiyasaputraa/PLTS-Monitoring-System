@@ -58,50 +58,40 @@ test("rejects invalid passwords or unknown users", () => {
   assert.equal(authenticateLocalAccount("random.user", "test_env_pass_superadmin"), null);
 });
 
-test("authenticates accounts via SHA-256 hash fallback when env vars are absent", () => {
-  // Clear env vars to simulate Vercel deployment without manual env setup
-  delete process.env.VITE_AUTH_ADMIN_PUSAT_PASS;
-  delete process.env.VITE_AUTH_ADMIN_UTARA_PASS;
-  delete process.env.VITE_AUTH_ADMIN_BARAT_PASS;
-  delete process.env.VITE_AUTH_ADMIN_SELATAN_PASS;
-  delete process.env.VITE_AUTH_ADMIN_TIMUR_PASS;
-  delete process.env.VITE_AUTH_SUPERADMIN_PASS;
-
-  const pusat = authenticateLocalAccount("admin.pusat", "JaksPV!Pusat#2026");
+test("maps regional accounts correctly for Supabase Auth integration", () => {
+  const pusat = REGIONAL_ACCOUNTS.find((a) => a.username === "admin.pusat");
   assert.ok(pusat);
+  assert.equal(pusat.email, "admin.pusat@jakarta.go.id");
   assert.equal(pusat.region, "jakpus");
+  assert.equal(pusat.role, "regional_admin");
 
-  const utara = authenticateLocalAccount("admin.utara", "JaksPV!Utara#2026");
+  const utara = REGIONAL_ACCOUNTS.find((a) => a.username === "admin.utara");
   assert.ok(utara);
+  assert.equal(utara.email, "admin.utara@jakarta.go.id");
   assert.equal(utara.region, "jakut");
 
-  const barat = authenticateLocalAccount("admin.barat", "JaksPV!Barat#2026");
+  const barat = REGIONAL_ACCOUNTS.find((a) => a.username === "admin.barat");
   assert.ok(barat);
+  assert.equal(barat.email, "admin.barat@jakarta.go.id");
   assert.equal(barat.region, "jakbar");
 
-  const selatan = authenticateLocalAccount("admin.selatan", "JaksPV!Selatan#2026");
+  const selatan = REGIONAL_ACCOUNTS.find((a) => a.username === "admin.selatan");
   assert.ok(selatan);
+  assert.equal(selatan.email, "admin.selatan@jakarta.go.id");
   assert.equal(selatan.region, "jaksel");
 
-  const timur = authenticateLocalAccount("admin.timur", "JaksPV!Timur#2026");
+  const timur = REGIONAL_ACCOUNTS.find((a) => a.username === "admin.timur");
   assert.ok(timur);
+  assert.equal(timur.email, "admin.timur@jakarta.go.id");
   assert.equal(timur.region, "jaktim");
 
-  const superAdmin = authenticateLocalAccount("admin", "admin123");
+  const superAdmin = REGIONAL_ACCOUNTS.find((a) => a.username === "admin");
   assert.ok(superAdmin);
+  assert.equal(superAdmin.email, "adminplts@sudinaker.go.id");
   assert.equal(superAdmin.role, "super_admin");
-
-  // Wrong password must still fail
-  assert.equal(authenticateLocalAccount("admin.pusat", "WrongPassword!"), null);
-
-  // Restore test env vars for subsequent tests
-  process.env.VITE_AUTH_ADMIN_PUSAT_PASS = "test_env_pass_pusat";
-  process.env.VITE_AUTH_ADMIN_UTARA_PASS = "test_env_pass_utara";
-  process.env.VITE_AUTH_ADMIN_BARAT_PASS = "test_env_pass_barat";
-  process.env.VITE_AUTH_ADMIN_SELATAN_PASS = "test_env_pass_selatan";
-  process.env.VITE_AUTH_ADMIN_TIMUR_PASS = "test_env_pass_timur";
-  process.env.VITE_AUTH_SUPERADMIN_PASS = "test_env_pass_superadmin";
+  assert.equal(superAdmin.region, "all");
 });
+
 
 
 

@@ -284,23 +284,16 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 10_000) {
 function normalizeSession(payload) {
   if (!payload?.access_token || !payload?.refresh_token) return null;
   const expiresAt = payload.expires_at || Math.floor(Date.now() / 1000) + Number(payload.expires_in || 3600);
-  return {
+  const session = {
     access_token: payload.access_token,
     refresh_token: payload.refresh_token,
     expires_at: expiresAt,
     user: payload.user || null,
     isDemo: Boolean(payload.isDemo),
   };
-}
 
-function readStoredSession() {
-  try {
-    const raw = JSON.parse(window.localStorage.getItem(AUTH_STORAGE_KEY) || "null");
-    if (!raw) return null;
-    const session = normalizeSession(raw);
-    if (!session || !session.user) return null;
-
-    // Sinkronisasi dengan REGIONAL_ACCOUNTS jika user id / username cocok dengan akun wilayah
+  // Sinkronisasi data peran (role) dan wilayah (region) akun wilayah & super admin
+  if (session.user) {
     const userIdentifier = (session.user.username || session.user.id || "").toLowerCase();
     const userEmail = (session.user.email || "").toLowerCase();
     const matchingAcc = REGIONAL_ACCOUNTS.find(
@@ -322,7 +315,32 @@ function readStoredSession() {
         ? "Super Admin DKI Jakarta"
         : `Admin Wilayah ${matchingAcc.regionName}`;
     }
-    return session;
+  }
+
+  return session;
+}
+
+function resolveAuthEmail(input) {
+  const clean = (input || "").trim().toLowerCase();
+  if (clean === "admin" || clean === "superadmin") {
+    return "adminplts@sudinaker.go.id";
+  }
+  const acc = REGIONAL_ACCOUNTS.find(
+    (a) =>
+      a.username.toLowerCase() === clean ||
+      a.email.toLowerCase() === clean ||
+      a.id.toLowerCase() === clean ||
+      clean.includes(a.region)
+  );
+  if (acc && acc.email) return acc.email;
+  return (input || "").trim();
+}
+
+function readStoredSession() {
+  try {
+    const raw = JSON.parse(window.localStorage.getItem(AUTH_STORAGE_KEY) || "null");
+    if (!raw) return null;
+    return normalizeSession(raw);
   } catch {
     return null;
   }
@@ -380,8 +398,31 @@ async function authRequest(path, body) {
 async function signInWithPassword(email, password) {
   const cleanEmail = (email || "").trim();
   const cleanPass = (password || "").trim();
+  if (!cleanEmail || !cleanPass) {
+    throw new Error("Username/Email dan Password wajib diisi.");
+  }
 
-  // 1. Cek kredensial akun wilayah (5 Sudin) & Super Admin terlebih dahulu
+  // 1. Prioritas Utama: Autentikasi Server-Side Resmi via Supabase Auth
+  const authEmail = resolveAuthEmail(cleanEmail);
+  try {
+    const payload = await authRequest("/auth/v1/token?grant_type=password", {
+      email: authEmail,
+      password: cleanPass,
+    });
+    const session = normalizeSession(payload);
+    if (session) {
+      storeSession(session);
+      return session;
+    }
+  } catch (err) {
+    const msg = String(err?.message || "").toLowerCase();
+    if (msg.includes("invalid login credentials") || msg.includes("invalid_grant")) {
+      throw new Error(`Username/Email atau password salah untuk "${cleanEmail}". Silakan periksa kembali.`);
+    }
+    console.warn("Supabase Auth error/offline, mencoba fallback lokal:", err);
+  }
+
+  // 2. Fallback offline / local environment variable (.env) jika Supabase tidak terjangkau
   const localAccount = authenticateLocalAccount(cleanEmail, cleanPass);
   if (localAccount) {
     const localSession = {
@@ -406,29 +447,6 @@ async function signInWithPassword(email, password) {
     };
     storeSession(localSession);
     return localSession;
-  }
-
-  // Jika input cocok dengan akun wilayah namun gagal autentikasi, berarti password salah
-  const isRegionalTarget = REGIONAL_ACCOUNTS.some(
-    (acc) =>
-      acc.username.toLowerCase() === cleanEmail.toLowerCase() ||
-      acc.email.toLowerCase() === cleanEmail.toLowerCase()
-  );
-  if (isRegionalTarget) {
-    throw new Error("Password salah untuk akun " + cleanEmail + ". Silakan periksa kembali password Anda.");
-  }
-
-  // 2. Cek Supabase Auth jika dikonfigurasi
-  try {
-    const payload = await authRequest("/auth/v1/token?grant_type=password", {
-      email: cleanEmail,
-      password: cleanPass,
-    });
-    const session = normalizeSession(payload);
-    storeSession(session);
-    return session;
-  } catch (err) {
-    console.warn("Supabase auth failed or not configured, checking local credentials:", err);
   }
 
   // 3. Fallback demo viewer mode jika diperlukan
