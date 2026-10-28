@@ -6417,7 +6417,7 @@ function RevenueView({
                     : "Lihat tarif dasar listrik PLN (Mode Hanya Lihat untuk Akun Wilayah)"
                   }
                 >
-                  <span>{canUserEditTariffs(currentUser) ? "⚙️ Atur Tarif Listrik" : "👁️ Lihat Tarif Listrik"}</span>
+                  <span>{canUserEditTariffs(currentUser) ? "⚙️ Atur Tarif" : "👁️ Lihat Tarif"}</span>
                   {customCount > 0 && <span className="tariff-badge-custom-count">{customCount}</span>}
                 </button>
                 <div className="period-toggle-pill">
