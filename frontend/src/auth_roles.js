@@ -55,6 +55,16 @@ export const REGIONAL_ACCOUNTS = [
     envKey: "VITE_AUTH_ADMIN_TIMUR_PASS",
   },
   {
+    id: "admin_seribu",
+    username: "admin.seribu",
+    email: "admin.seribu@jakarta.go.id",
+    role: "regional_admin",
+    region: "seribu",
+    regionName: "Kepulauan Seribu",
+    name: "Admin Sudin Kepulauan Seribu",
+    envKey: "VITE_AUTH_ADMIN_SERIBU_PASS",
+  },
+  {
     id: "admin_super",
     username: "admin",
     email: "adminplts@sudinaker.go.id",
@@ -83,6 +93,8 @@ function readStaticViteEnv(envKey) {
           return import.meta.env.VITE_AUTH_ADMIN_SELATAN_PASS;
         case "VITE_AUTH_ADMIN_TIMUR_PASS":
           return import.meta.env.VITE_AUTH_ADMIN_TIMUR_PASS;
+        case "VITE_AUTH_ADMIN_SERIBU_PASS":
+          return import.meta.env.VITE_AUTH_ADMIN_SERIBU_PASS;
         case "VITE_AUTH_SUPERADMIN_PASS":
           return import.meta.env.VITE_AUTH_SUPERADMIN_PASS;
         default:

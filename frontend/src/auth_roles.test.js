@@ -15,9 +15,10 @@ process.env.VITE_AUTH_ADMIN_UTARA_PASS = "test_env_pass_utara";
 process.env.VITE_AUTH_ADMIN_BARAT_PASS = "test_env_pass_barat";
 process.env.VITE_AUTH_ADMIN_SELATAN_PASS = "test_env_pass_selatan";
 process.env.VITE_AUTH_ADMIN_TIMUR_PASS = "test_env_pass_timur";
+process.env.VITE_AUTH_ADMIN_SERIBU_PASS = "test_env_pass_seribu";
 process.env.VITE_AUTH_SUPERADMIN_PASS = "test_env_pass_superadmin";
 
-test("authenticates all 5 regional accounts and super admin from environment variables", () => {
+test("authenticates all 6 regional accounts and super admin from environment variables", () => {
   // 1. Jakarta Pusat
   const pusat = authenticateLocalAccount("admin.pusat", "test_env_pass_pusat");
   assert.ok(pusat);
@@ -45,6 +46,12 @@ test("authenticates all 5 regional accounts and super admin from environment var
   assert.ok(timur);
   assert.equal(timur.region, "jaktim");
 
+  // 6. Kepulauan Seribu
+  const seribu = authenticateLocalAccount("admin.seribu", "test_env_pass_seribu");
+  assert.ok(seribu);
+  assert.equal(seribu.region, "seribu");
+  assert.equal(seribu.role, "regional_admin");
+
   // Super Admin
   const superAdmin = authenticateLocalAccount("admin", "test_env_pass_superadmin");
   assert.ok(superAdmin);
@@ -54,7 +61,7 @@ test("authenticates all 5 regional accounts and super admin from environment var
 
 test("rejects invalid passwords or unknown users", () => {
   assert.equal(authenticateLocalAccount("admin.pusat", "wrongpass"), null);
-  assert.equal(authenticateLocalAccount("admin.utara", "12345"), null);
+  assert.equal(authenticateLocalAccount("admin.seribu", "12345"), null);
   assert.equal(authenticateLocalAccount("random.user", "test_env_pass_superadmin"), null);
 });
 
@@ -84,6 +91,11 @@ test("maps regional accounts correctly for Supabase Auth integration", () => {
   assert.ok(timur);
   assert.equal(timur.email, "admin.timur@jakarta.go.id");
   assert.equal(timur.region, "jaktim");
+
+  const seribu = REGIONAL_ACCOUNTS.find((a) => a.username === "admin.seribu");
+  assert.ok(seribu);
+  assert.equal(seribu.email, "admin.seribu@jakarta.go.id");
+  assert.equal(seribu.region, "seribu");
 
   const superAdmin = REGIONAL_ACCOUNTS.find((a) => a.username === "admin");
   assert.ok(superAdmin);
