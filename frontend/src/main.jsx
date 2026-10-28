@@ -1610,7 +1610,9 @@ function Dashboard({ session, onSignOut }) {
                 </span>
                 <div className="user-nav-info">
                   <span className="user-nav-name">
-                    {session.user.user_metadata?.name || session.user.email}
+                    {session.user.role === "super_admin"
+                      ? "Admin Provinsi"
+                      : (session.user.user_metadata?.name || session.user.email)}
                   </span>
                   <span className={`user-nav-role-pill role-${session.user.region || 'all'}`}>
                     {session.user.user_metadata?.regionName || "DKI Jakarta"}

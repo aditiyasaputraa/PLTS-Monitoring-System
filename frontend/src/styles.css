@@ -3416,8 +3416,8 @@ button {
 .user-nav-badge {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 10px 4px 6px;
+  gap: 5px;
+  padding: 2px 7px 2px 4px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 999px;
@@ -3431,42 +3431,45 @@ button {
 }
 
 .user-nav-avatar {
-  font-size: 14px;
+  font-size: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 17px;
+  height: 17px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
 }
 
 .user-nav-info {
   display: flex;
   flex-direction: column;
-  line-height: 1.1;
+  line-height: 1.05;
   text-align: left;
 }
 
 .user-nav-name {
-  font-size: 11.5px;
+  font-size: 9.5px;
   font-weight: 600;
-  color: #e5e7eb;
-  max-width: 150px;
+  color: #e2e8f0;
+  max-width: 125px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .user-nav-role-pill {
-  font-size: 9.5px;
+  font-size: 7.5px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
-  padding: 1px 5px;
-  border-radius: 4px;
+  letter-spacing: 0.25px;
+  padding: 0.5px 4px;
+  border-radius: 3px;
   display: inline-block;
   margin-top: 1px;
+  width: fit-content;
+  line-height: 1.1;
 }
 
 .user-nav-role-pill.role-all {
