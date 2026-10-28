@@ -4616,7 +4616,7 @@ function AnalyticsQuarterlyKpiCardGroup({
     <div className="analytics-kpi-group-card">
       <h3 className="analytics-group-title">{title}</h3>
       <div className="kpi-2x2-grid">
-        <div className="kpi-card-box">
+        <div className="kpi-card-box" title="Triwulan 1: Januari - Maret">
           <span className="kpi-card-tag">TW 1</span>
           <div className="kpi-card-value">
             {q1Val} <span className="kpi-card-unit">{q1Unit}</span>
@@ -4624,7 +4624,7 @@ function AnalyticsQuarterlyKpiCardGroup({
           <div className="kpi-card-sub">{q1Sub}</div>
         </div>
 
-        <div className="kpi-card-box">
+        <div className="kpi-card-box" title="Triwulan 2: April - Juni">
           <span className="kpi-card-tag">TW 2</span>
           <div className="kpi-card-value">
             {q2Val} <span className="kpi-card-unit">{q2Unit}</span>
@@ -4632,7 +4632,7 @@ function AnalyticsQuarterlyKpiCardGroup({
           <div className="kpi-card-sub">{q2Sub}</div>
         </div>
 
-        <div className="kpi-card-box">
+        <div className="kpi-card-box" title="Triwulan 3: Juli - September">
           <span className="kpi-card-tag">TW 3</span>
           <div className="kpi-card-value">
             {q3Val} <span className="kpi-card-unit">{q3Unit}</span>
@@ -4640,7 +4640,7 @@ function AnalyticsQuarterlyKpiCardGroup({
           <div className="kpi-card-sub">{q3Sub}</div>
         </div>
 
-        <div className="kpi-card-box">
+        <div className="kpi-card-box" title="Triwulan 4: Oktober - Desember">
           <span className="kpi-card-tag">TW 4</span>
           <div className="kpi-card-value">
             {q4Val} <span className="kpi-card-unit">{q4Unit}</span>
@@ -4658,56 +4658,46 @@ function getFleetQuarterlyValues({ targetLocations, selectedYear, metricType = "
   const currentYear = now.getFullYear();
   const yr = selectedYear || currentYear;
   const isCurrentYear = yr === currentYear;
-  const currentMonth = now.getMonth();
-
-  // Reference month: if current year, use current month (e.g. Oktober = 9).
-  // If viewing a past year, use December (11).
-  const refMonth = isCurrentYear ? currentMonth : 11;
-
-  const ID_MONTH_NAMES = [
-    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
-  ];
-
-  // 4 months back from refMonth: e.g. refMonth = 9 (Oktober) -> offsets [-3, -2, -1, 0] -> [6, 7, 8, 9] (Juli, Agustus, September, Oktober)
-  const monthOffsets = [-3, -2, -1, 0];
-  const targetMonthsInfo = monthOffsets.map((offset) => {
-    const d = new Date(yr, refMonth + offset, 1);
-    return {
-      monthIdx: d.getMonth(),
-      year: d.getFullYear(),
-      name: ID_MONTH_NAMES[d.getMonth()],
-      shortName: ID_MONTH_NAMES[d.getMonth()].slice(0, 3).toUpperCase(),
-    };
-  });
+  const currentMonthIdx = now.getMonth();
 
   const locs = targetLocations || [];
-  const monthSums = [0, 0, 0, 0];
 
-  targetMonthsInfo.forEach((target, slotIdx) => {
-    locs.forEach((loc) => {
-      const mVals = getStationMonthlyValues(loc, target.year, metricType);
-      if (Array.isArray(mVals) && target.monthIdx < mVals.length) {
-        monthSums[slotIdx] += Number(mVals[target.monthIdx]) || 0;
+  // Triwulan resmi:
+  // TW 1: Januari - Maret (Bulan 1 - 3 -> index 0, 1, 2)
+  // TW 2: April - Juni (Bulan 4 - 6 -> index 3, 4, 5)
+  // TW 3: Juli - September (Bulan 7 - 9 -> index 6, 7, 8)
+  // TW 4: Oktober - Desember (Bulan 10 - 12 -> index 9, 10, 11)
+  const yearlyMonthlyTotals = Array(12).fill(0);
+
+  locs.forEach((loc) => {
+    const mVals = getStationMonthlyValues(loc, yr, metricType);
+    if (Array.isArray(mVals)) {
+      for (let m = 0; m < 12; m++) {
+        yearlyMonthlyTotals[m] += Number(mVals[m]) || 0;
       }
-    });
+    }
   });
 
-  let [q1, q2, q3, q4] = monthSums;
-
-  // In current year, the latest slot (q4) is the current month: enforce exact match with currentMonthVal
+  // Jika tahun berjalan dan currentMonthVal diberikan, pastikan bulan berjalan mencerminkan nilai realtime
   if (isCurrentYear && currentMonthVal !== null && currentMonthVal !== undefined && Number(currentMonthVal) >= 0) {
-    q4 = Number(currentMonthVal);
+    if (yearlyMonthlyTotals[currentMonthIdx] < Number(currentMonthVal)) {
+      yearlyMonthlyTotals[currentMonthIdx] = Number(currentMonthVal);
+    }
   }
 
-  // Fallback if data is empty but fallbackYearVal is provided
+  // Jumlahkan nilai 3 bulan untuk masing-masing Triwulan
+  let q1 = yearlyMonthlyTotals[0] + yearlyMonthlyTotals[1] + yearlyMonthlyTotals[2];
+  let q2 = yearlyMonthlyTotals[3] + yearlyMonthlyTotals[4] + yearlyMonthlyTotals[5];
+  let q3 = yearlyMonthlyTotals[6] + yearlyMonthlyTotals[7] + yearlyMonthlyTotals[8];
+  let q4 = yearlyMonthlyTotals[9] + yearlyMonthlyTotals[10] + yearlyMonthlyTotals[11];
+
+  // Fallback proporsional jika belum ada data namun fallbackYearVal tersedia
   const totalQ = q1 + q2 + q3 + q4;
   if (totalQ === 0 && fallbackYearVal > 0) {
-    const monthlyEst = fallbackYearVal / 12;
-    q1 = monthlyEst * 0.95;
-    q2 = monthlyEst * 1.05;
-    q3 = monthlyEst * 0.98;
-    q4 = monthlyEst * 1.02;
+    q1 = fallbackYearVal * 0.23;
+    q2 = fallbackYearVal * 0.26;
+    q3 = fallbackYearVal * 0.28;
+    q4 = fallbackYearVal * 0.23;
   }
 
   return {
@@ -4715,10 +4705,14 @@ function getFleetQuarterlyValues({ targetLocations, selectedYear, metricType = "
     q2: isRevenue ? Math.round(q2) : Math.round(q2 * 10) / 10,
     q3: isRevenue ? Math.round(q3) : Math.round(q3 * 10) / 10,
     q4: isRevenue ? Math.round(q4) : Math.round(q4 * 10) / 10,
-    m1Name: targetMonthsInfo[0].name,
-    m2Name: targetMonthsInfo[1].name,
-    m3Name: targetMonthsInfo[2].name,
-    m4Name: targetMonthsInfo[3].name,
+    m1Name: "Jan - Mar",
+    m2Name: "Apr - Jun",
+    m3Name: "Jul - Sep",
+    m4Name: "Okt - Des",
+    m1FullName: "Januari - Maret",
+    m2FullName: "April - Juni",
+    m3FullName: "Juli - September",
+    m4FullName: "Oktober - Desember",
   };
 }
 
