@@ -140,7 +140,39 @@ export default function ChartExportModal({
   const [targetScope, setTargetScope] = useState(initialStationId ? "single" : "all"); // "all" | "single"
   const [selectedStationId, setSelectedStationId] = useState(initialStationId || "");
   const [selectedYear, setSelectedYear] = useState(currentYear);
-  const [selectedPeriod, setSelectedPeriod] = useState("year_monthly"); // "year_monthly" | "tw1" | "tw2" | "tw3" | "tw4" | "m_0" .. "m_11"
+  const [selectedMonths, setSelectedMonths] = useState([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+  const [rangeStart, setRangeStart] = useState(0);
+  const [rangeEnd, setRangeEnd] = useState(1);
+
+  const toggleMonth = (mIdx) => {
+    setSelectedMonths((prev) => {
+      if (prev.includes(mIdx)) {
+        if (prev.length === 1) return prev;
+        return prev.filter((m) => m !== mIdx);
+      } else {
+        return [...prev, mIdx].sort((a, b) => a - b);
+      }
+    });
+  };
+
+  const handleSelectAll = () => setSelectedMonths([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+  const handleSelectTw = (twNum) => {
+    if (twNum === 1) setSelectedMonths([0, 1, 2]);
+    else if (twNum === 2) setSelectedMonths([3, 4, 5]);
+    else if (twNum === 3) setSelectedMonths([6, 7, 8]);
+    else if (twNum === 4) setSelectedMonths([9, 10, 11]);
+  };
+  const handleSelectSemester = (semNum) => {
+    if (semNum === 1) setSelectedMonths([0, 1, 2, 3, 4, 5]);
+    else if (semNum === 2) setSelectedMonths([6, 7, 8, 9, 10, 11]);
+  };
+  const handleApplyRange = () => {
+    const s = Math.min(Number(rangeStart), Number(rangeEnd));
+    const e = Math.max(Number(rangeStart), Number(rangeEnd));
+    const arr = [];
+    for (let i = s; i <= e; i++) arr.push(i);
+    setSelectedMonths(arr);
+  };
   const [includeEnergy, setIncludeEnergy] = useState(true);
   const [includeRevenue, setIncludeRevenue] = useState(true);
   const [includeEmission, setIncludeEmission] = useState(true);
@@ -190,27 +222,11 @@ export default function ChartExportModal({
       }
 
       // Determine which month indices to export
-      let monthIndices = [];
-      let periodLabel = "";
-      if (selectedPeriod === "year_monthly") {
-        monthIndices = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-        periodLabel = `1 Tahun Penuh ${yr}`;
-      } else if (selectedPeriod === "tw1") {
-        monthIndices = [0, 1, 2];
-        periodLabel = `Triwulan 1 (Jan - Mar) ${yr}`;
-      } else if (selectedPeriod === "tw2") {
-        monthIndices = [3, 4, 5];
-        periodLabel = `Triwulan 2 (Apr - Jun) ${yr}`;
-      } else if (selectedPeriod === "tw3") {
-        monthIndices = [6, 7, 8];
-        periodLabel = `Triwulan 3 (Jul - Sep) ${yr}`;
-      } else if (selectedPeriod === "tw4") {
-        monthIndices = [9, 10, 11];
-        periodLabel = `Triwulan 4 (Okt - Des) ${yr}`;
-      } else if (selectedPeriod.startsWith("m_")) {
-        const mIdx = parseInt(selectedPeriod.replace("m_", ""), 10);
-        monthIndices = [mIdx];
-        periodLabel = `Bulan ${ID_MONTH_NAMES[mIdx]} ${yr}`;
+      const monthIndices = [...selectedMonths].sort((a, b) => a - b);
+      if (monthIndices.length === 0) {
+        alert("Pilih setidaknya satu bulan untuk diekspor.");
+        setIsExporting(false);
+        return;
       }
 
       if (!includeEnergy && !includeRevenue && !includeEmission) {
@@ -237,8 +253,30 @@ export default function ChartExportModal({
       const safeScope = targetScope === "single"
         ? (targetList[0]?.name || "Gedung").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 30)
         : currentRegionName.replace(/\s+/g, "_");
-      const safePeriod = selectedPeriod.replace("_", "-");
-      const filename = `Kinerja_PLTS_${safeScope}_${yr}_${safePeriod}.xlsx`;
+
+      let periodLabel = "";
+      if (monthIndices.length === 12) {
+        periodLabel = "1-Tahun-Penuh";
+      } else if (monthIndices.length === 3 && [0,1,2].every((m) => monthIndices.includes(m))) {
+        periodLabel = "TW1";
+      } else if (monthIndices.length === 3 && [3,4,5].every((m) => monthIndices.includes(m))) {
+        periodLabel = "TW2";
+      } else if (monthIndices.length === 3 && [6,7,8].every((m) => monthIndices.includes(m))) {
+        periodLabel = "TW3";
+      } else if (monthIndices.length === 3 && [9,10,11].every((m) => monthIndices.includes(m))) {
+        periodLabel = "TW4";
+      } else if (monthIndices.length === 1) {
+        periodLabel = `Bulan_${ID_MONTH_NAMES[monthIndices[0]]}`;
+      } else {
+        const firstMonth = ID_MONTH_NAMES[monthIndices[0]];
+        const lastMonth = ID_MONTH_NAMES[monthIndices[monthIndices.length - 1]];
+        if (monthIndices.length === (monthIndices[monthIndices.length - 1] - monthIndices[0] + 1)) {
+          periodLabel = `${firstMonth}-${lastMonth}`;
+        } else {
+          periodLabel = `${monthIndices.length}_Bulan_Pilihan`;
+        }
+      }
+      const filename = `Kinerja_PLTS_${safeScope}_${yr}_${periodLabel}.xlsx`;
 
       downloadExcelWorkbook(filename, sheets);
       onClose();
@@ -314,9 +352,9 @@ export default function ChartExportModal({
             )}
           </div>
 
-          {/* Section 2: Pilih Tahun & Periode */}
-          <div className="export-form-row" style={{ display: "grid", gridTemplateColumns: "1fr 1.6fr", gap: "12px", marginTop: "16px" }}>
-            <div className="export-form-group">
+          {/* Section 2: Tahun & Pilihan Rentang Cepat */}
+          <div style={{ display: "flex", gap: "12px", marginTop: "14px" }}>
+            <div className="export-form-group" style={{ flex: "0 0 130px" }}>
               <label className="export-label">2. Pilih Tahun</label>
               <select
                 className="export-select-input"
@@ -330,30 +368,130 @@ export default function ChartExportModal({
               </select>
             </div>
 
-            <div className="export-form-group">
-              <label className="export-label">3. Rentang Waktu / Periode</label>
-              <select
-                className="export-select-input"
-                value={selectedPeriod}
-                onChange={(e) => setSelectedPeriod(e.target.value)}
-              >
-                <optgroup label="Akumulasi & Tahunan">
-                  <option value="year_monthly">📅 Semua Bulan (Januari - Desember)</option>
-                </optgroup>
-                <optgroup label="Per Triwulan">
-                  <option value="tw1">🌱 TW 1 (Januari - Maret)</option>
-                  <option value="tw2">☀️ TW 2 (April - Juni)</option>
-                  <option value="tw3">🍂 TW 3 (Juli - September)</option>
-                  <option value="tw4">❄️ TW 4 (Oktober - Desember)</option>
-                </optgroup>
-                <optgroup label="Per Bulan Spesifik">
-                  {ID_MONTH_NAMES.map((mName, idx) => (
-                    <option key={idx} value={`m_${idx}`}>
-                      {mName}
+            {/* Quick Range Helper */}
+            <div className="export-form-group" style={{ flex: 1 }}>
+              <label className="export-label">Rentang Cepat (Bulan s/d Bulan)</label>
+              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                <select
+                  className="export-select-input"
+                  style={{ flex: 1 }}
+                  value={rangeStart}
+                  onChange={(e) => setRangeStart(Number(e.target.value))}
+                >
+                  {ID_MONTH_NAMES.map((name, idx) => (
+                    <option key={idx} value={idx}>
+                      {name}
                     </option>
                   ))}
-                </optgroup>
-              </select>
+                </select>
+                <span style={{ fontSize: "12px", color: "#64748b", fontWeight: 600 }}>s/d</span>
+                <select
+                  className="export-select-input"
+                  style={{ flex: 1 }}
+                  value={rangeEnd}
+                  onChange={(e) => setRangeEnd(Number(e.target.value))}
+                >
+                  {ID_MONTH_NAMES.map((name, idx) => (
+                    <option key={idx} value={idx}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="export-pill-btn"
+                  style={{ flex: "0 0 auto", padding: "7px 12px", background: "#f0fdf4", borderColor: "#86efac", color: "#166534" }}
+                  onClick={handleApplyRange}
+                  title="Terapkan rentang bulan ini ke pilihan di bawah"
+                >
+                  Terapkan
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 3: Pilihan Bulan Interaktif (Bebas pilih 2 bulan, 4 bulan, dsb) */}
+          <div className="export-form-group" style={{ marginTop: "14px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+              <label className="export-label">3. Pilih Bulan yang Ingin Diambil</label>
+              <span className="export-selected-summary">
+                ✓ {selectedMonths.length} bulan terpilih
+              </span>
+            </div>
+
+            {/* Presets */}
+            <div className="export-month-presets">
+              <button
+                type="button"
+                className={`export-preset-pill ${selectedMonths.length === 12 ? "active" : ""}`}
+                onClick={handleSelectAll}
+              >
+                Semua (12 Bulan)
+              </button>
+              <button
+                type="button"
+                className={`export-preset-pill ${selectedMonths.length === 3 && [0,1,2].every((m) => selectedMonths.includes(m)) ? "active" : ""}`}
+                onClick={() => handleSelectTw(1)}
+              >
+                TW 1 (Jan-Mar)
+              </button>
+              <button
+                type="button"
+                className={`export-preset-pill ${selectedMonths.length === 3 && [3,4,5].every((m) => selectedMonths.includes(m)) ? "active" : ""}`}
+                onClick={() => handleSelectTw(2)}
+              >
+                TW 2 (Apr-Jun)
+              </button>
+              <button
+                type="button"
+                className={`export-preset-pill ${selectedMonths.length === 3 && [6,7,8].every((m) => selectedMonths.includes(m)) ? "active" : ""}`}
+                onClick={() => handleSelectTw(3)}
+              >
+                TW 3 (Jul-Sep)
+              </button>
+              <button
+                type="button"
+                className={`export-preset-pill ${selectedMonths.length === 3 && [9,10,11].every((m) => selectedMonths.includes(m)) ? "active" : ""}`}
+                onClick={() => handleSelectTw(4)}
+              >
+                TW 4 (Okt-Des)
+              </button>
+              <button
+                type="button"
+                className={`export-preset-pill ${selectedMonths.length === 6 && [0,1,2,3,4,5].every((m) => selectedMonths.includes(m)) ? "active" : ""}`}
+                onClick={() => handleSelectSemester(1)}
+              >
+                Semester 1
+              </button>
+              <button
+                type="button"
+                className={`export-preset-pill ${selectedMonths.length === 6 && [6,7,8,9,10,11].every((m) => selectedMonths.includes(m)) ? "active" : ""}`}
+                onClick={() => handleSelectSemester(2)}
+              >
+                Semester 2
+              </button>
+            </div>
+
+            {/* 12-Month Toggle Grid */}
+            <div className="export-month-grid">
+              {ID_MONTH_NAMES.map((mName, idx) => {
+                const isSelected = selectedMonths.includes(idx);
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    className={`export-month-pill ${isSelected ? "active" : ""}`}
+                    onClick={() => toggleMonth(idx)}
+                    title={`Klik untuk ${isSelected ? "membatalkan" : "memilih"} bulan ${mName}`}
+                  >
+                    <span style={{ fontSize: "11px" }}>{isSelected ? "✓" : "○"}</span>
+                    <span>{mName}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ marginTop: "6px", fontSize: "11px", color: "#64748b" }}>
+              💡 <em>Tips: Klik tombol bulan di atas untuk memilih/menghapus bulan sesuka Anda (misal: hanya Januari & Februari, atau 4 bulan).</em>
             </div>
           </div>
 
