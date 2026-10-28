@@ -13,7 +13,6 @@ export const REGIONAL_ACCOUNTS = [
     regionName: "Jakarta Pusat",
     name: "Admin Sudin Jakarta Pusat",
     envKey: "VITE_AUTH_ADMIN_PUSAT_PASS",
-    defaultPass: "JaksPV!Pusat#2026",
   },
   {
     id: "admin_utara",
@@ -24,7 +23,6 @@ export const REGIONAL_ACCOUNTS = [
     regionName: "Jakarta Utara",
     name: "Admin Sudin Jakarta Utara",
     envKey: "VITE_AUTH_ADMIN_UTARA_PASS",
-    defaultPass: "JaksPV!Utara#2026",
   },
   {
     id: "admin_barat",
@@ -35,7 +33,6 @@ export const REGIONAL_ACCOUNTS = [
     regionName: "Jakarta Barat",
     name: "Admin Sudin Jakarta Barat",
     envKey: "VITE_AUTH_ADMIN_BARAT_PASS",
-    defaultPass: "JaksPV!Barat#2026",
   },
   {
     id: "admin_selatan",
@@ -46,7 +43,6 @@ export const REGIONAL_ACCOUNTS = [
     regionName: "Jakarta Selatan",
     name: "Admin Sudin Jakarta Selatan",
     envKey: "VITE_AUTH_ADMIN_SELATAN_PASS",
-    defaultPass: "JaksPV!Selatan#2026",
   },
   {
     id: "admin_timur",
@@ -57,7 +53,6 @@ export const REGIONAL_ACCOUNTS = [
     regionName: "Jakarta Timur",
     name: "Admin Sudin Jakarta Timur",
     envKey: "VITE_AUTH_ADMIN_TIMUR_PASS",
-    defaultPass: "JaksPV!Timur#2026",
   },
   {
     id: "admin_super",
@@ -68,7 +63,6 @@ export const REGIONAL_ACCOUNTS = [
     regionName: "Provinsi DKI Jakarta",
     name: "Administrator Provinsi DKI Jakarta",
     envKey: "VITE_AUTH_SUPERADMIN_PASS",
-    defaultPass: "admin123",
   },
 ];
 
@@ -100,10 +94,12 @@ function readStaticViteEnv(envKey) {
 }
 
 /**
- * Mengambil password akun dari environment variable (Vite / Node / fallback)
+ * Mengambil password akun dari environment variable (Vite / Node)
+ * SANGAT AMAN: Tidak ada password yang di-hardcode di file ini.
+ * Password HANYA dibaca dari .env lokal dan Environment Variables Vercel.
  */
-export function getAccountPassword(envKey, fallbackPass = "") {
-  if (!envKey) return fallbackPass;
+export function getAccountPassword(envKey) {
+  if (!envKey) return "";
 
   // 1. Static access untuk Vite browser runtime
   const viteVal = readStaticViteEnv(envKey);
@@ -116,8 +112,7 @@ export function getAccountPassword(envKey, fallbackPass = "") {
     }
   } catch (_) {}
 
-  // 3. Fallback default password
-  return fallbackPass;
+  return "";
 }
 
 /**
@@ -135,9 +130,9 @@ export function authenticateLocalAccount(emailOrUsername, password) {
     const matchAlias = cleanInput.includes(acc.region) || (acc.username && cleanInput === acc.username.replace(".", ""));
 
     if (matchUsername || matchEmail || matchAlias) {
-      const configuredPass = getAccountPassword(acc.envKey, acc.defaultPass);
+      const configuredPass = getAccountPassword(acc.envKey);
 
-      // Verifikasi password terhadap environment variable / configured password
+      // Verifikasi password HANYA terhadap environment variable yang terpasang
       if (configuredPass && cleanPass === configuredPass) {
         return {
           id: acc.id,

@@ -429,27 +429,26 @@ async function signInWithPassword(email, password) {
     console.warn("Supabase auth failed or not configured, checking local credentials:", err);
   }
 
-  // 3. Fallback generic local/demo credentials (hanya demo atau admin pusat)
+  // 3. Fallback demo viewer mode jika diperlukan
   const emLower = cleanEmail.toLowerCase();
-  const isStrictAdmin = emLower === "admin" || emLower === "adminplts@sudinaker.go.id";
   const isStrictViewer = emLower === "demo" || emLower === "operator" || emLower === "operator.plts@jakarta.go.id";
 
-  if (isStrictAdmin && (cleanPass === "admin" || cleanPass === "admin123")) {
+  if (isStrictViewer && (cleanPass === "demo" || cleanPass === "operator")) {
     const localSession = {
-      access_token: "local_session_admin",
-      refresh_token: "local_session_admin",
+      access_token: "local_session_demo",
+      refresh_token: "local_session_demo",
       expires_at: Math.floor(Date.now() / 1000) + 86400 * 30,
       user: {
-        id: "admin",
-        email: "adminplts@sudinaker.go.id",
-        role: "super_admin",
+        id: "demo",
+        email: "operator.plts@jakarta.go.id",
+        role: "viewer",
         region: "all",
-        regionName: "DKI Jakarta",
+        regionName: "DKI Jakarta (Demo)",
         user_metadata: {
-          name: "Administrator PLTS Provinsi",
-          role: "super_admin",
+          name: "Operator PLTS (Demo)",
+          role: "viewer",
           region: "all",
-          regionName: "DKI Jakarta",
+          regionName: "DKI Jakarta (Demo)",
         },
       },
       isDemo: true,
