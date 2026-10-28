@@ -2824,6 +2824,8 @@ def normalize_nested_chart(data: Any) -> dict[str, Any] | None:
     if not isinstance(data, dict):
         return None
     inner = data.get("data") if isinstance(data.get("data"), dict) else data
+    if isinstance(inner, dict) and isinstance(inner.get("data"), dict):
+        inner = inner["data"]
     unit = None
     unit_data = inner.get("unit") if isinstance(inner, dict) else None
     if isinstance(unit_data, dict) and isinstance(unit_data.get("unit"), list) and unit_data.get("unit"):
