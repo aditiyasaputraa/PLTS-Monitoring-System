@@ -4346,86 +4346,37 @@ function handleExportStationList(stations = [], regionLabel = "DKI Jakarta") {
 
   const rows = [];
   rows.push([
-    "No",
-    "Nama Gedung PLTS",
-    "Pemilik Aset / Instansi",
-    "Wilayah",
-    "Platform Vendor",
-    "Kapasitas (kWp)",
+    "Nama PLTS",
+    "Alamat",
     "Status",
-    "Produksi Hari Ini (kWh)",
-    "Produksi Bulan Ini (kWh)",
-    "Total Kumulatif (kWh)",
-    "Tarif Listrik (Rp/kWh)",
-    "Total Penghematan (Rp)",
-    "Reduksi Emisi (kg CO2)",
+    "Aset",
+    "Vendor",
   ]);
 
-  let totalCap = 0;
-  let totalDaily = 0;
-  let totalMonthly = 0;
-  let totalCumulative = 0;
-  let totalRevenue = 0;
-  let totalEmission = 0;
+  stations.forEach((st) => {
+    const name = st.custom_name || st.name || st.raw_name || "-";
+    const address = st.address || "-";
 
-  stations.forEach((st, idx) => {
-    const name = st.name || st.raw_name || `PLTS ${idx + 1}`;
-    const owner = st.asset_owner || "-";
-    const reg = (st.region ? String(st.region).toUpperCase() : getStationRegion(st).toUpperCase());
-    const vendor = (st.source || st.site?.platform || "-").toUpperCase();
-    const cap = Number(st.installed_capacity || st.capacity_kw || 0);
-    const status = st.status || "NORMAL";
-    const dailyKwh = Number(st.today_kwh || st.today_energy || 0);
-    const monthKwh = Number(st.month_kwh || st.month_energy || 0);
-    const totalKwh = Number(st.total_kwh || st.lifetime_kwh || st.total_energy || 0);
-    const tariff = Number(st.tariff_per_kwh || 900);
-    const revenue = Math.round(totalKwh * tariff);
-    const emission = Math.round(totalKwh * 0.85 * 10) / 10;
+    const powerVal = Number(st.current_power_kw ?? st.output_power_kw ?? st.pv_power_kw ?? st.power_kw ?? 0);
+    const dailyVal = Number(st.daily_energy_kwh ?? st.today_energy_kwh ?? st.today_kwh ?? 0);
+    const isOffline = st.status === "offline" || st.status === "disconnected" || (powerVal === 0 && dailyVal === 0);
+    const status = isOffline ? "Offline" : "Online";
 
-    totalCap += cap;
-    totalDaily += dailyKwh;
-    totalMonthly += monthKwh;
-    totalCumulative += totalKwh;
-    totalRevenue += revenue;
-    totalEmission += emission;
+    const asset = st.asset_owner || "-";
+    const vendor = String(st.source || st.site?.platform || "SMA").toUpperCase();
 
     rows.push([
-      idx + 1,
       name,
-      owner,
-      reg,
-      vendor,
-      cap > 0 ? cap.toFixed(2) : "0",
+      address,
       status,
-      dailyKwh.toFixed(2),
-      monthKwh.toFixed(2),
-      totalKwh.toFixed(2),
-      tariff,
-      revenue,
-      emission.toFixed(2),
+      asset,
+      vendor,
     ]);
   });
 
-  rows.push([]);
-  rows.push([
-    "TOTAL",
-    `Total ${stations.length} Stasiun PLTS`,
-    "",
-    regionLabel,
-    "",
-    totalCap.toFixed(2),
-    "",
-    totalDaily.toFixed(2),
-    totalMonthly.toFixed(2),
-    totalCumulative.toFixed(2),
-    "-",
-    totalRevenue,
-    totalEmission.toFixed(2),
-  ]);
-
   const dateStr = new Date().toISOString().slice(0, 10);
   const cleanReg = regionLabel.replace(/\s+/g, "_");
-  const filename = `Rekap_Daftar_PLTS_${cleanReg}_${dateStr}.csv`;
+  const filename = `Daftar_PLTS_${cleanReg}_${dateStr}.csv`;
   downloadCsv(filename, rows);
 }
 
