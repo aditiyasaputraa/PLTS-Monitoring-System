@@ -3501,6 +3501,12 @@ button {
   color: #fb923c;
   background: rgba(249, 115, 22, 0.16);
 }
+
+.user-nav-role-pill.role-seribu {
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.16);
+}
+
 /* ==========================================================================
    STATION LIST PROTECTED/LOCKED STYLES
    ========================================================================== */

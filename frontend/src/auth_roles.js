@@ -11,7 +11,7 @@ export const REGIONAL_ACCOUNTS = [
     role: "regional_admin",
     region: "jakpus",
     regionName: "Jakarta Pusat",
-    name: "Admin Sudin Jakarta Pusat",
+    name: "Admin Sudin",
     envKey: "VITE_AUTH_ADMIN_PUSAT_PASS",
   },
   {
@@ -21,7 +21,7 @@ export const REGIONAL_ACCOUNTS = [
     role: "regional_admin",
     region: "jakut",
     regionName: "Jakarta Utara",
-    name: "Admin Sudin Jakarta Utara",
+    name: "Admin Sudin",
     envKey: "VITE_AUTH_ADMIN_UTARA_PASS",
   },
   {
@@ -31,7 +31,7 @@ export const REGIONAL_ACCOUNTS = [
     role: "regional_admin",
     region: "jakbar",
     regionName: "Jakarta Barat",
-    name: "Admin Sudin Jakarta Barat",
+    name: "Admin Sudin",
     envKey: "VITE_AUTH_ADMIN_BARAT_PASS",
   },
   {
@@ -41,7 +41,7 @@ export const REGIONAL_ACCOUNTS = [
     role: "regional_admin",
     region: "jaksel",
     regionName: "Jakarta Selatan",
-    name: "Admin Sudin Jakarta Selatan",
+    name: "Admin Sudin",
     envKey: "VITE_AUTH_ADMIN_SELATAN_PASS",
   },
   {
@@ -51,7 +51,7 @@ export const REGIONAL_ACCOUNTS = [
     role: "regional_admin",
     region: "jaktim",
     regionName: "Jakarta Timur",
-    name: "Admin Sudin Jakarta Timur",
+    name: "Admin Sudin",
     envKey: "VITE_AUTH_ADMIN_TIMUR_PASS",
   },
   {
@@ -61,7 +61,7 @@ export const REGIONAL_ACCOUNTS = [
     role: "regional_admin",
     region: "seribu",
     regionName: "Kepulauan Seribu",
-    name: "Admin Sudin Kepulauan Seribu",
+    name: "Admin Sudin",
     envKey: "VITE_AUTH_ADMIN_SERIBU_PASS",
   },
   {
@@ -71,7 +71,7 @@ export const REGIONAL_ACCOUNTS = [
     role: "super_admin",
     region: "all",
     regionName: "Provinsi DKI Jakarta",
-    name: "Administrator Provinsi DKI Jakarta",
+    name: "Admin Dinas Pusat",
     envKey: "VITE_AUTH_SUPERADMIN_PASS",
   },
 ];
