@@ -1057,7 +1057,7 @@
         "sign": "z7nw9ow21TyRf/lVobbKMrhKVZ2rJ36PRCbgBH7iMmhZ8bDHN/YEKcf+NqGYiLBV",
         "web_version": "3.0.4"
       },
-      "payload_raw": "stationId=17478&dimension=5&targetTime=2026-06-27&chartType=1"
+      "payload_raw": "stationId=17478&dimension=3&targetTime=2026&chartType=1"
     },
     {
       "id": "035_getPowerTrendChartOfStation",

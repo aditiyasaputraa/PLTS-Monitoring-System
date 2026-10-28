@@ -1025,6 +1025,21 @@ def kehua_extra_station_calls(
                 },
                 "payload_raw": f"displayRank=0&companyId={company_id}&stationId={station_id}",
             })
+        calls.append({
+            "id": f"get_energy_trend_{station_id}",
+            "site": "kehua",
+            "name": "getEnergyTrendChartOfStation",
+            "method": "POST",
+            "url": f"{base_url}/necp/server-monitor/monitor/getEnergyTrendChartOfStation",
+            "headers": {
+                "Accept": "application/json, text/plain, */*",
+                "Content-Type": "application/x-www-form-urlencoded",
+                "clientType": "web",
+                "locale": "en",
+                "web_version": "3.0.4",
+            },
+            "payload_raw": f"stationId={station_id}&dimension=3&targetTime={datetime.now().year}&chartType=1",
+        })
     return calls
 
 
@@ -2006,6 +2021,22 @@ def normalize_kehua_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[d
                                                 "current_power_kw": round(last_power, 2),
                                                 "output_power_kw": round(last_power, 2),
                                             })
+
+    for call in grouped.get("getEnergyTrendChartOfStation", []):
+        chart_res = response_data(call)
+        if isinstance(chart_res, dict):
+            call_payload = parse_form_payload(str(call.get("payload_raw") or ""))
+            target_station_id = str(call_payload.get("stationId") or "")
+            dimension = str(call_payload.get("dimension") or "")
+            key_to_merge = target_station_id if target_station_id in by_id else only_station_key(by_id)
+            if key_to_merge and dimension == "3":
+                chart_data = normalize_nested_chart(chart_res)
+                if chart_data:
+                    target_st = by_id.setdefault(key_to_merge, {"platform": "kehua", "station_id": key_to_merge})
+                    st_charts = target_st.setdefault("charts", {})
+                    trends = st_charts.setdefault("company_power_trends", {})
+                    trends["year_monthly"] = chart_data
+                    st_charts["station_energy_trend"] = chart_data
 
     device_status = first_data(grouped, "getDeviceStatus")
     if isinstance(device_status, dict):

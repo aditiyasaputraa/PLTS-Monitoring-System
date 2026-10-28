@@ -2539,9 +2539,10 @@ function getStationMonthlyValues(station, targetYear, metric = "energy", customT
   // 1. Kehua
   if (source === "kehua") {
     const trends = station.charts?.company_power_trends || station.site?.charts?.company_power_trends;
-    const seriesGroup = trends?.year_monthly;
+    const seriesGroup = trends?.year_monthly || station.charts?.station_energy_trend;
     const yearSeries = seriesGroup?.series?.[String(targetYear)];
-    const unit = normalizeUnitString(seriesGroup?.unit, "MWh").toUpperCase();
+    const rawUnit = seriesGroup?.unit || "kWh";
+    const unit = normalizeUnitString(rawUnit, "kWh").toUpperCase();
     const multiplier = unit === "MWH" ? 1000 : 1;
 
     if (yearSeries) {
