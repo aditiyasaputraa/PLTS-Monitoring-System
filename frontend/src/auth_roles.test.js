@@ -5,6 +5,8 @@ import {
   authenticateLocalAccount,
   canUserEditStation,
   canUserEditCategoryTariff,
+  canUserEditStationTariff,
+  canUserOpenTariffSettings,
 } from "./auth_roles.js";
 
 // Setup dummy environment variables for test execution only (NO real passwords in git)
@@ -86,21 +88,29 @@ test("restricts category global tariff edits to super admin", () => {
   assert.equal(canUserEditCategoryTariff(superAdmin), true);
 });
 
-test("restricts electricity tariffs (canUserEditTariffs) strictly to super admin", () => {
+test("allows regional admins to edit tariffs in their own region but locks other regions", () => {
   const pusat = authenticateLocalAccount("admin.pusat", "test_env_pass_pusat");
-  const utara = authenticateLocalAccount("admin.utara", "test_env_pass_utara");
   const barat = authenticateLocalAccount("admin.barat", "test_env_pass_barat");
-  const selatan = authenticateLocalAccount("admin.selatan", "test_env_pass_selatan");
-  const timur = authenticateLocalAccount("admin.timur", "test_env_pass_timur");
   const superAdmin = authenticateLocalAccount("admin", "test_env_pass_superadmin");
+  const getRegion = (st) => st.region;
 
-  // All 5 regional accounts must NOT be able to edit tariffs
-  assert.equal(canUserEditCategoryTariff(pusat), false);
-  assert.equal(canUserEditCategoryTariff(utara), false);
-  assert.equal(canUserEditCategoryTariff(barat), false);
-  assert.equal(canUserEditCategoryTariff(selatan), false);
-  assert.equal(canUserEditCategoryTariff(timur), false);
+  const stationPusat = { name: "SMKN 2 JAKPUS", region: "jakpus" };
+  const stationBarat = { name: "SMKN 53 JAKBAR", region: "jakbar" };
 
-  // Super Admin can edit tariffs
-  assert.equal(canUserEditCategoryTariff(superAdmin), true);
+  // Admin Pusat can edit station tariff in Pusat, but NOT in Barat
+  assert.equal(canUserEditStationTariff(pusat, stationPusat, getRegion), true);
+  assert.equal(canUserEditStationTariff(pusat, stationBarat, getRegion), false);
+
+  // Admin Barat can edit station tariff in Barat, but NOT in Pusat
+  assert.equal(canUserEditStationTariff(barat, stationBarat, getRegion), true);
+  assert.equal(canUserEditStationTariff(barat, stationPusat, getRegion), false);
+
+  // Super Admin can edit station tariff in any region
+  assert.equal(canUserEditStationTariff(superAdmin, stationPusat, getRegion), true);
+  assert.equal(canUserEditStationTariff(superAdmin, stationBarat, getRegion), true);
+
+  // Both regional and super admin can open tariff settings modal
+  assert.equal(canUserOpenTariffSettings(pusat), true);
+  assert.equal(canUserOpenTariffSettings(barat), true);
+  assert.equal(canUserOpenTariffSettings(superAdmin), true);
 });

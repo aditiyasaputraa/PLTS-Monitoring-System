@@ -10,6 +10,8 @@ import {
   canUserEditStation,
   canUserEditTariffs,
   canUserEditCategoryTariff,
+  canUserEditStationTariff,
+  canUserOpenTariffSettings,
 } from "./auth_roles.js";
 import TariffSettingsModal from "./TariffSettingsModal.jsx";
 import { MOCK_MONITORING_DATA } from "./mock_data.js";
@@ -1359,32 +1361,34 @@ function Dashboard({ session, onSignOut }) {
   }, [session?.user, updateStationMetadata]);
 
   const handleUpdateCategoryRate = useCallback((catId, rate) => {
-    if (!canUserEditTariffs(session?.user)) {
-      alert("Akses Ditolak: Hanya Administrator Provinsi DKI Jakarta yang dapat mengubah tarif listrik.");
+    if (!canUserEditCategoryTariff(session?.user)) {
+      alert("Akses Ditolak: Hanya Administrator Provinsi DKI Jakarta yang dapat mengubah tarif kategori global.");
       return;
     }
     updateCategoryRate(catId, rate);
   }, [session?.user, updateCategoryRate]);
 
   const handleUpdateStationRate = useCallback((uid, rate) => {
-    if (!canUserEditTariffs(session?.user)) {
-      alert("Akses Ditolak: Hanya Administrator Provinsi DKI Jakarta yang dapat mengubah tarif listrik.");
+    const st = allLocations.find((loc) => (loc.uid || `${loc.source || loc.platform}-${loc.id}`) === uid);
+    if (!canUserEditStationTariff(session?.user, st, getStationRegion)) {
+      alert("Akses Ditolak: Anda hanya memiliki izin mengatur tarif stasiun di wilayah tugas Anda.");
       return;
     }
     updateStationRate(uid, rate);
-  }, [session?.user, updateStationRate]);
+  }, [allLocations, session?.user, updateStationRate]);
 
   const handleResetStationRate = useCallback((uid) => {
-    if (!canUserEditTariffs(session?.user)) {
-      alert("Akses Ditolak: Hanya Administrator Provinsi DKI Jakarta yang dapat mereset tarif listrik.");
+    const st = allLocations.find((loc) => (loc.uid || `${loc.source || loc.platform}-${loc.id}`) === uid);
+    if (!canUserEditStationTariff(session?.user, st, getStationRegion)) {
+      alert("Akses Ditolak: Anda hanya memiliki izin mereset tarif stasiun di wilayah tugas Anda.");
       return;
     }
     resetStationRate(uid);
-  }, [session?.user, resetStationRate]);
+  }, [allLocations, session?.user, resetStationRate]);
 
   const handleResetAllToDefaults = useCallback(() => {
-    if (!canUserEditTariffs(session?.user)) {
-      alert("Akses Ditolak: Hanya Administrator Provinsi DKI Jakarta yang dapat mereset tarif listrik.");
+    if (!canUserEditCategoryTariff(session?.user)) {
+      alert("Akses Ditolak: Hanya Administrator Provinsi DKI Jakarta yang dapat mereset seluruh tarif ke bawaan.");
       return;
     }
     resetAllToDefaults();

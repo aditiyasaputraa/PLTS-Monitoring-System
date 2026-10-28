@@ -21,14 +21,14 @@ export default function TariffSettingsModal({
   currentUser = null,
   getStationRegionFn = null,
 }) {
-  const [activeSubTab, setActiveSubTab] = useState("category"); // "category" | "station"
-  const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("all");
-  const [toastMessage, setToastMessage] = useState(null);
-
   const isSuperAdmin = canUserEditCategoryTariff(currentUser);
   const userRegion = currentUser?.region || currentUser?.user_metadata?.region;
   const isRegionalAdmin = !isSuperAdmin && userRegion && userRegion !== "all";
+
+  const [activeSubTab, setActiveSubTab] = useState(() => (isRegionalAdmin ? "station" : "category")); // "category" | "station"
+  const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState(() => (isRegionalAdmin ? "my_region" : "all"));
+  const [toastMessage, setToastMessage] = useState(null);
 
   // Temporary local state for editing categories
   const [localCategories, setLocalCategories] = useState(() => ({
@@ -232,11 +232,11 @@ export default function TariffSettingsModal({
 
           {activeSubTab === "station" && (
             <div className="tariff-station-content">
-              {!isSuperAdmin && (
-                <div className="tariff-info-notice" style={{ background: "#fffbeb", borderColor: "#fde68a", color: "#92400e", marginBottom: "14px" }}>
-                  <span className="notice-icon">🔒</span>
+              {isRegionalAdmin && (
+                <div className="tariff-info-notice" style={{ background: "#f0fdf4", borderColor: "#bbf7d0", color: "#166534", marginBottom: "14px" }}>
+                  <span className="notice-icon">🏢</span>
                   <div>
-                    <strong>Mode Hanya Lihat:</strong> Pengaturan tarif rekening listrik PLN (baik kategori maupun per stasiun) hanya dapat diubah oleh <strong>Administrator Provinsi DKI Jakarta</strong>. Akun wilayah hanya memiliki izin untuk memantau data tarif.
+                    <strong>Admin {currentUser?.user_metadata?.regionName || "Wilayah"}:</strong> Anda memiliki izin untuk menyesuaikan tarif stasiun/gedung di wilayah tugas Anda. Gedung sekolah tetap terkunci <strong>Rp 900/kWh</strong> (Tarif Sosial PLN).
                   </div>
                 </div>
               )}
@@ -338,6 +338,7 @@ export default function TariffSettingsModal({
                         const isSchool = catKey === "school";
                         const isCustom = !isSchool && tariffConfig?.customRates?.[uid] !== undefined;
                         const currentRate = getStationTariff(st, tariffConfig);
+                        const canEditStationRate = !isSchool && (isSuperAdmin || canUserEditStation(currentUser, st, getStationRegionFn));
 
                         return (
                           <tr key={uid} className={isCustom ? "custom-row" : (isSchool ? "school-row" : "")}>
@@ -355,24 +356,24 @@ export default function TariffSettingsModal({
                               </span>
                             </td>
                             <td>
-                              <div className={`tariff-table-input-wrap ${isSchool || !isSuperAdmin ? "is-locked" : ""}`}>
+                              <div className={`tariff-table-input-wrap ${!canEditStationRate ? "is-locked" : ""}`}>
                                 <span className="prefix">Rp</span>
                                 <input
                                   type="number"
                                   step="0.01"
                                   min="1"
-                                  disabled={isSchool || !isSuperAdmin}
+                                  disabled={!canEditStationRate}
                                   title={
                                     isSchool
-                                      ? "Tarif sekolah dikunci tetap Rp 900/kWh (Tarif Sosial)"
-                                      : (!isSuperAdmin
-                                        ? "Pengaturan tarif listrik hanya dapat diubah oleh Administrator Provinsi DKI Jakarta"
-                                        : undefined)
+                                      ? "Tarif sekolah dikunci tetap Rp 900/kWh (Tarif Sosial PLN)"
+                                      : (!canEditStationRate
+                                        ? `Terkunci: PLTS ini berada di ${st.region || "wilayah lain"}. Anda hanya dapat mengedit tarif stasiun di wilayah Anda.`
+                                        : "Sesuaikan tarif listrik khusus untuk gedung ini")
                                   }
                                   className={`station-rate-input ${isCustom ? "is-custom" : ""}`}
                                   value={currentRate}
                                   onChange={(e) => {
-                                    if (isSchool || !isSuperAdmin) return;
+                                    if (!canEditStationRate) return;
                                     const val = e.target.value === "" ? "" : Number(e.target.value);
                                     if (val) {
                                       onUpdateStationRate(uid, val);
@@ -387,13 +388,13 @@ export default function TariffSettingsModal({
                                 <span className="tariff-locked-tag" title="Tarif sekolah dikunci tetap Rp 900/kWh">
                                   🔒 Tetap Rp 900
                                 </span>
-                              ) : !isSuperAdmin ? (
+                              ) : !canEditStationRate ? (
                                 <span
                                   className="tariff-locked-tag"
                                   style={{ background: "#f1f5f9", color: "#64748b", borderColor: "#cbd5e1" }}
-                                  title="Pengaturan tarif listrik khusus Administrator Provinsi (Mode hanya lihat)"
+                                  title={`Terkunci: Stasiun berada di ${st.region || "wilayah lain"}`}
                                 >
-                                  🔒 Khusus Provinsi
+                                  🔒 Khusus {st.region || "Wilayah Lain"}
                                 </span>
                               ) : isCustom ? (
                                 <button

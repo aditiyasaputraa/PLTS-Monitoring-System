@@ -210,11 +210,19 @@ export function canUserEditStation(user, station, getStationRegionFn) {
 }
 
 /**
- * Memeriksa apakah user dapat mengedit tarif listrik PLN (kategori maupun khusus stasiun)
- * HANYA Super Admin / Administrator Provinsi yang berhak mengubah tarif listrik.
- * Akun wilayah sama sekali TIDAK BISA mengedit tarif listrik (hanya lihat).
+ * Memeriksa apakah user dapat membuka pengaturan tarif dalam mode edit (Super Admin & Admin Wilayah)
  */
-export function canUserEditTariffs(user) {
+export function canUserOpenTariffSettings(user) {
+  if (!user) return false;
+  const role = user.role || user.user_metadata?.role || "viewer";
+  return role === "super_admin" || role === "regional_admin";
+}
+
+/**
+ * Memeriksa apakah user dapat mengedit tarif kategori global PLN
+ * Hanya Super Admin Provinsi yang berhak karena berdampak ke seluruh DKI Jakarta.
+ */
+export function canUserEditCategoryTariff(user) {
   if (!user) return false;
   const role = user.role || user.user_metadata?.role || "viewer";
   const userRegion = normalizeRegionCode(user.region || user.user_metadata?.region || "");
@@ -222,8 +230,18 @@ export function canUserEditTariffs(user) {
 }
 
 /**
- * Alias kompatibilitas untuk canUserEditTariffs
+ * Memeriksa apakah user dapat mengedit tarif listrik stasiun tertentu
+ * - Super admin dapat mengedit tarif seluruh stasiun
+ * - Admin wilayah dapat mengedit tarif stasiun di wilayahnya sendiri
+ * - Viewer / demo tidak dapat mengedit
  */
-export function canUserEditCategoryTariff(user) {
-  return canUserEditTariffs(user);
+export function canUserEditStationTariff(user, station, getStationRegionFn) {
+  return canUserEditStation(user, station, getStationRegionFn);
+}
+
+/**
+ * Alias kompatibilitas
+ */
+export function canUserEditTariffs(user) {
+  return canUserOpenTariffSettings(user);
 }
