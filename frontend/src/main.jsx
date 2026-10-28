@@ -2629,6 +2629,38 @@ function getStationMonthlyValues(station, targetYear, metric = "energy", customT
       const liveMonthKwh = Number(station.monthly_energy_kwh ?? station.month_energy_kwh ?? 0);
       monthly[currentMonthIdx] = Math.round(liveMonthKwh * 0.85 * 10) / 10;
     }
+
+    // Jika bulan-bulan lampau (Jan s/d sebelum bulan berjalan) masih 0 (misalnya Kehua yang tidak mengirimkan array monthly riwayat),
+    // rekonstruksi dari selisih produksi tahun berjalan (yearly_energy_kwh / yearly_income) dengan bobot iradiasi matahari Jakarta
+    const hasPastData = monthly.slice(0, currentMonthIdx).some((v) => v > 0);
+    if (!hasPastData && currentMonthIdx > 0) {
+      const yearKwh = Number(station.yearly_energy_kwh ?? station.year_energy_kwh ?? 0);
+      const monthKwh = Number(station.monthly_energy_kwh ?? station.month_energy_kwh ?? 0);
+      const yearIncome = Number(station.yearly_income || 0);
+      const monthIncome = Number(station.monthly_income || 0);
+
+      if (yearKwh > monthKwh || (metric === "revenue" && yearIncome > monthIncome)) {
+        const pastYearKwh = Math.max(0, yearKwh - monthKwh);
+        const pastYearRev = Math.max(0, yearIncome - monthIncome);
+
+        let sumWeights = 0;
+        for (let i = 0; i < currentMonthIdx; i++) {
+          sumWeights += JAKARTA_SOLAR_MONTHLY_WEIGHTS[i] || 0.08;
+        }
+
+        for (let i = 0; i < currentMonthIdx; i++) {
+          const w = (JAKARTA_SOLAR_MONTHLY_WEIGHTS[i] || 0.08) / (sumWeights || 1);
+          if (metric === "revenue") {
+            const revVal = pastYearKwh > 0 ? (pastYearKwh * tariff * w) : (pastYearRev * w);
+            monthly[i] = Math.round(revVal);
+          } else if (metric === "emission") {
+            monthly[i] = Math.round(pastYearKwh * w * 0.85 * 10) / 10;
+          } else {
+            monthly[i] = Math.round(pastYearKwh * w * 10) / 10;
+          }
+        }
+      }
+    }
   }
 
   return monthly;
