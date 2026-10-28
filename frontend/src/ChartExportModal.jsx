@@ -1,10 +1,22 @@
 import React, { useState, useMemo } from "react";
+import * as XLSX from "xlsx";
 import { getStationTariff } from "./tariffs.js";
 
 const ID_MONTH_NAMES = [
   "Januari", "Februari", "Maret", "April", "Mei", "Juni",
   "Juli", "Agustus", "September", "Oktober", "November", "Desember"
 ];
+
+export function downloadExcel(filename, rows, sheetName = "Data PLTS", colWidths = null) {
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  if (colWidths && Array.isArray(colWidths)) {
+    ws["!cols"] = colWidths;
+  }
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  const safeFilename = filename.endsWith(".xlsx") ? filename : `${filename.replace(/\.csv$/i, "")}.xlsx`;
+  XLSX.writeFile(wb, safeFilename);
+}
 
 export function downloadCsv(filename, rows) {
   // UTF-8 BOM so Microsoft Excel and spreadsheet tools open accents & Indonesian numbers properly
@@ -264,9 +276,9 @@ export default function ChartExportModal({
         ? (targetList[0]?.name || "Gedung").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 30)
         : currentRegionName.replace(/\s+/g, "_");
       const safePeriod = selectedPeriod.replace("_", "-");
-      const filename = `Laporan_PLTS_${safeScope}_${yr}_${safePeriod}.csv`;
+      const filename = `Laporan_PLTS_${safeScope}_${yr}_${safePeriod}.xlsx`;
 
-      downloadCsv(filename, rows);
+      downloadExcel(filename, rows, "Kinerja PLTS");
       onClose();
     } catch (err) {
       console.error("Export error:", err);
@@ -418,7 +430,7 @@ export default function ChartExportModal({
           <div className="export-info-box">
             <span style={{ marginRight: "6px" }}>💡</span>
             <span>
-              Format file adalah <strong>CSV (.csv)</strong> terkompatibilitas penuh dengan Microsoft Excel, Google Sheets, dan aplikasi spreadsheet pemerintah.
+              Format file adalah <strong>Excel (.xlsx)</strong> siap pakai dan terformat rapi untuk Microsoft Excel, Google Sheets, dan aplikasi spreadsheet pemerintah.
             </span>
           </div>
         </div>
@@ -435,7 +447,7 @@ export default function ChartExportModal({
             onClick={handleExport}
             disabled={isExporting}
           >
-            {isExporting ? "Menyiapkan File..." : "📥 Download File CSV / Excel"}
+            {isExporting ? "Menyiapkan File..." : "📥 Download File Excel (.xlsx)"}
           </button>
         </div>
       </div>

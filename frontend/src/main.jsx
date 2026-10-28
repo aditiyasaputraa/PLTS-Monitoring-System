@@ -14,7 +14,7 @@ import {
   canUserOpenTariffSettings,
 } from "./auth_roles.js";
 import TariffSettingsModal from "./TariffSettingsModal.jsx";
-import ChartExportModal, { downloadCsv } from "./ChartExportModal.jsx";
+import ChartExportModal, { downloadExcel, downloadCsv } from "./ChartExportModal.jsx";
 import { MOCK_MONITORING_DATA } from "./mock_data.js";
 import "./styles.css";
 
@@ -4376,8 +4376,15 @@ function handleExportStationList(stations = [], regionLabel = "DKI Jakarta") {
 
   const dateStr = new Date().toISOString().slice(0, 10);
   const cleanReg = regionLabel.replace(/\s+/g, "_");
-  const filename = `Daftar_PLTS_${cleanReg}_${dateStr}.csv`;
-  downloadCsv(filename, rows);
+  const filename = `Daftar_PLTS_${cleanReg}_${dateStr}.xlsx`;
+  const colWidths = [
+    { wch: 35 }, // Nama PLTS
+    { wch: 65 }, // Alamat
+    { wch: 15 }, // Status
+    { wch: 30 }, // Aset
+    { wch: 15 }, // Vendor
+  ];
+  downloadExcel(filename, rows, "Daftar PLTS", colWidths);
 }
 
 function StationListDarkCard({
@@ -4428,10 +4435,10 @@ function StationListDarkCard({
           type="button"
           className="btn-export-station-list"
           onClick={() => handleExportStationList(displayLocations, regionLabel)}
-          title="Download Rekap Daftar PLTS (CSV)"
+          title="Download Daftar PLTS (Excel .xlsx)"
         >
           <DownloadIcon style={{ width: "12px", height: "12px" }} />
-          <span>Export Rekap</span>
+          <span>Export Excel</span>
         </button>
       </div>
 
