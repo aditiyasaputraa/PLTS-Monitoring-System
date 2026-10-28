@@ -4346,6 +4346,7 @@ function handleExportStationList(stations = [], regionLabel = "DKI Jakarta") {
 
   const rows = [];
   rows.push([
+    "No",
     "Nama PLTS",
     "Alamat",
     "Status",
@@ -4353,7 +4354,7 @@ function handleExportStationList(stations = [], regionLabel = "DKI Jakarta") {
     "Vendor",
   ]);
 
-  stations.forEach((st) => {
+  stations.forEach((st, idx) => {
     const name = st.custom_name || st.name || st.raw_name || "-";
     const address = st.address || "-";
 
@@ -4366,6 +4367,7 @@ function handleExportStationList(stations = [], regionLabel = "DKI Jakarta") {
     const vendor = String(st.source || st.site?.platform || "SMA").toUpperCase();
 
     rows.push([
+      idx + 1,
       name,
       address,
       status,
@@ -4378,6 +4380,7 @@ function handleExportStationList(stations = [], regionLabel = "DKI Jakarta") {
   const cleanReg = regionLabel.replace(/\s+/g, "_");
   const filename = `Daftar_PLTS_${cleanReg}_${dateStr}.xlsx`;
   const colWidths = [
+    { wch: 6 },  // No
     { wch: 35 }, // Nama PLTS
     { wch: 65 }, // Alamat
     { wch: 15 }, // Status
