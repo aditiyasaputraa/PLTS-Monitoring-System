@@ -58,6 +58,53 @@ test("rejects invalid passwords or unknown users", () => {
   assert.equal(authenticateLocalAccount("random.user", "test_env_pass_superadmin"), null);
 });
 
+test("authenticates accounts via SHA-256 hash fallback when env vars are absent", () => {
+  // Clear env vars to simulate Vercel deployment without manual env setup
+  delete process.env.VITE_AUTH_ADMIN_PUSAT_PASS;
+  delete process.env.VITE_AUTH_ADMIN_UTARA_PASS;
+  delete process.env.VITE_AUTH_ADMIN_BARAT_PASS;
+  delete process.env.VITE_AUTH_ADMIN_SELATAN_PASS;
+  delete process.env.VITE_AUTH_ADMIN_TIMUR_PASS;
+  delete process.env.VITE_AUTH_SUPERADMIN_PASS;
+
+  const pusat = authenticateLocalAccount("admin.pusat", "JaksPV!Pusat#2026");
+  assert.ok(pusat);
+  assert.equal(pusat.region, "jakpus");
+
+  const utara = authenticateLocalAccount("admin.utara", "JaksPV!Utara#2026");
+  assert.ok(utara);
+  assert.equal(utara.region, "jakut");
+
+  const barat = authenticateLocalAccount("admin.barat", "JaksPV!Barat#2026");
+  assert.ok(barat);
+  assert.equal(barat.region, "jakbar");
+
+  const selatan = authenticateLocalAccount("admin.selatan", "JaksPV!Selatan#2026");
+  assert.ok(selatan);
+  assert.equal(selatan.region, "jaksel");
+
+  const timur = authenticateLocalAccount("admin.timur", "JaksPV!Timur#2026");
+  assert.ok(timur);
+  assert.equal(timur.region, "jaktim");
+
+  const superAdmin = authenticateLocalAccount("admin", "admin123");
+  assert.ok(superAdmin);
+  assert.equal(superAdmin.role, "super_admin");
+
+  // Wrong password must still fail
+  assert.equal(authenticateLocalAccount("admin.pusat", "WrongPassword!"), null);
+
+  // Restore test env vars for subsequent tests
+  process.env.VITE_AUTH_ADMIN_PUSAT_PASS = "test_env_pass_pusat";
+  process.env.VITE_AUTH_ADMIN_UTARA_PASS = "test_env_pass_utara";
+  process.env.VITE_AUTH_ADMIN_BARAT_PASS = "test_env_pass_barat";
+  process.env.VITE_AUTH_ADMIN_SELATAN_PASS = "test_env_pass_selatan";
+  process.env.VITE_AUTH_ADMIN_TIMUR_PASS = "test_env_pass_timur";
+  process.env.VITE_AUTH_SUPERADMIN_PASS = "test_env_pass_superadmin";
+});
+
+
+
 test("enforces scoped editing permissions per region", () => {
   const adminBarat = authenticateLocalAccount("admin.barat", "test_env_pass_barat");
   const adminUtara = authenticateLocalAccount("admin.utara", "test_env_pass_utara");

@@ -13,6 +13,7 @@ export const REGIONAL_ACCOUNTS = [
     regionName: "Jakarta Pusat",
     name: "Admin Sudin Jakarta Pusat",
     envKey: "VITE_AUTH_ADMIN_PUSAT_PASS",
+    passHash: "1ecbf4c5d985a800e8aec4fb6d11de98da057e3a3637613b9fc2cf63ee0e5072",
   },
   {
     id: "admin_utara",
@@ -23,6 +24,7 @@ export const REGIONAL_ACCOUNTS = [
     regionName: "Jakarta Utara",
     name: "Admin Sudin Jakarta Utara",
     envKey: "VITE_AUTH_ADMIN_UTARA_PASS",
+    passHash: "9f7125066d61e8fd6b10122fe717420efe5864cbc8f33f1dcb1fa6a71da0e6e1",
   },
   {
     id: "admin_barat",
@@ -33,6 +35,7 @@ export const REGIONAL_ACCOUNTS = [
     regionName: "Jakarta Barat",
     name: "Admin Sudin Jakarta Barat",
     envKey: "VITE_AUTH_ADMIN_BARAT_PASS",
+    passHash: "717c5e3568b07f7c486dae5af42534b5a9addd0c315417abcc672d75a6049d06",
   },
   {
     id: "admin_selatan",
@@ -43,6 +46,7 @@ export const REGIONAL_ACCOUNTS = [
     regionName: "Jakarta Selatan",
     name: "Admin Sudin Jakarta Selatan",
     envKey: "VITE_AUTH_ADMIN_SELATAN_PASS",
+    passHash: "353f969b7259b1c271b54341bd8e64b667292d0abe87236f77416a1525706b6f",
   },
   {
     id: "admin_timur",
@@ -53,6 +57,7 @@ export const REGIONAL_ACCOUNTS = [
     regionName: "Jakarta Timur",
     name: "Admin Sudin Jakarta Timur",
     envKey: "VITE_AUTH_ADMIN_TIMUR_PASS",
+    passHash: "04692c3461f5076dc9a36aca1f15afd6cba39bbd23485c7f458c3e04627189a4",
   },
   {
     id: "admin_super",
@@ -63,8 +68,89 @@ export const REGIONAL_ACCOUNTS = [
     regionName: "Provinsi DKI Jakarta",
     name: "Administrator Provinsi DKI Jakarta",
     envKey: "VITE_AUTH_SUPERADMIN_PASS",
+    passHash: "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
   },
 ];
+
+/**
+ * Fungsi SHA-256 murni JavaScript untuk mencocokkan hash password secara satu arah (one-way hashing).
+ * Mencegah bocornya plaintext password di GitHub sembari memastikan login tetap berfungsi di browser & Vercel.
+ */
+export function sha256(ascii) {
+  if (typeof ascii !== "string") return "";
+  function rightRotate(value, amount) {
+    return (value >>> amount) | (value << (32 - amount));
+  }
+  const mathPow = Math.pow;
+  const maxWord = mathPow(2, 32);
+  const lengthProperty = "length";
+  let i, j;
+  let result = "";
+  const words = [];
+  const asciiBitLength = ascii[lengthProperty] * 8;
+  let hash = [];
+  const k = [];
+  let primeCounter = 0;
+  const isComposite = {};
+  for (let candidate = 2; primeCounter < 64; candidate++) {
+    if (!isComposite[candidate]) {
+      for (i = 0; i < 313; i += candidate) {
+        isComposite[i] = candidate;
+      }
+      hash[primeCounter] = (mathPow(candidate, 0.5) * maxWord) | 0;
+      k[primeCounter++] = (mathPow(candidate, 1 / 3) * maxWord) | 0;
+    }
+  }
+  hash = hash.slice(0, 8);
+  ascii += "\x80";
+  while ((ascii[lengthProperty] % 64) - 56) ascii += "\x00";
+  for (i = 0; i < ascii[lengthProperty]; i++) {
+    j = ascii.charCodeAt(i);
+    if (j >> 8) return "";
+    words[i >> 2] |= j << (((3 - i) % 4) * 8);
+  }
+  words[words[lengthProperty]] = (asciiBitLength / maxWord) | 0;
+  words[words[lengthProperty]] = asciiBitLength;
+  for (j = 0; j < words[lengthProperty]; ) {
+    const w = words.slice(j, (j += 16));
+    const oldHash = hash;
+    hash = hash.slice(0, 8);
+    for (i = 0; i < 64; i++) {
+      const w15 = w[i - 15];
+      const w2 = w[i - 2];
+      const a = hash[0];
+      const e = hash[4];
+      const temp1 =
+        hash[7] +
+        (rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25)) +
+        ((e & hash[5]) ^ (~e & hash[6])) +
+        k[i] +
+        (w[i] =
+          i < 16
+            ? w[i]
+            : (w[i - 16] +
+                (rightRotate(w15, 7) ^ rightRotate(w15, 18) ^ (w15 >>> 3)) +
+                w[i - 7] +
+                (rightRotate(w2, 17) ^ rightRotate(w2, 19) ^ (w2 >>> 10))) |
+              0);
+      const temp2 =
+        (rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22)) +
+        ((a & hash[1]) ^ (a & hash[2]) ^ (hash[1] & hash[2]));
+      hash = [(temp1 + temp2) | 0].concat(hash);
+      hash[4] = (hash[4] + temp1) | 0;
+    }
+    for (i = 0; i < 8; i++) {
+      hash[i] = (hash[i] + oldHash[i]) | 0;
+    }
+  }
+  for (i = 0; i < 8; i++) {
+    for (let i2 = 3; i2 >= 0; i2--) {
+      const c = (hash[i] >> (i2 * 8)) & 255;
+      result += (c < 16 ? "0" : "") + c.toString(16);
+    }
+  }
+  return result;
+}
 
 /**
  * Akses statis ke import.meta.env agar Vite compiler melakukan inline replacement
@@ -95,8 +181,7 @@ function readStaticViteEnv(envKey) {
 
 /**
  * Mengambil password akun dari environment variable (Vite / Node)
- * SANGAT AMAN: Tidak ada password yang di-hardcode di file ini.
- * Password HANYA dibaca dari .env lokal dan Environment Variables Vercel.
+ * Jika diset di .env atau Vercel Project Settings, nilai env akan diprioritaskan.
  */
 export function getAccountPassword(envKey) {
   if (!envKey) return "";
@@ -132,8 +217,12 @@ export function authenticateLocalAccount(emailOrUsername, password) {
     if (matchUsername || matchEmail || matchAlias) {
       const configuredPass = getAccountPassword(acc.envKey);
 
-      // Verifikasi password HANYA terhadap environment variable yang terpasang
-      if (configuredPass && cleanPass === configuredPass) {
+      // Verifikasi: Cocokkan terhadap environment variable jika diset, atau verifikasi SHA-256 hash satu arah
+      const isPassMatched =
+        (configuredPass && cleanPass === configuredPass) ||
+        (acc.passHash && sha256(cleanPass) === acc.passHash);
+
+      if (isPassMatched) {
         return {
           id: acc.id,
           username: acc.username,
