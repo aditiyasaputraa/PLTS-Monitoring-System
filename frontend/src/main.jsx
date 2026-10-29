@@ -3102,23 +3102,6 @@ function getStationDailyMonthValues(station, targetYear, targetMonth, metric = "
           }
         }
       }
-    } else {
-      const monthlyValues = getStationMonthlyValues(station, targetYear, "energy");
-      const monthTotal = (Array.isArray(monthlyValues) && targetMonth >= 0 && targetMonth < 12) ? Number(monthlyValues[targetMonth]) || 0 : 0;
-      if (monthTotal > 0) {
-        const activeDays = isCurrentMonth ? Math.min(daysInSelectedMonth, now.getDate()) : daysInSelectedMonth;
-        const weights = [];
-        let weightSum = 0;
-        for (let d = 1; d <= activeDays; d++) {
-          const w = 0.82 + (((d * 17 + targetMonth * 11) % 37) / 100);
-          weights.push(w);
-          weightSum += w;
-        }
-        for (let d = 1; d <= activeDays; d++) {
-          const dayKwh = weightSum > 0 ? (weights[d - 1] / weightSum) * monthTotal : (monthTotal / activeDays);
-          daily[d - 1] = Math.round(dayKwh * 10) / 10;
-        }
-      }
     }
   }
   // 2. SMA
