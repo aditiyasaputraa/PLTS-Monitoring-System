@@ -3194,6 +3194,10 @@ def scrape_site(
         if site_name == "kehua" and call.get("name") == "listStationCardInfoByCondition" and result.get("success"):
             for extra_call in kehua_extra_station_calls(site, result):
                 extra_result = replay_call(session, extra_call, timeout)
+                if extra_result.get("auth_error") and account and account.get("username") and account.get("password"):
+                    re_meta = kehua_password_login(session, site, account["username"], account["password"], timeout)
+                    if re_meta.get("success"):
+                        extra_result = replay_call(session, extra_call, timeout)
                 calls.append(extra_result)
                 if delay:
                     time.sleep(delay)

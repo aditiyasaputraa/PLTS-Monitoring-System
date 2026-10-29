@@ -14,6 +14,90 @@ from supabase import Client, create_client
 from site_rollups import extract_site_daily_rollups, extract_site_hourly_rollups
 
 
+def merge_payload_preserve_history(existing: dict[str, Any] | None, incoming: dict[str, Any]) -> dict[str, Any]:
+    """Preserve historical chart series (e.g. multi-year month_daily, daily_by_month) across scrape snapshots."""
+    if not isinstance(existing, dict) or not isinstance(incoming, dict):
+        return incoming
+
+    existing_by_site = existing.get("by_site")
+    incoming_by_site = incoming.get("by_site")
+    if not isinstance(existing_by_site, dict) or not isinstance(incoming_by_site, dict):
+        return incoming
+
+    for plat, incoming_site in incoming_by_site.items():
+        if not isinstance(incoming_site, dict):
+            continue
+        existing_site = existing_by_site.get(plat)
+        if not isinstance(existing_site, dict):
+            continue
+
+        existing_stations = existing_site.get("stations")
+        incoming_stations = incoming_site.get("stations")
+        if not isinstance(existing_stations, list) or not isinstance(incoming_stations, list):
+            continue
+
+        old_by_key: dict[str, dict[str, Any]] = {}
+        for st in existing_stations:
+            if not isinstance(st, dict):
+                continue
+            st_id = str(st.get("station_id") or st.get("id") or "")
+            st_name = str(st.get("name") or "")
+            if st_id:
+                old_by_key[st_id] = st
+            if st_name:
+                old_by_key[st_name] = st
+
+        for new_st in incoming_stations:
+            if not isinstance(new_st, dict):
+                continue
+            new_id = str(new_st.get("station_id") or new_st.get("id") or "")
+            new_name = str(new_st.get("name") or "")
+            old_st = old_by_key.get(new_id) or old_by_key.get(new_name)
+            if not old_st or not isinstance(old_st, dict):
+                continue
+
+            # 1. Merge charts.company_power_trends
+            old_charts = old_st.get("charts")
+            if isinstance(old_charts, dict):
+                new_charts = new_st.setdefault("charts", {})
+                old_cpt = old_charts.get("company_power_trends")
+                if isinstance(old_cpt, dict):
+                    new_cpt = new_charts.setdefault("company_power_trends", {})
+                    for trend_key in ("month_daily", "year_monthly", "all_yearly", "week_daily"):
+                        old_group = old_cpt.get(trend_key)
+                        if isinstance(old_group, dict):
+                            new_group = new_cpt.setdefault(trend_key, {"unit": old_group.get("unit", "kWh"), "series": {}})
+                            old_series = old_group.get("series")
+                            if isinstance(old_series, dict):
+                                new_series = new_group.setdefault("series", {})
+                                for k, v in old_series.items():
+                                    if k not in new_series or not new_series[k]:
+                                        new_series[k] = v
+
+                    if "month_daily" in new_cpt:
+                        new_charts["station_energy_trend_month"] = new_cpt["month_daily"]
+                    if "year_monthly" in new_cpt:
+                        new_charts["station_energy_trend"] = new_cpt["year_monthly"]
+                    if "all_yearly" in new_cpt:
+                        new_charts["station_energy_trend_total"] = new_cpt["all_yearly"]
+                    if "week_daily" in new_cpt:
+                        new_charts["station_energy_trend_week"] = new_cpt["week_daily"]
+
+            # 2. Merge energy_charts
+            old_echarts = old_st.get("energy_charts")
+            if isinstance(old_echarts, dict):
+                new_echarts = new_st.setdefault("energy_charts", {})
+                for ekey in ("daily_by_month", "monthly_by_year", "hourly_by_date"):
+                    old_sub = old_echarts.get(ekey)
+                    if isinstance(old_sub, dict):
+                        new_sub = new_echarts.setdefault(ekey, {})
+                        for k, v in old_sub.items():
+                            if k not in new_sub or not new_sub[k]:
+                                new_sub[k] = v
+
+    return incoming
+
+
 def server_key_error(secret_key: str) -> str | None:
     if secret_key.startswith("sb_publishable_"):
         return "SUPABASE_SECRET_KEY contains a publishable browser key; use a server secret key"
@@ -164,16 +248,25 @@ class SupabaseStore:
     ) -> dict[str, Any]:
         client, config = self._require()
         updated_at = utc_iso()
-        current_row = {
-            "id": 1,
-            "run_id": run_id,
-            "scraped_at": scraped_at,
-            "payload": payload,
-            "summary": summary,
-            "updated_at": updated_at,
-        }
 
         with self._lock:
+            try:
+                current_query = client.table(config.current_table).select("payload").eq("id", 1).limit(1).execute()
+                if current_query.data and isinstance(current_query.data, list) and len(current_query.data) > 0:
+                    existing_payload = current_query.data[0].get("payload")
+                    if isinstance(existing_payload, dict):
+                        payload = merge_payload_preserve_history(existing_payload, payload)
+            except Exception:
+                pass
+
+            current_row = {
+                "id": 1,
+                "run_id": run_id,
+                "scraped_at": scraped_at,
+                "payload": payload,
+                "summary": summary,
+                "updated_at": updated_at,
+            }
             client.table(config.current_table).upsert(current_row, on_conflict="id").execute()
             history_saved = self._save_history_if_due(
                 client=client,
