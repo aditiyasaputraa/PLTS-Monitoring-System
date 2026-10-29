@@ -1295,6 +1295,31 @@ def sma_extra_plant_calls(site: dict[str, Any], navigation_call: dict[str, Any])
                 "dateTimeEnd": f"{jakarta_now.year - 1:04d}-12-31T17:00:00Z",
             }),
         })
+        calls.append({
+            "id": f"sma_plant_monthly_history_{component_id}",
+            "site": "sma",
+            "name": f"sma_plant_monthly_history_{component_id}",
+            "method": "POST",
+            "url": f"{api_base}/measurements/search",
+            "headers": {
+                "Accept": "application/json, text/plain, */*",
+                "Content-Type": "application/json",
+                "Origin": "https://ennexos.sunnyportal.com",
+                "Referer": "https://ennexos.sunnyportal.com/",
+            },
+            "payload_raw": json.dumps({
+                "queryItems": [{
+                    "componentId": component_id,
+                    "channelId": "Measurement.Metering.TotWhOut.Pv",
+                    "resolution": "OneMonth",
+                    "aggregate": "Dif",
+                    "multiAggregate": "Sum",
+                    "timezone": "Asia/Jakarta",
+                }],
+                "dateTimeBegin": "2019-12-31T17:00:00.000Z",
+                "dateTimeEnd": now_end,
+            }),
+        })
     return calls
 
 
@@ -2457,6 +2482,7 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
         daily_kwh = 0.0
         month_daily_labels = []
         month_daily_values = []
+        daily_by_month: dict[str, dict[str, list]] = {}
         year_monthly_labels = [f"{m:02d}" for m in range(1, 13)]
         year_monthly_values = [0.0] * 12
 
@@ -2480,8 +2506,13 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
                                             year_monthly_values[m_idx] = round(year_monthly_values[m_idx] + kwh, 2)
                                     except Exception:
                                         pass
+                                    m_prefix = date_part[:7]
+                                    day_str = date_part[8:10]
+                                    if m_prefix not in daily_by_month:
+                                        daily_by_month[m_prefix] = {"labels": [], "values": []}
+                                    daily_by_month[m_prefix]["labels"].append(day_str)
+                                    daily_by_month[m_prefix]["values"].append(round(kwh, 3))
                                     if date_part.startswith(current_month_prefix):
-                                        day_str = date_part[8:10]
                                         month_daily_labels.append(day_str)
                                         month_daily_values.append(kwh)
                                         daily_kwh = kwh
@@ -2543,7 +2574,33 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
                             except Exception:
                                 pass
 
+        # Monthly history across all years (resolution: OneMonth)
+        monthly_hist_call = grouped.get(f"sma_plant_monthly_history_{component_id}") or []
+        monthly_hist_body = response_data(monthly_hist_call[0]) if monthly_hist_call else []
+        monthly_by_year: dict[str, list[float]] = {}
+        if isinstance(monthly_hist_body, list):
+            for channel in monthly_hist_body:
+                if isinstance(channel, dict) and "values" in channel:
+                    for v in channel.get("values", []):
+                        if isinstance(v, dict) and v.get("value") is not None:
+                            val = to_float(v["value"])
+                            if val is not None:
+                                kwh = round(val / 1000.0, 2)
+                                time_str = str(v.get("time") or "")
+                                if len(time_str) >= 7:
+                                    y_str = time_str[:4]
+                                    try:
+                                        m_idx = int(time_str[5:7]) - 1
+                                        if 0 <= m_idx < 12:
+                                            if y_str not in monthly_by_year:
+                                                monthly_by_year[y_str] = [0.0] * 12
+                                            monthly_by_year[y_str][m_idx] = kwh
+                                    except Exception:
+                                        pass
+
         curr_year_str = str(jakarta_now.year)
+        if curr_year_str in monthly_by_year:
+            year_monthly_values = monthly_by_year[curr_year_str]
         yearly_by_year[curr_year_str] = yearly_energy_kwh
 
         if yearly_by_year:
@@ -2663,6 +2720,8 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
                     "labels": year_monthly_labels,
                     "values": year_monthly_values,
                 },
+                "monthly_by_year": monthly_by_year,
+                "daily_by_month": daily_by_month,
                 "yearly": {
                     "labels": yearly_chart_labels,
                     "values": yearly_chart_values,
@@ -2689,6 +2748,7 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
                     "labels": year_monthly_labels,
                     "values": [round(val * SMA_TARIFF_PER_KWH, 2) for val in year_monthly_values],
                 },
+                "monthly_by_year": {y: [round(v * SMA_TARIFF_PER_KWH, 2) for v in vals] for y, vals in monthly_by_year.items()},
                 "yearly": {
                     "labels": yearly_chart_labels,
                     "values": [round(val * SMA_TARIFF_PER_KWH, 2) for val in yearly_chart_values],
@@ -2696,6 +2756,39 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
                 "lifetime": {
                     "labels": yearly_chart_labels,
                     "values": [round(val * SMA_TARIFF_PER_KWH, 2) for val in yearly_chart_values],
+                },
+            },
+            "charts": {
+                "company_power_trends": {
+                    "year_monthly": {
+                        "unit": "kWh",
+                        "series": {
+                            y_key: {
+                                "x": [str(m) for m in range(1, 13)],
+                                "y": m_vals,
+                            }
+                            for y_key, m_vals in monthly_by_year.items()
+                        },
+                    },
+                    "month_daily": {
+                        "unit": "kWh",
+                        "series": {
+                            m_key: {
+                                "x": d_obj["labels"],
+                                "y": d_obj["values"],
+                            }
+                            for m_key, d_obj in daily_by_month.items()
+                        },
+                    },
+                    "all_yearly": {
+                        "unit": "kWh",
+                        "series": {
+                            "all": {
+                                "x": yearly_chart_labels,
+                                "y": yearly_chart_values,
+                            }
+                        },
+                    },
                 },
             },
         }

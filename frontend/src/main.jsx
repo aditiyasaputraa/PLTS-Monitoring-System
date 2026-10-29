@@ -2453,6 +2453,16 @@ function getStationLifetimeYears(station) {
     if (allSeries?.x && Array.isArray(allSeries.x) && allSeries.x.length > 0) {
       return allSeries.x.map(String);
     }
+  } else if (source === "sma") {
+    const yearlyChart = station?.energy_charts?.yearly || station?.energy_charts?.lifetime;
+    if (yearlyChart?.labels && Array.isArray(yearlyChart.labels) && yearlyChart.labels.length > 0) {
+      return yearlyChart.labels.map(String);
+    }
+    const trends = station?.charts?.company_power_trends;
+    const allSeries = trends?.all_yearly?.series?.all;
+    if (allSeries?.x && Array.isArray(allSeries.x) && allSeries.x.length > 0) {
+      return allSeries.x.map(String);
+    }
   }
   const curYear = new Date().getFullYear();
   const lifetimeYears = [];
@@ -2575,7 +2585,67 @@ function getStationMonthlyValues(station, targetYear, metric = "energy", customT
     // Kehua strictly uses real vendor curve; if no data for targetYear, leave as 0s
     return monthly;
   }
-  // 2. Huawei or SMA (when isCurrentYear)
+  // 2. SMA (strictly real vendor monthly curves)
+  else if (source === "sma") {
+    const targetYearStr = String(targetYear);
+    const monthlyByYear = station.energy_charts?.monthly_by_year;
+    const yearArray = monthlyByYear?.[targetYearStr];
+    const trends = station.charts?.company_power_trends;
+    const yearSeries = trends?.year_monthly?.series?.[targetYearStr];
+
+    if (Array.isArray(yearArray)) {
+      for (let m = 0; m < 12; m++) {
+        const rawVal = Number(yearArray[m]);
+        if (Number.isFinite(rawVal) && rawVal >= 0) {
+          if (metric === "revenue") monthly[m] = Math.round(rawVal * tariff);
+          else if (metric === "emission") monthly[m] = Math.round(rawVal * 0.85 * 10) / 10;
+          else monthly[m] = Math.round(rawVal * 10) / 10;
+        }
+      }
+    } else if (yearSeries) {
+      const xLabels = yearSeries.x || [];
+      const yData = yearSeries.y || [];
+      for (let i = 0; i < xLabels.length; i++) {
+        const mNum = parseInt(xLabels[i], 10);
+        if (mNum >= 1 && mNum <= 12) {
+          const rawVal = Number(yData[i]);
+          if (Number.isFinite(rawVal) && rawVal >= 0) {
+            if (metric === "revenue") monthly[mNum - 1] = Math.round(rawVal * tariff);
+            else if (metric === "emission") monthly[mNum - 1] = Math.round(rawVal * 0.85 * 10) / 10;
+            else monthly[mNum - 1] = Math.round(rawVal * 10) / 10;
+          }
+        }
+      }
+    } else if (isCurrentYear) {
+      const eChart = station.energy_charts?.monthly;
+      if (eChart?.labels && eChart?.values) {
+        for (let i = 0; i < eChart.labels.length; i++) {
+          const mNum = parseInt(eChart.labels[i], 10);
+          const val = Number(eChart.values[i]);
+          if (Number.isFinite(val) && val >= 0) {
+            const resVal = metric === "revenue"
+              ? Math.round(val * tariff)
+              : (metric === "emission" ? Math.round(val * 0.85 * 10) / 10 : Math.round(val * 10) / 10);
+            if (mNum >= 1 && mNum <= 12) monthly[mNum - 1] = resVal;
+            else if (i < 12) monthly[i] = resVal;
+          }
+        }
+      }
+    }
+
+    if (isCurrentYear) {
+      const liveMonthKwh = Number(station.monthly_energy_kwh ?? station.month_energy_kwh ?? 0);
+      if (liveMonthKwh > 0) {
+        if (metric === "energy") monthly[currentMonthIdx] = Math.round(liveMonthKwh * 10) / 10;
+        else if (metric === "revenue") monthly[currentMonthIdx] = Math.round(liveMonthKwh * tariff);
+        else if (metric === "emission") monthly[currentMonthIdx] = Math.round(liveMonthKwh * 0.85 * 10) / 10;
+      }
+    }
+
+    // SMA strictly uses real vendor curve; if no data for targetYear, leave as 0s
+    return monthly;
+  }
+  // 3. Huawei (when isCurrentYear)
   else if (isCurrentYear) {
     const chartMap = metric === "revenue" ? station.revenue_charts : station.energy_charts;
     const fallbackEnergyMap = station.energy_charts;
