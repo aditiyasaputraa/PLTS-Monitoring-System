@@ -2426,6 +2426,18 @@ function getAvailableProductionYears(locations, selected) {
         if (Number.isFinite(num) && num >= 2000 && num <= 2100) years.add(num);
       }
     }
+    if (loc?.energy_charts?.monthly_by_year) {
+      for (const yKey of Object.keys(loc.energy_charts.monthly_by_year)) {
+        const num = parseInt(yKey, 10);
+        if (Number.isFinite(num) && num >= 2000 && num <= 2100) years.add(num);
+      }
+    }
+    if (loc?.energy_charts?.daily_by_month) {
+      for (const mKey of Object.keys(loc.energy_charts.daily_by_month)) {
+        const num = parseInt(mKey.split("-")[0], 10);
+        if (Number.isFinite(num) && num >= 2000 && num <= 2100) years.add(num);
+      }
+    }
     const gridDate = loc?.grid_connected_at || loc?.gridConnectedTime || loc?.install_date || loc?.commissioning_date || loc?.create_time;
     if (gridDate) {
       const parsedYear = new Date(gridDate).getFullYear();
@@ -2806,11 +2818,6 @@ function getStationDailyValues(station, targetDateStr, metric = "energy", custom
   const effectiveDateStr = targetDateStr || todayStr;
   const isToday = effectiveDateStr === todayStr;
   const targetDate = new Date(effectiveDateStr + "T12:00:00");
-  const isFuture = targetDate > now && !isToday;
-
-  if (isFuture) {
-    return { labels: hourlyLabels, values: rawValues };
-  }
 
   const solarWeights = [
     0, 0, 0, 0, 0, 0,
@@ -3029,12 +3036,6 @@ function getStationWeeklyValues(station, targetDateStr, metric = "energy", custo
     const monthStr = `${yr}-${mo}`;
     const dayNum = d.getDate();
     const isToday = yr === now.getFullYear() && d.getMonth() === now.getMonth() && dayNum === now.getDate();
-    const isFuture = d > now && !isToday;
-
-    if (isFuture) {
-      rawKwhs.push(0);
-      continue;
-    }
 
     let kwh = 0;
 
@@ -3120,11 +3121,6 @@ function getStationDailyMonthValues(station, targetYear, targetMonth, metric = "
   const targetMonthStr = `${targetYear}-${String(targetMonth + 1).padStart(2, "0")}`;
   const now = new Date();
   const isCurrentMonth = targetYear === now.getFullYear() && targetMonth === now.getMonth();
-  const isFutureMonth = targetYear > now.getFullYear() || (targetYear === now.getFullYear() && targetMonth > now.getMonth());
-
-  if (isFutureMonth) {
-    return daily;
-  }
 
   // 1. Kehua
   if (source === "kehua") {
@@ -3220,6 +3216,9 @@ function getStationDailyMonthValues(station, targetYear, targetMonth, metric = "
   // Live update for today's value if current month and current day
   if (isCurrentMonth) {
     const todayNum = now.getDate();
+    for (let d = todayNum; d < daysInSelectedMonth; d++) {
+      daily[d] = 0;
+    }
     if (todayNum >= 1 && todayNum <= daysInSelectedMonth) {
       const liveTodayKwh = Number(station.daily_energy_kwh ?? station.today_energy_kwh ?? 0);
       if (liveTodayKwh > 0) {
@@ -4464,32 +4463,6 @@ function EnergyProductionChart({ series, period }) {
     if (period === "week") {
       return true;
     }
-    if (period === "day" || period === "today") {
-      const daily = getStationDailyValues(activeStation, selectedDate, "energy");
-      return {
-        available: true,
-        labels: daily.labels,
-        values: daily.values,
-        unit: "kWh",
-        kind: "bar",
-        title: "Daily production curve",
-        caption: `Generasi per jam (${formatToDisplayDate(selectedDate)})`,
-      };
-    }
-
-    if (period === "week") {
-      const weekly = getStationWeeklyValues(activeStation, selectedDate, "energy");
-      return {
-        available: true,
-        labels: weekly.labels,
-        values: weekly.values,
-        unit: "kWh",
-        kind: "bar",
-        title: "Weekly production curve (7 days)",
-        caption: `Generasi 7 hari (${formatToDisplayDate(selectedDate)})`,
-      };
-    }
-
     if (period === "month") {
       const day = parseInt(effectiveLabels[index], 10);
       return [1, 5, 10, 15, 20, 25, 30].includes(day);
@@ -5584,8 +5557,8 @@ function buildAggregatedFleetSeries({
       }
     });
 
-    for (let i = 0; i < 12; i++) {
-      if (isFutureYear || (isCurrentYear && i > nowMonth)) {
+    if (isCurrentYear) {
+      for (let i = nowMonth + 1; i < 12; i++) {
         aggregated[i] = 0;
       }
     }
