@@ -1137,7 +1137,7 @@ def sma_extra_plant_calls(site: dict[str, Any], navigation_call: dict[str, Any],
     today_end_utc = jakarta_today_end.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
     # Query current year daily readings (from Jan 1) for current month daily curve and 12-month annual curve
-    daily_begin = f"{jakarta_now.year - 1:04d}-12-31T17:00:00Z"
+    daily_begin = "2019-12-31T17:00:00Z"
     daily_end = f"{jakarta_now.year:04d}-{jakarta_now.month:02d}-{jakarta_now.day:02d}T17:00:00Z"
     monthly_begin = "2019-12-31T17:00:00Z"
     monthly_end = f"{jakarta_now.year:04d}-12-31T17:00:00Z"
