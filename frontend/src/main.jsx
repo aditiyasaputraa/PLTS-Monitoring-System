@@ -2797,7 +2797,8 @@ function getStationDailyValues(station, targetDateStr, metric = "energy", custom
       const mo = String(targetDate.getMonth() + 1).padStart(2, "0");
       const dayNum = targetDate.getDate();
       const monthStr = `${yr}-${mo}`;
-      const monthObj = station?.energy_charts?.daily_by_month?.[monthStr];
+      const dailyByMonth = station?.energy_charts?.daily_by_month || station?.site?.energy_charts?.daily_by_month || station?.charts?.daily_by_month;
+      const monthObj = dailyByMonth?.[monthStr];
       let dayKwh = 0;
       if (monthObj?.labels && Array.isArray(monthObj?.values)) {
         const idx = monthObj.labels.findIndex((l) => parseInt(l, 10) === dayNum);
@@ -2932,6 +2933,10 @@ function getStationDailyValues(station, targetDateStr, metric = "energy", custom
       for (let h = 0; h < 24; h++) {
         rawValues[h] = rawValues[h] * scale;
       }
+    } else if (liveTodayKwh > 0 && sumCalc === 0) {
+      for (let h = 0; h < 24; h++) {
+        rawValues[h] = Math.round(solarWeights[h] * liveTodayKwh * 100) / 100;
+      }
     }
   }
 
@@ -2982,7 +2987,8 @@ function getStationWeeklyValues(station, targetDateStr, metric = "energy", custo
 
     // 1. SMA
     if (source === "sma") {
-      const monthObj = station?.energy_charts?.daily_by_month?.[monthStr];
+      const dailyByMonth = station?.energy_charts?.daily_by_month || station?.site?.energy_charts?.daily_by_month || station?.charts?.daily_by_month;
+      const monthObj = dailyByMonth?.[monthStr];
       if (monthObj?.labels && Array.isArray(monthObj?.values)) {
         const idx = monthObj.labels.findIndex((l) => parseInt(l, 10) === dayNum);
         if (idx >= 0 && Number.isFinite(Number(monthObj.values[idx]))) {
@@ -3076,7 +3082,7 @@ function getStationDailyMonthValues(station, targetYear, targetMonth, metric = "
   }
   // 2. SMA
   else if (source === "sma") {
-    const dailyByMonth = station.energy_charts?.daily_by_month;
+    const dailyByMonth = station.energy_charts?.daily_by_month || station.site?.energy_charts?.daily_by_month || station.charts?.daily_by_month;
     const monthObj = dailyByMonth?.[targetMonthStr];
     const trends = station.charts?.company_power_trends;
     const monthSeries = trends?.month_daily?.series?.[targetMonthStr];
@@ -5712,6 +5718,32 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
       };
     }
 
+    if (period === "day" || period === "today") {
+      const daily = getStationDailyValues(activeStation, selectedDate, "energy");
+      return {
+        available: true,
+        labels: daily.labels,
+        values: daily.values,
+        unit: "kWh",
+        kind: "bar",
+        title: "Daily production curve",
+        caption: `Generasi per jam (${formatToDisplayDate(selectedDate)})`,
+      };
+    }
+
+    if (period === "week") {
+      const weekly = getStationWeeklyValues(activeStation, selectedDate, "energy");
+      return {
+        available: true,
+        labels: weekly.labels,
+        values: weekly.values,
+        unit: "kWh",
+        kind: "bar",
+        title: "Weekly production curve (7 days)",
+        caption: `Generasi 7 hari (${formatToDisplayDate(selectedDate)})`,
+      };
+    }
+
     if (period === "month") {
       const daysInSelectedMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
       const labels = Array.from({ length: daysInSelectedMonth }, (_, i) => String(i + 1).padStart(2, "0"));
@@ -6614,6 +6646,32 @@ function RevenueView({
         values: Array(count).fill(0),
         unit: "IDR",
         title: "Revenue history",
+      };
+    }
+
+    if (period === "day" || period === "today") {
+      const daily = getStationDailyValues(activeStation, selectedDate, "revenue", stationTariff);
+      return {
+        available: true,
+        labels: daily.labels,
+        values: daily.values,
+        unit: "IDR",
+        kind: "bar",
+        title: "Daily revenue curve",
+        caption: `Pendapatan per jam (${formatToDisplayDate(selectedDate)})`,
+      };
+    }
+
+    if (period === "week") {
+      const weekly = getStationWeeklyValues(activeStation, selectedDate, "revenue", stationTariff);
+      return {
+        available: true,
+        labels: weekly.labels,
+        values: weekly.values,
+        unit: "IDR",
+        kind: "bar",
+        title: "Weekly revenue curve (7 days)",
+        caption: `Pendapatan 7 hari (${formatToDisplayDate(selectedDate)})`,
       };
     }
 
@@ -7545,6 +7603,32 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
         values: Array(count).fill(0),
         unit: "kg CO₂",
         title: "Emission history",
+      };
+    }
+
+    if (period === "day" || period === "today") {
+      const daily = getStationDailyValues(activeStation, selectedDate, "emission");
+      return {
+        available: true,
+        labels: daily.labels,
+        values: daily.values,
+        unit: "kg CO₂",
+        kind: "bar",
+        title: "Daily emission reduction curve",
+        caption: `Reduksi emisi per jam (${formatToDisplayDate(selectedDate)})`,
+      };
+    }
+
+    if (period === "week") {
+      const weekly = getStationWeeklyValues(activeStation, selectedDate, "emission");
+      return {
+        available: true,
+        labels: weekly.labels,
+        values: weekly.values,
+        unit: "kg CO₂",
+        kind: "bar",
+        title: "Weekly emission reduction curve (7 days)",
+        caption: `Reduksi emisi 7 hari (${formatToDisplayDate(selectedDate)})`,
       };
     }
 
