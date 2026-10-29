@@ -1040,21 +1040,25 @@ def kehua_extra_station_calls(
             },
             "payload_raw": f"stationId={station_id}&dimension=3&targetTime={datetime.now().year}&chartType=1",
         })
-        calls.append({
-            "id": f"get_energy_trend_month_{station_id}",
-            "site": "kehua",
-            "name": "getEnergyTrendChartOfStation",
-            "method": "POST",
-            "url": f"{base_url}/necp/server-monitor/monitor/getEnergyTrendChartOfStation",
-            "headers": {
-                "Accept": "application/json, text/plain, */*",
-                "Content-Type": "application/x-www-form-urlencoded",
-                "clientType": "web",
-                "locale": "en",
-                "web_version": "3.0.4",
-            },
-            "payload_raw": f"stationId={station_id}&dimension=2&targetTime={datetime.now().strftime('%Y-%m')}&chartType=1",
-        })
+        now_dt = datetime.now()
+        for m_idx in range(1, now_dt.month + 1):
+            m_target = f"{now_dt.year:04d}-{m_idx:02d}"
+            calls.append({
+                "id": f"get_energy_trend_month_{m_target}_{station_id}",
+                "site": "kehua",
+                "name": "getEnergyTrendChartOfStation",
+                "method": "POST",
+                "url": f"{base_url}/necp/server-monitor/monitor/getEnergyTrendChartOfStation",
+                "headers": {
+                    "Accept": "application/json, text/plain, */*",
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "clientType": "web",
+                    "locale": "en",
+                    "web_version": "3.0.4",
+                },
+                "preserve_target_time": True,
+                "payload_raw": f"stationId={station_id}&dimension=2&targetTime={m_target}&chartType=1",
+            })
         calls.append({
             "id": f"get_energy_trend_week_{station_id}",
             "site": "kehua",
@@ -2151,8 +2155,12 @@ def normalize_kehua_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[d
                             trends["year_monthly"] = chart_data
                         st_charts["station_energy_trend"] = trends["year_monthly"]
                     elif dimension == "2":
-                        trends["month_daily"] = chart_data
-                        st_charts["station_energy_trend_month"] = chart_data
+                        existing = trends.get("month_daily")
+                        if existing and isinstance(existing.get("series"), dict):
+                            existing["series"].update(chart_data.get("series", {}))
+                        else:
+                            trends["month_daily"] = chart_data
+                        st_charts["station_energy_trend_month"] = trends["month_daily"]
                     elif dimension == "4":
                         trends["all_yearly"] = chart_data
                         st_charts["station_energy_trend_total"] = chart_data
