@@ -2530,12 +2530,13 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
                                 time_str = str(v.get("time") or "")
                                 date_part = time_str[:10]
                                 if len(date_part) == 10:
-                                    try:
-                                        m_idx = int(date_part[5:7]) - 1
-                                        if 0 <= m_idx < 12:
-                                            year_monthly_values[m_idx] = round(year_monthly_values[m_idx] + kwh, 2)
-                                    except Exception:
-                                        pass
+                                    if date_part.startswith(f"{jakarta_now.year:04d}"):
+                                        try:
+                                            m_idx = int(date_part[5:7]) - 1
+                                            if 0 <= m_idx < 12:
+                                                year_monthly_values[m_idx] = round(year_monthly_values[m_idx] + kwh, 2)
+                                        except Exception:
+                                            pass
                                     m_prefix = date_part[:7]
                                     day_str = date_part[8:10]
                                     if m_prefix not in daily_by_month:
