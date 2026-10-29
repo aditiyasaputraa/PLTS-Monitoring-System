@@ -257,13 +257,13 @@ export default function ChartExportModal({
       let periodLabel = "";
       if (monthIndices.length === 12) {
         periodLabel = "1-Tahun-Penuh";
-      } else if (monthIndices.length === 3 && [0,1,2].every((m) => monthIndices.includes(m))) {
+      } else if (monthIndices.length === 3 && [0, 1, 2].every((m) => monthIndices.includes(m))) {
         periodLabel = "TW1";
-      } else if (monthIndices.length === 3 && [3,4,5].every((m) => monthIndices.includes(m))) {
+      } else if (monthIndices.length === 3 && [3, 4, 5].every((m) => monthIndices.includes(m))) {
         periodLabel = "TW2";
-      } else if (monthIndices.length === 3 && [6,7,8].every((m) => monthIndices.includes(m))) {
+      } else if (monthIndices.length === 3 && [6, 7, 8].every((m) => monthIndices.includes(m))) {
         periodLabel = "TW3";
-      } else if (monthIndices.length === 3 && [9,10,11].every((m) => monthIndices.includes(m))) {
+      } else if (monthIndices.length === 3 && [9, 10, 11].every((m) => monthIndices.includes(m))) {
         periodLabel = "TW4";
       } else if (monthIndices.length === 1) {
         periodLabel = `Bulan_${ID_MONTH_NAMES[monthIndices[0]]}`;
@@ -430,42 +430,42 @@ export default function ChartExportModal({
               </button>
               <button
                 type="button"
-                className={`export-preset-pill ${selectedMonths.length === 3 && [0,1,2].every((m) => selectedMonths.includes(m)) ? "active" : ""}`}
+                className={`export-preset-pill ${selectedMonths.length === 3 && [0, 1, 2].every((m) => selectedMonths.includes(m)) ? "active" : ""}`}
                 onClick={() => handleSelectTw(1)}
               >
                 TW 1 (Jan-Mar)
               </button>
               <button
                 type="button"
-                className={`export-preset-pill ${selectedMonths.length === 3 && [3,4,5].every((m) => selectedMonths.includes(m)) ? "active" : ""}`}
+                className={`export-preset-pill ${selectedMonths.length === 3 && [3, 4, 5].every((m) => selectedMonths.includes(m)) ? "active" : ""}`}
                 onClick={() => handleSelectTw(2)}
               >
                 TW 2 (Apr-Jun)
               </button>
               <button
                 type="button"
-                className={`export-preset-pill ${selectedMonths.length === 3 && [6,7,8].every((m) => selectedMonths.includes(m)) ? "active" : ""}`}
+                className={`export-preset-pill ${selectedMonths.length === 3 && [6, 7, 8].every((m) => selectedMonths.includes(m)) ? "active" : ""}`}
                 onClick={() => handleSelectTw(3)}
               >
                 TW 3 (Jul-Sep)
               </button>
               <button
                 type="button"
-                className={`export-preset-pill ${selectedMonths.length === 3 && [9,10,11].every((m) => selectedMonths.includes(m)) ? "active" : ""}`}
+                className={`export-preset-pill ${selectedMonths.length === 3 && [9, 10, 11].every((m) => selectedMonths.includes(m)) ? "active" : ""}`}
                 onClick={() => handleSelectTw(4)}
               >
                 TW 4 (Okt-Des)
               </button>
               <button
                 type="button"
-                className={`export-preset-pill ${selectedMonths.length === 6 && [0,1,2,3,4,5].every((m) => selectedMonths.includes(m)) ? "active" : ""}`}
+                className={`export-preset-pill ${selectedMonths.length === 6 && [0, 1, 2, 3, 4, 5].every((m) => selectedMonths.includes(m)) ? "active" : ""}`}
                 onClick={() => handleSelectSemester(1)}
               >
                 Semester 1
               </button>
               <button
                 type="button"
-                className={`export-preset-pill ${selectedMonths.length === 6 && [6,7,8,9,10,11].every((m) => selectedMonths.includes(m)) ? "active" : ""}`}
+                className={`export-preset-pill ${selectedMonths.length === 6 && [6, 7, 8, 9, 10, 11].every((m) => selectedMonths.includes(m)) ? "active" : ""}`}
                 onClick={() => handleSelectSemester(2)}
               >
                 Semester 2

@@ -661,7 +661,7 @@ export function getEnergySeries(location, period) {
 
     if (normPeriod === "month") {
       const nested = latestNestedSeries(charts.company_power_trends?.month_daily);
-      if (nested.data?.labels?.length && (!effectiveMonth && !effectiveToday)) {
+      if (nested.data?.labels?.length) {
         return chartSeries(nested.data, {
           unit: normalizeUnitString(charts.company_power_trends?.month_daily?.unit, "kWh"),
           kind: "bar",
@@ -838,7 +838,8 @@ export function getRevenueSeries(location, period) {
     const energySeries = getEnergySeries(location, normPeriod);
     if (energySeries && energySeries.available !== false && Array.isArray(energySeries.values)) {
       const isMwh = normalizeUnitString(energySeries.unit, "").toUpperCase() === "MWH";
-      const multiplier = isMwh ? (900 * 1000) : 900;
+      const rate = location?.tariff_per_kwh || 900;
+      const multiplier = isMwh ? (rate * 1000) : rate;
       const revValues = energySeries.values.map((v) =>
         v !== null && v !== undefined ? Math.round(Number(v) * multiplier) : null
       );
@@ -848,7 +849,7 @@ export function getRevenueSeries(location, period) {
         unit: "IDR",
         kind: "bar",
         title: config?.title || "Revenue history",
-        caption: (energySeries.caption ? `${energySeries.caption} · ` : "") + "Dihitung otomatis (Rp 900/kWh)",
+        caption: (energySeries.caption ? `${energySeries.caption} · ` : "") + `Dihitung otomatis (Rp ${rate.toLocaleString("id-ID")}/kWh)`,
         available: true,
       };
     }
