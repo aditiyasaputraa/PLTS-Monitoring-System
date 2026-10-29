@@ -2537,7 +2537,7 @@ function getStationMonthlyValues(station, targetYear, metric = "energy", customT
   if (!station) return monthly;
 
   const tariff = customTariff || station.tariff_per_kwh || 900;
-  const source = (station.source || station.site?.platform || "").toLowerCase();
+  const source = (station.source || station.platform || station.site?.platform || "").toLowerCase();
 
   // 1. Kehua
   if (source === "kehua") {
@@ -2601,8 +2601,9 @@ function getStationMonthlyValues(station, targetYear, metric = "energy", customT
   }
 
   // 3. Historical Year (not current year)
-  // Untuk tahun berjalan, jika data 0 atau tidak ada chart vendor, JANGAN suntik estimasi buatan
-  if (!isCurrentYear) {
+  // Hanya gunakan estimasi bobot jika vendor TIDAK menyediakan kurva bulanan riil untuk tahun tersebut
+  const hasVendorMonthly = monthly.some((v) => v > 0);
+  if (!isCurrentYear && !hasVendorMonthly) {
     const annualKwh = getStationHistoricalYearKwh(station, targetYear);
     if (annualKwh > 0) {
       for (let m = 0; m < 12; m++) {
@@ -2684,13 +2685,13 @@ function getAggregateMonthlyValues(locations, activeStation, targetYear, metric 
   const seenKehuaTrendKeys = new Set();
 
   for (const st of pool) {
-    const source = (st.source || st.site?.platform || "").toLowerCase();
+    const source = (st.source || st.platform || st.site?.platform || "").toLowerCase();
     if (source === "kehua") {
       const trends = st.charts?.company_power_trends || st.site?.charts?.company_power_trends;
       const seriesGroup = trends?.year_monthly;
       const yearSeries = seriesGroup?.series?.[String(targetYear)];
       if (yearSeries) {
-        const key = `${st.site?.account || "kehua"}-${JSON.stringify(yearSeries.x || [])}-${JSON.stringify(yearSeries.y || [])}`;
+        const key = `${st.id || st.station_id || st.uid || "kehua"}-${JSON.stringify(yearSeries.x || [])}-${JSON.stringify(yearSeries.y || [])}`;
         if (seenKehuaTrendKeys.has(key)) {
           continue;
         }

@@ -711,7 +711,7 @@ export function getEnergySeries(location, period) {
 
     if (normPeriod === "year") {
       const nested = latestNestedSeries(charts.company_power_trends?.year_monthly);
-      if (nested.data?.labels?.length && (!effectiveYear && !effectiveMonth)) {
+      if (nested.data?.labels?.length) {
         return chartSeries(nested.data, {
           unit: normalizeUnitString(charts.company_power_trends?.year_monthly?.unit, "MWh"),
           kind: "bar",
@@ -724,7 +724,7 @@ export function getEnergySeries(location, period) {
 
     if (normPeriod === "lifetime") {
       const nested = latestNestedSeries(charts.company_power_trends?.all_yearly);
-      if (nested.data?.labels?.length && (!effectiveLifetime && !effectiveYear)) {
+      if (nested.data?.labels?.length) {
         return chartSeries(nested.data, {
           unit: normalizeUnitString(charts.company_power_trends?.all_yearly?.unit, "MWh"),
           kind: "bar",
