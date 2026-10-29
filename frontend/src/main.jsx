@@ -2471,15 +2471,17 @@ function getStationHistoricalYearKwh(station, targetYear) {
 
   // 3. Kehua company_power_trends.all_yearly
   const trends = station.charts?.company_power_trends || station.site?.charts?.company_power_trends;
-  const allYearly = trends?.all_yearly;
-  if (allYearly?.series?.all?.x && allYearly?.series?.all?.y) {
-    const xList = allYearly.series.all.x;
-    const yList = allYearly.series.all.y?.y_data || allYearly.series.all.y?.y_data_elec || allYearly.series.all.y || [];
+  const allYearly = trends?.all_yearly || station.charts?.station_energy_trend_total;
+  const allSeries = allYearly?.series?.all || allYearly?.series?.[""] || Object.values(allYearly?.series || {})[0];
+  if (allSeries?.x && allSeries?.y) {
+    const xList = allSeries.x;
+    const yList = allSeries.y?.y_data || allSeries.y?.y_data_elec || allSeries.y || [];
     const idx = xList.indexOf(targetYearStr);
     if (idx >= 0 && yList[idx] !== null && yList[idx] !== undefined) {
       const rawVal = Number(yList[idx]);
       if (Number.isFinite(rawVal) && rawVal >= 0) {
-        const unit = normalizeUnitString(allYearly.unit, "MWh").toUpperCase();
+        const rawUnit = allYearly.unit || "kWh";
+        const unit = normalizeUnitString(rawUnit, "kWh").toUpperCase();
         const multiplier = unit === "MWH" ? 1000 : 1;
         return rawVal * multiplier;
       }
@@ -2487,12 +2489,13 @@ function getStationHistoricalYearKwh(station, targetYear) {
   }
 
   // 4. Kehua year_monthly series sum
-  const yearMonthly = trends?.year_monthly?.series?.[targetYearStr];
+  const yearMonthly = trends?.year_monthly?.series?.[targetYearStr] || station.charts?.station_energy_trend?.series?.[targetYearStr];
   if (yearMonthly) {
     const yData = yearMonthly.y?.y_data || yearMonthly.y?.y_data_elec || yearMonthly.y || [];
     const sum = yData.reduce((acc, v) => acc + (Number(v) || 0), 0);
     if (sum > 0) {
-      const unit = normalizeUnitString(trends?.year_monthly?.unit, "MWh").toUpperCase();
+      const rawUnit = trends?.year_monthly?.unit || station.charts?.station_energy_trend?.unit || "kWh";
+      const unit = normalizeUnitString(rawUnit, "kWh").toUpperCase();
       const multiplier = unit === "MWH" ? 1000 : 1;
       return sum * multiplier;
     }

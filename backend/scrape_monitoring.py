@@ -808,7 +808,7 @@ def prepare_replay_call(
 
     if call.get("site") == "kehua":
         payload = parse_form_payload(str(prepared.get("payload_raw") or ""))
-        if "targetTime" in payload:
+        if "targetTime" in payload and not call.get("preserve_target_time"):
             dimension = str(payload.get("dimension") or "")
             if dimension == "2":
                 payload["targetTime"] = jakarta_now.strftime("%Y-%m")
@@ -1070,6 +1070,39 @@ def kehua_extra_station_calls(
             },
             "payload_raw": f"stationId={station_id}&dimension=5&targetTime={datetime.now().strftime('%Y-%m-%d')}&chartType=1",
         })
+        calls.append({
+            "id": f"get_energy_trend_total_{station_id}",
+            "site": "kehua",
+            "name": "getEnergyTrendChartOfStation",
+            "method": "POST",
+            "url": f"{base_url}/necp/server-monitor/monitor/getEnergyTrendChartOfStation",
+            "headers": {
+                "Accept": "application/json, text/plain, */*",
+                "Content-Type": "application/x-www-form-urlencoded",
+                "clientType": "web",
+                "locale": "en",
+                "web_version": "3.0.4",
+            },
+            "payload_raw": f"stationId={station_id}&dimension=4&targetTime=&chartType=1",
+        })
+        current_year = datetime.now().year
+        for past_yr in (current_year - 1, current_year - 2, current_year - 3, current_year - 4):
+            calls.append({
+                "id": f"get_energy_trend_{past_yr}_{station_id}",
+                "site": "kehua",
+                "name": "getEnergyTrendChartOfStation",
+                "method": "POST",
+                "url": f"{base_url}/necp/server-monitor/monitor/getEnergyTrendChartOfStation",
+                "headers": {
+                    "Accept": "application/json, text/plain, */*",
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "clientType": "web",
+                    "locale": "en",
+                    "web_version": "3.0.4",
+                },
+                "preserve_target_time": True,
+                "payload_raw": f"stationId={station_id}&dimension=3&targetTime={past_yr}&chartType=1",
+            })
     return calls
 
 
@@ -2059,18 +2092,25 @@ def normalize_kehua_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[d
             target_station_id = str(call_payload.get("stationId") or "")
             dimension = str(call_payload.get("dimension") or "")
             key_to_merge = target_station_id if target_station_id in by_id else only_station_key(by_id)
-            if key_to_merge and dimension in ("2", "3", "5"):
+            if key_to_merge and dimension in ("2", "3", "4", "5"):
                 chart_data = normalize_nested_chart(chart_res)
                 if chart_data:
                     target_st = by_id.setdefault(key_to_merge, {"platform": "kehua", "station_id": key_to_merge})
                     st_charts = target_st.setdefault("charts", {})
                     trends = st_charts.setdefault("company_power_trends", {})
                     if dimension == "3":
-                        trends["year_monthly"] = chart_data
-                        st_charts["station_energy_trend"] = chart_data
+                        existing = trends.get("year_monthly")
+                        if existing and isinstance(existing.get("series"), dict):
+                            existing["series"].update(chart_data.get("series", {}))
+                        else:
+                            trends["year_monthly"] = chart_data
+                        st_charts["station_energy_trend"] = trends["year_monthly"]
                     elif dimension == "2":
                         trends["month_daily"] = chart_data
                         st_charts["station_energy_trend_month"] = chart_data
+                    elif dimension == "4":
+                        trends["all_yearly"] = chart_data
+                        st_charts["station_energy_trend_total"] = chart_data
                     elif dimension == "5":
                         trends["week_daily"] = chart_data
                         st_charts["station_energy_trend_week"] = chart_data
@@ -2871,7 +2911,8 @@ def normalize_nested_chart(data: Any) -> dict[str, Any] | None:
     for key, value in inner.items() if isinstance(inner, dict) else []:
         if key == "unit" or not isinstance(value, dict):
             continue
-        series[key] = {
+        series_key = str(key) if key else "all"
+        series[series_key] = {
             "x": value.get("x_data"),
             "y": {
                 child_key: [to_float(item) for item in child_value]
