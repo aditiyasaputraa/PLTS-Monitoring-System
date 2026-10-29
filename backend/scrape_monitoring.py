@@ -1116,7 +1116,7 @@ def sma_extra_plant_calls(site: dict[str, Any], navigation_call: dict[str, Any])
     jakarta_today_start = datetime(jakarta_now.year, jakarta_now.month, jakarta_now.day, 0, 0, 0, tzinfo=timezone(timedelta(hours=7)))
     jakarta_today_end = jakarta_today_start + timedelta(days=1) - timedelta(seconds=1)
 
-    today_begin_utc = jakarta_today_start.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    today_begin_utc = (jakarta_today_start - timedelta(days=7)).astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
     today_end_utc = jakarta_today_end.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
     # Query current year daily readings (from Jan 1) for current month daily curve and 12-month annual curve
@@ -2459,11 +2459,16 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
         if capacity_kwp and capacity_kwp > 500:
             capacity_kwp = round(capacity_kwp / 1000.0, 2)
 
-        # 1. Hourly curve for today (24 hours)
+        jakarta_now = datetime.now(timezone(timedelta(hours=7)))
+
+        # 1. Hourly curve for today and recent days (24 hours per day)
         today_call = grouped.get(f"sma_plant_today_hourly_{component_id}") or []
         today_body = response_data(today_call[0]) if today_call else []
         today_hourly_labels = [f"{h:02d}:00" for h in range(24)]
         today_hourly_values = [0.0] * 24
+        hourly_by_date: dict[str, list[float]] = {}
+        today_date_str = jakarta_now.strftime("%Y-%m-%d")
+
         if isinstance(today_body, list):
             for channel in today_body:
                 if isinstance(channel, dict) and "values" in channel:
@@ -2474,10 +2479,16 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
                             try:
                                 t_utc = datetime.fromisoformat(time_str.replace("Z", "+00:00"))
                                 t_jkt = t_utc.astimezone(timezone(timedelta(hours=7)))
+                                d_key = t_jkt.strftime("%Y-%m-%d")
+                                if d_key not in hourly_by_date:
+                                    hourly_by_date[d_key] = [0.0] * 24
                                 if 0 <= t_jkt.hour < 24:
-                                    today_hourly_values[t_jkt.hour] = round((val or 0.0) / 1000.0, 3)
+                                    hourly_by_date[d_key][t_jkt.hour] = round((val or 0.0) / 1000.0, 3)
                             except Exception:
                                 pass
+
+        if today_date_str in hourly_by_date:
+            today_hourly_values = hourly_by_date[today_date_str]
 
         # 2. Daily energy points across the current year (Jan 1 to now)
         energy_call = grouped.get(f"sma_plant_daily_energy_{component_id}") or grouped.get("daily_energy") or []
@@ -2489,7 +2500,6 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
         year_monthly_labels = [f"{m:02d}" for m in range(1, 13)]
         year_monthly_values = [0.0] * 12
 
-        jakarta_now = datetime.now(timezone(timedelta(hours=7)))
         current_month_prefix = f"{jakarta_now.year:04d}-{jakarta_now.month:02d}"
 
         if isinstance(energy_body, list):
@@ -2711,6 +2721,7 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
                     "labels": today_hourly_labels,
                     "values": today_hourly_values,
                 },
+                "hourly_by_date": hourly_by_date,
                 "hourly": {
                     "labels": today_hourly_labels,
                     "values": today_hourly_values,
