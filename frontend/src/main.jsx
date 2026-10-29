@@ -2582,6 +2582,25 @@ function getStationMonthlyValues(station, targetYear, metric = "energy", customT
         }
       }
     }
+    // Fallback: If any month in year_monthly is 0 or missing, aggregate real daily bars from month_daily
+    const monthDailySeries = trends?.month_daily?.series;
+    if (monthDailySeries) {
+      for (let m = 0; m < 12; m++) {
+        if (monthly[m] === 0) {
+          const mKey = `${targetYear}-${String(m + 1).padStart(2, "0")}`;
+          const mData = monthDailySeries[mKey];
+          if (mData?.y) {
+            const yArr = mData.y.y_data_elec || mData.y.y_data || mData.y || [];
+            const sumKwh = yArr.reduce((acc, v) => acc + (Number(v) || 0), 0);
+            if (sumKwh > 0) {
+              if (metric === "revenue") monthly[m] = Math.round(sumKwh * tariff);
+              else if (metric === "emission") monthly[m] = Math.round(sumKwh * 0.85 * 10) / 10;
+              else monthly[m] = Math.round(sumKwh * 10) / 10;
+            }
+          }
+        }
+      }
+    }
     // Kehua strictly uses real vendor curve; if no data for targetYear, leave as 0s
     return monthly;
   }
@@ -2616,7 +2635,28 @@ function getStationMonthlyValues(station, targetYear, metric = "energy", customT
           }
         }
       }
-    } else if (isCurrentYear) {
+    }
+
+    // Fallback: If any month in monthlyByYear is 0 or missing, aggregate real daily values from daily_by_month
+    const dailyByMonth = station.energy_charts?.daily_by_month || station.site?.energy_charts?.daily_by_month;
+    if (dailyByMonth) {
+      for (let m = 0; m < 12; m++) {
+        if (monthly[m] === 0) {
+          const mKey = `${targetYear}-${String(m + 1).padStart(2, "0")}`;
+          const mObj = dailyByMonth[mKey];
+          if (Array.isArray(mObj?.values)) {
+            const sumKwh = mObj.values.reduce((acc, v) => acc + (Number(v) || 0), 0);
+            if (sumKwh > 0) {
+              if (metric === "revenue") monthly[m] = Math.round(sumKwh * tariff);
+              else if (metric === "emission") monthly[m] = Math.round(sumKwh * 0.85 * 10) / 10;
+              else monthly[m] = Math.round(sumKwh * 10) / 10;
+            }
+          }
+        }
+      }
+    }
+
+    if (isCurrentYear) {
       const eChart = station.energy_charts?.monthly;
       if (eChart?.labels && eChart?.values) {
         for (let i = 0; i < eChart.labels.length; i++) {
