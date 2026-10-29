@@ -2751,6 +2751,119 @@ function getStationMonthlyValues(station, targetYear, metric = "energy", customT
   return monthly;
 }
 
+function getStationDailyMonthValues(station, targetYear, targetMonth, metric = "energy", customTariff = null) {
+  const daysInSelectedMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+  const daily = Array(daysInSelectedMonth).fill(0);
+  if (!station) return daily;
+
+  const tariff = customTariff || station.tariff_per_kwh || 900;
+  const source = (station.source || station.platform || station.site?.platform || "").toLowerCase();
+  const targetMonthStr = `${targetYear}-${String(targetMonth + 1).padStart(2, "0")}`;
+  const now = new Date();
+  const isCurrentMonth = targetYear === now.getFullYear() && targetMonth === now.getMonth();
+  const isFutureMonth = targetYear > now.getFullYear() || (targetYear === now.getFullYear() && targetMonth > now.getMonth());
+
+  if (isFutureMonth) {
+    return daily;
+  }
+
+  // 1. Kehua
+  if (source === "kehua") {
+    const trends = station.charts?.company_power_trends || station.site?.charts?.company_power_trends;
+    const seriesGroup = trends?.month_daily;
+    const monthSeries = seriesGroup?.series?.[targetMonthStr];
+    if (monthSeries?.x && monthSeries?.y) {
+      const xLabels = monthSeries.x || [];
+      const yData = monthSeries.y?.y_data || monthSeries.y?.y_data_elec || monthSeries.y || [];
+      for (let i = 0; i < xLabels.length; i++) {
+        const dNum = parseInt(xLabels[i], 10);
+        if (dNum >= 1 && dNum <= daysInSelectedMonth) {
+          const rawVal = Number(yData[i]);
+          if (Number.isFinite(rawVal) && rawVal >= 0) {
+            daily[dNum - 1] = rawVal;
+          }
+        }
+      }
+    }
+  }
+  // 2. SMA
+  else if (source === "sma") {
+    const dailyByMonth = station.energy_charts?.daily_by_month;
+    const monthObj = dailyByMonth?.[targetMonthStr];
+    const trends = station.charts?.company_power_trends;
+    const monthSeries = trends?.month_daily?.series?.[targetMonthStr];
+
+    if (monthObj?.labels && Array.isArray(monthObj?.values)) {
+      for (let i = 0; i < monthObj.labels.length; i++) {
+        const dNum = parseInt(monthObj.labels[i], 10);
+        if (dNum >= 1 && dNum <= daysInSelectedMonth) {
+          const rawVal = Number(monthObj.values[i]);
+          if (Number.isFinite(rawVal) && rawVal >= 0) {
+            daily[dNum - 1] = rawVal;
+          }
+        }
+      }
+    } else if (monthSeries?.x && Array.isArray(monthSeries?.y)) {
+      for (let i = 0; i < monthSeries.x.length; i++) {
+        const dNum = parseInt(monthSeries.x[i], 10);
+        if (dNum >= 1 && dNum <= daysInSelectedMonth) {
+          const rawVal = Number(monthSeries.y[i]);
+          if (Number.isFinite(rawVal) && rawVal >= 0) {
+            daily[dNum - 1] = rawVal;
+          }
+        }
+      }
+    } else if (isCurrentMonth) {
+      const eDaily = station.energy_charts?.daily;
+      if (eDaily?.labels && eDaily?.values) {
+        for (let i = 0; i < eDaily.labels.length; i++) {
+          const dNum = parseInt(eDaily.labels[i], 10);
+          if (dNum >= 1 && dNum <= daysInSelectedMonth) {
+            const rawVal = Number(eDaily.values[i]);
+            if (Number.isFinite(rawVal) && rawVal >= 0) {
+              daily[dNum - 1] = rawVal;
+            }
+          }
+        }
+      }
+    }
+  }
+  // 3. Huawei
+  else if (source === "huawei") {
+    if (isCurrentMonth) {
+      const eDaily = station.energy_charts?.daily;
+      if (eDaily?.labels && eDaily?.values) {
+        for (let i = 0; i < eDaily.labels.length; i++) {
+          const dNum = parseInt(eDaily.labels[i], 10);
+          if (dNum >= 1 && dNum <= daysInSelectedMonth) {
+            const rawVal = Number(eDaily.values[i]);
+            if (Number.isFinite(rawVal) && rawVal >= 0) {
+              daily[dNum - 1] = rawVal;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Live update for today's value if current month and current day
+  if (isCurrentMonth) {
+    const todayNum = now.getDate();
+    if (todayNum >= 1 && todayNum <= daysInSelectedMonth) {
+      const liveTodayKwh = Number(station.daily_energy_kwh ?? station.today_energy_kwh ?? 0);
+      if (liveTodayKwh > 0) {
+        daily[todayNum - 1] = liveTodayKwh;
+      }
+    }
+  }
+
+  return daily.map((kwh) => {
+    if (metric === "revenue") return Math.round(kwh * tariff);
+    if (metric === "emission") return Math.round(kwh * 0.85 * 10) / 10;
+    return Math.round(kwh * 10) / 10;
+  });
+}
+
 function getAggregateMonthlyValues(locations, activeStation, targetYear, metric = "energy", fleet = null) {
   const currentYear = new Date().getFullYear();
   const isCurrentYear = targetYear === currentYear;
@@ -5054,34 +5167,15 @@ function buildAggregatedFleetSeries({
 
   if (period === "month") {
     const daysInSelectedMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
-    const now = new Date();
-    const isCurrentMonth = selectedYear === now.getFullYear() && selectedMonth === now.getMonth();
-    const isFutureMonth = selectedYear > now.getFullYear() || (selectedYear === now.getFullYear() && selectedMonth > now.getMonth());
-
     const labels = Array.from({ length: daysInSelectedMonth }, (_, i) => String(i + 1).padStart(2, "0"));
     const aggregated = Array(daysInSelectedMonth).fill(0);
 
     locs.forEach((loc) => {
-      const s = getLocSeries(loc, "month");
-      if (s && s.available !== false && Array.isArray(s.values)) {
-        s.values.forEach((v, idx) => {
-          if (idx < daysInSelectedMonth) {
-            aggregated[idx] += Number(v) || 0;
-          }
-        });
-      } else {
-        const mVal = getLocMonthly(loc);
-        const dVal = getLocDaily(loc);
-        const avg = mVal > 0 ? (mVal / Math.max(1, isCurrentMonth ? now.getDate() : daysInSelectedMonth)) : (dVal || 10);
+      const tariff = loc?.tariff_per_kwh || getStationTariff(loc, tariffConfig);
+      const vals = getStationDailyMonthValues(loc, selectedYear, selectedMonth, metricType, tariff);
+      if (Array.isArray(vals)) {
         for (let i = 0; i < daysInSelectedMonth; i++) {
-          if (isFutureMonth || (isCurrentMonth && (i + 1 > now.getDate()))) {
-            // 0
-          } else if (isCurrentMonth && (i + 1 === now.getDate()) && dVal > 0) {
-            aggregated[i] += dVal;
-          } else {
-            const factor = 0.85 + (((i + selectedMonth) * 7) % 30) / 100;
-            aggregated[i] += avg * factor;
-          }
+          aggregated[i] += Number(vals[i]) || 0;
         }
       }
     });
@@ -5320,6 +5414,21 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
         values: Array(count).fill(0),
         unit: "kWh",
         title: "Energy history",
+      };
+    }
+
+    if (period === "month") {
+      const daysInSelectedMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+      const labels = Array.from({ length: daysInSelectedMonth }, (_, i) => String(i + 1).padStart(2, "0"));
+      const vals = getStationDailyMonthValues(activeStation, selectedYear, selectedMonth, "energy");
+      return {
+        available: true,
+        labels,
+        values: vals,
+        unit: "kWh",
+        kind: "bar",
+        title: "Monthly production curve",
+        caption: `Generasi harian (${MONTH_NAMES[selectedMonth]} ${selectedYear})`,
       };
     }
 
@@ -6210,6 +6319,21 @@ function RevenueView({
         values: Array(count).fill(0),
         unit: "IDR",
         title: "Revenue history",
+      };
+    }
+
+    if (period === "month") {
+      const daysInSelectedMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+      const labels = Array.from({ length: daysInSelectedMonth }, (_, i) => String(i + 1).padStart(2, "0"));
+      const vals = getStationDailyMonthValues(activeStation, selectedYear, selectedMonth, "revenue", stationTariff);
+      return {
+        available: true,
+        labels,
+        values: vals,
+        unit: "IDR",
+        kind: "bar",
+        title: "Daily revenue this month",
+        caption: `Pendapatan harian (${MONTH_NAMES[selectedMonth]} ${selectedYear})`,
       };
     }
 
@@ -7197,6 +7321,21 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
         values: Array(count).fill(0),
         unit: "kg CO₂",
         title: "Emission history",
+      };
+    }
+
+    if (period === "month") {
+      const daysInSelectedMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+      const labels = Array.from({ length: daysInSelectedMonth }, (_, i) => String(i + 1).padStart(2, "0"));
+      const vals = getStationDailyMonthValues(activeStation, selectedYear, selectedMonth, "emission");
+      return {
+        available: true,
+        labels,
+        values: vals,
+        unit: "kg CO₂",
+        kind: "bar",
+        title: "Daily emission reduction this month",
+        caption: `Reduksi emisi harian (${MONTH_NAMES[selectedMonth]} ${selectedYear}) (0.85 kg CO₂/kWh)`,
       };
     }
 
