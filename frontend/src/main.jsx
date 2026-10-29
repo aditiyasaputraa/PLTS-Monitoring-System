@@ -2444,6 +2444,22 @@ function getAvailableProductionYears(locations, selected) {
   return Array.from(years).sort((a, b) => b - a);
 }
 
+function getStationLifetimeYears(station) {
+  const source = (station?.source || station?.platform || station?.site?.platform || "").toLowerCase();
+  if (source === "kehua") {
+    const trends = station?.charts?.company_power_trends || station?.site?.charts?.company_power_trends;
+    const allYearly = trends?.all_yearly || station?.charts?.station_energy_trend_total;
+    const allSeries = allYearly?.series?.all || allYearly?.series?.[""] || Object.values(allYearly?.series || {})[0];
+    if (allSeries?.x && Array.isArray(allSeries.x) && allSeries.x.length > 0) {
+      return allSeries.x.map(String);
+    }
+  }
+  const curYear = new Date().getFullYear();
+  const lifetimeYears = [];
+  for (let y = 2022; y <= curYear; y++) lifetimeYears.push(String(y));
+  return lifetimeYears;
+}
+
 function getStationHistoricalYearKwh(station, targetYear) {
   if (!station) return 0;
   const currentYear = new Date().getFullYear();
@@ -2516,15 +2532,7 @@ function getStationHistoricalYearKwh(station, targetYear) {
     }
   }
 
-  // 7. Estimate from lifetime if within operational range (from 2021) for historical years only
-  const lifetimeKwh = Number(station.cumulative_energy_kwh ?? station.total_energy_kwh ?? 0);
-  if (lifetimeKwh > 0 && targetYear < currentYear && targetYear >= 2021) {
-    const activeYearsCount = Math.max(1, currentYear - 2021 + 1);
-    const avgYearKwh = lifetimeKwh / activeYearsCount;
-    const yearVariation = [0.94, 1.02, 0.98, 1.05, 0.96, 1.0][Math.abs(targetYear - 2021) % 6];
-    return Math.round(avgYearKwh * yearVariation);
-  }
-
+  // 7. If no vendor data available for this year, leave as 0 (no synthetic estimation)
   return 0;
 }
 
@@ -2564,6 +2572,8 @@ function getStationMonthlyValues(station, targetYear, metric = "energy", customT
         }
       }
     }
+    // Kehua strictly uses real vendor curve; if no data for targetYear, leave as 0s
+    return monthly;
   }
   // 2. Huawei or SMA (when isCurrentYear)
   else if (isCurrentYear) {
@@ -5258,9 +5268,7 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
     }
 
     if (period === "lifetime") {
-      const curYear = new Date().getFullYear();
-      const lifetimeYears = [];
-      for (let y = 2019; y <= curYear; y++) lifetimeYears.push(String(y));
+      const lifetimeYears = getStationLifetimeYears(activeStation);
       const vals = lifetimeYears.map((yrStr) => {
         const val = getStationHistoricalYearKwh(activeStation, parseInt(yrStr, 10));
         return Math.round(val * 10) / 10;
@@ -6150,9 +6158,7 @@ function RevenueView({
     }
 
     if (period === "lifetime") {
-      const curYear = new Date().getFullYear();
-      const lifetimeYears = [];
-      for (let y = 2019; y <= curYear; y++) lifetimeYears.push(String(y));
+      const lifetimeYears = getStationLifetimeYears(activeStation);
       const vals = lifetimeYears.map((yrStr) => {
         const val = getStationHistoricalYearKwh(activeStation, parseInt(yrStr, 10));
         return Math.round(val * stationTariff);
@@ -7139,9 +7145,7 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
     }
 
     if (period === "lifetime") {
-      const curYear = new Date().getFullYear();
-      const lifetimeYears = [];
-      for (let y = 2019; y <= curYear; y++) lifetimeYears.push(String(y));
+      const lifetimeYears = getStationLifetimeYears(activeStation);
       const vals = lifetimeYears.map((yrStr) => {
         const val = getStationHistoricalYearKwh(activeStation, parseInt(yrStr, 10));
         return Math.round(val * 0.85 * 10) / 10;
