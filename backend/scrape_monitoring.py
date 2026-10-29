@@ -1106,11 +1106,28 @@ def kehua_extra_station_calls(
     return calls
 
 
-def sma_extra_plant_calls(site: dict[str, Any], navigation_call: dict[str, Any]) -> list[dict[str, Any]]:
+def sma_extra_plant_calls(site: dict[str, Any], navigation_call: dict[str, Any], session: requests.Session | None = None) -> list[dict[str, Any]]:
     body = response_data(navigation_call) or navigation_call.get("response_body")
     items = body if isinstance(body, list) else ([body] if isinstance(body, dict) else [])
     api_base = site.get("api_base") or f"{site.get('base_url', 'https://ennexos.sunnyportal.com')}/api/v1"
     calls: list[dict[str, Any]] = []
+
+    expanded_items = []
+    for item in items:
+        if isinstance(item, dict) and item.get("componentType") == "PlantGroup":
+            group_id = str(item.get("componentId") or item.get("plantGroupId") or "")
+            if group_id and session:
+                try:
+                    r_group = session.get(f"{api_base}/plantgroups/{group_id}/plants", timeout=15)
+                    if r_group.ok:
+                        g_plants = r_group.json()
+                        if isinstance(g_plants, list):
+                            expanded_items.extend(g_plants)
+                except Exception:
+                    pass
+        else:
+            expanded_items.append(item)
+    items = expanded_items
 
     jakarta_now = datetime.now(timezone(timedelta(hours=7)))
     jakarta_today_start = datetime(jakarta_now.year, jakarta_now.month, jakarta_now.day, 0, 0, 0, tzinfo=timezone(timedelta(hours=7)))
@@ -3172,7 +3189,7 @@ def scrape_site(
                 if delay:
                     time.sleep(delay)
         if site_name == "sma" and call.get("name") in ("navigation", "plants") and result.get("success"):
-            for extra_call in sma_extra_plant_calls(site, result):
+            for extra_call in sma_extra_plant_calls(site, result, session=session):
                 extra_result = replay_call(session, extra_call, timeout)
                 calls.append(extra_result)
                 if delay:
