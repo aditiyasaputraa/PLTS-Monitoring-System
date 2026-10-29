@@ -647,8 +647,17 @@ export function getEnergySeries(location, period) {
     }
 
     if (normPeriod === "week") {
+      const weekNested = latestNestedSeries(charts.company_power_trends?.week_daily || charts.station_energy_trend_week || charts.station_energy_trend);
+      if (weekNested.data?.labels?.length) {
+        return chartSeries(weekNested.data, {
+          unit: normalizeUnitString(charts.company_power_trends?.week_daily?.unit || charts.station_energy_trend?.unit, "kWh"),
+          kind: "bar",
+          title,
+          caption: "Weekly generation reported by Kehua",
+        });
+      }
       const nested = latestNestedSeries(charts.company_power_trends?.month_daily);
-      if (nested.data?.labels?.length && (!effectiveMonth && !effectiveToday)) {
+      if (nested.data?.labels?.length) {
         return sliceLastDays(nested.data, 7, {
           unit: normalizeUnitString(charts.company_power_trends?.month_daily?.unit, "kWh"),
           kind: "bar",

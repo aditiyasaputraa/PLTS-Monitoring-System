@@ -4029,7 +4029,15 @@ function EnergyProductionChart({ series, period }) {
           zIndex: 10,
         }}>
           <span style={{ color: "#a3b8aa" }}>
-            {period === "lifetime" ? `Tahun ${effectiveLabels[hoveredIndex]}` : (period === "year" ? `Bulan ${effectiveLabels[hoveredIndex]}` : (period === "month" ? `Tgl ${effectiveLabels[hoveredIndex]}` : `Jam ${effectiveLabels[hoveredIndex]}`))}
+            {period === "lifetime"
+              ? `Tahun ${effectiveLabels[hoveredIndex]}`
+              : (period === "year"
+                ? `Bulan ${effectiveLabels[hoveredIndex]}`
+                : (period === "month"
+                  ? `Tgl ${effectiveLabels[hoveredIndex]}`
+                  : (period === "week"
+                    ? `Hari ${effectiveLabels[hoveredIndex]}`
+                    : `Jam ${effectiveLabels[hoveredIndex]} `)))}
           </span>
           <span style={{ color: "#34d399" }}>
             {Number(effectiveValues[hoveredIndex] || 0).toFixed(2)} {series?.unit || "kWh"}
