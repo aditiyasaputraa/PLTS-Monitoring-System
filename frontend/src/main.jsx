@@ -2685,58 +2685,59 @@ function getStationMonthlyValues(station, targetYear, metric = "energy", customT
     // SMA strictly uses real vendor curve; if no data for targetYear, leave as 0s
     return monthly;
   }
-  // 3. Huawei (when isCurrentYear)
-  else if (isCurrentYear) {
-    const chartMap = metric === "revenue" ? station.revenue_charts : station.energy_charts;
-    const fallbackEnergyMap = station.energy_charts;
-
-    let chartData = (metric === "revenue" && tariff === 900) ? chartMap?.monthly : null;
-    if (!chartData) {
-      const eChart = fallbackEnergyMap?.monthly;
-      if (eChart?.labels && eChart?.values) {
-        chartData = {
-          labels: eChart.labels,
-          values: eChart.values.map((v) => (v !== null && v !== undefined ? Math.round(Number(v) * (metric === "revenue" ? tariff : 1)) : null)),
-        };
+  // 3. Huawei (strictly real vendor monthly curves)
+  else if (source === "huawei") {
+    const targetYearStr = String(targetYear);
+    const monthlyByYear = station.energy_charts?.monthly_by_year;
+    const yearArray = monthlyByYear?.[targetYearStr];
+    if (Array.isArray(yearArray)) {
+      for (let m = 0; m < 12; m++) {
+        const rawVal = Number(yearArray[m]);
+        if (Number.isFinite(rawVal) && rawVal >= 0) {
+          if (metric === "revenue") monthly[m] = Math.round(rawVal * tariff);
+          else if (metric === "emission") monthly[m] = Math.round(rawVal * 0.85 * 10) / 10;
+          else monthly[m] = Math.round(rawVal * 10) / 10;
+        }
       }
     }
 
-    if (chartData?.labels && chartData?.values) {
-      for (let i = 0; i < chartData.labels.length; i++) {
-        const lbl = chartData.labels[i];
-        const mNum = parseInt(lbl, 10);
-        const val = Number(chartData.values[i]);
-        if (Number.isFinite(val) && val >= 0) {
-          const resVal = metric === "revenue"
-            ? Math.round(val)
-            : (metric === "emission" ? Math.round(val * 0.85 * 10) / 10 : Math.round(val * 10) / 10);
-          if (mNum >= 1 && mNum <= 12) {
-            monthly[mNum - 1] = resVal;
-          } else if (i < 12) {
-            monthly[i] = resVal;
+    // Fallback: If any month in monthlyByYear is 0 or missing, aggregate real daily values from daily_by_month
+    const dailyByMonth = station.energy_charts?.daily_by_month || station.site?.energy_charts?.daily_by_month;
+    if (dailyByMonth) {
+      for (let m = 0; m < 12; m++) {
+        if (monthly[m] === 0) {
+          const mKey = `${targetYear}-${String(m + 1).padStart(2, "0")}`;
+          const mObj = dailyByMonth[mKey];
+          if (Array.isArray(mObj?.values)) {
+            const sumKwh = mObj.values.reduce((acc, v) => acc + (Number(v) || 0), 0);
+            if (sumKwh > 0) {
+              if (metric === "revenue") monthly[m] = Math.round(sumKwh * tariff);
+              else if (metric === "emission") monthly[m] = Math.round(sumKwh * 0.85 * 10) / 10;
+              else monthly[m] = Math.round(sumKwh * 10) / 10;
+            }
           }
         }
       }
     }
-  }
 
-  // 3. Historical Year (not current year)
-  // Hanya gunakan estimasi bobot jika vendor TIDAK menyediakan kurva bulanan riil untuk tahun tersebut
-  const hasVendorMonthly = monthly.some((v) => v > 0);
-  if (!isCurrentYear && !hasVendorMonthly) {
-    const annualKwh = getStationHistoricalYearKwh(station, targetYear);
-    if (annualKwh > 0) {
-      for (let m = 0; m < 12; m++) {
-        const mKwh = annualKwh * JAKARTA_SOLAR_MONTHLY_WEIGHTS[m];
-        if (metric === "revenue") {
-          monthly[m] = Math.round(mKwh * tariff);
-        } else if (metric === "emission") {
-          monthly[m] = Math.round(mKwh * 0.85 * 10) / 10;
-        } else {
-          monthly[m] = Math.round(mKwh * 10) / 10;
+    if (isCurrentYear && monthly.every((v) => v === 0)) {
+      const eChart = station.energy_charts?.monthly;
+      if (eChart?.labels && eChart?.values) {
+        for (let i = 0; i < eChart.labels.length; i++) {
+          const mNum = parseInt(eChart.labels[i], 10);
+          const val = Number(eChart.values[i]);
+          if (Number.isFinite(val) && val >= 0) {
+            const resVal = metric === "revenue"
+              ? Math.round(val * tariff)
+              : (metric === "emission" ? Math.round(val * 0.85 * 10) / 10 : Math.round(val * 10) / 10);
+            if (mNum >= 1 && mNum <= 12) monthly[mNum - 1] = resVal;
+            else if (i < 12) monthly[i] = resVal;
+          }
         }
       }
     }
+
+    return monthly;
   }
 
   // Live for current month in current year: sync directly with live monthly counter
@@ -3186,9 +3187,21 @@ function getStationDailyMonthValues(station, targetYear, targetMonth, metric = "
       }
     }
   }
-  // 3. Huawei
+  // 3. Huawei (strictly real vendor daily values)
   else if (source === "huawei") {
-    if (isCurrentMonth) {
+    const dailyByMonth = station.energy_charts?.daily_by_month || station.site?.energy_charts?.daily_by_month || station.charts?.daily_by_month;
+    const monthObj = dailyByMonth?.[targetMonthStr];
+    if (monthObj?.labels && Array.isArray(monthObj?.values)) {
+      for (let i = 0; i < monthObj.labels.length; i++) {
+        const dNum = parseInt(monthObj.labels[i], 10);
+        if (dNum >= 1 && dNum <= daysInSelectedMonth) {
+          const rawVal = Number(monthObj.values[i]);
+          if (Number.isFinite(rawVal) && rawVal >= 0) {
+            daily[dNum - 1] = rawVal;
+          }
+        }
+      }
+    } else if (isCurrentMonth) {
       const eDaily = station.energy_charts?.daily;
       if (eDaily?.labels && eDaily?.values) {
         for (let i = 0; i < eDaily.labels.length; i++) {
@@ -3199,23 +3212,6 @@ function getStationDailyMonthValues(station, targetYear, targetMonth, metric = "
               daily[dNum - 1] = rawVal;
             }
           }
-        }
-      }
-    } else {
-      const monthlyValues = getStationMonthlyValues(station, targetYear, "energy");
-      const monthTotal = (Array.isArray(monthlyValues) && targetMonth >= 0 && targetMonth < 12) ? Number(monthlyValues[targetMonth]) || 0 : 0;
-      if (monthTotal > 0) {
-        const activeDays = daysInSelectedMonth;
-        const weights = [];
-        let weightSum = 0;
-        for (let d = 1; d <= activeDays; d++) {
-          const w = 0.82 + (((d * 17 + targetMonth * 11) % 37) / 100);
-          weights.push(w);
-          weightSum += w;
-        }
-        for (let d = 1; d <= activeDays; d++) {
-          const dayKwh = weightSum > 0 ? (weights[d - 1] / weightSum) * monthTotal : (monthTotal / activeDays);
-          daily[d - 1] = Math.round(dayKwh * 10) / 10;
         }
       }
     }
