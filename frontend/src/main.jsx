@@ -2475,6 +2475,11 @@ function getStationLifetimeYears(station) {
     if (allSeries?.x && Array.isArray(allSeries.x) && allSeries.x.length > 0) {
       return allSeries.x.map(String);
     }
+  } else if (source === "huawei") {
+    const mby = station?.energy_charts?.monthly_by_year;
+    if (mby && Object.keys(mby).length > 0) {
+      return Object.keys(mby).sort();
+    }
   }
   const curYear = new Date().getFullYear();
   const lifetimeYears = [];
@@ -2537,6 +2542,13 @@ function getStationHistoricalYearKwh(station, targetYear) {
       const multiplier = unit === "MWH" ? 1000 : 1;
       return sum * multiplier;
     }
+  }
+
+  // 4b. Huawei & SMA monthly_by_year sum
+  const mbyArr = station.energy_charts?.monthly_by_year?.[targetYearStr];
+  if (Array.isArray(mbyArr)) {
+    const sum = mbyArr.reduce((acc, v) => acc + (Number(v) || 0), 0);
+    if (sum > 0) return Math.round(sum * 10) / 10;
   }
 
   // 5. If targetYear is currentYear, return live yearly_energy_kwh recorded by the station
