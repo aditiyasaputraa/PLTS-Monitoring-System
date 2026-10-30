@@ -7,6 +7,26 @@ const ID_MONTH_NAMES = [
   "Juli", "Agustus", "September", "Oktober", "November", "Desember"
 ];
 
+const ASSET_OWNER_PRESETS = [
+  "Sudin Nakertransgi Jakarta Utara",
+  "Sudin Nakertransgi Jakarta Barat",
+  "Sudin Nakertransgi Jakarta Pusat",
+  "Sudin Nakertransgi Jakarta Timur",
+  "Sudin Nakertransgi Jakarta Selatan",
+  "Dinas Tenaga Kerja, Transmigrasi dan Energi DKI Jakarta",
+  "Dinas Pendidikan DKI Jakarta",
+  "Biro Umum & ASD Setda DKI Jakarta",
+  "Dinas Kesehatan DKI Jakarta",
+  "Dinas Lingkungan Hidup DKI Jakarta",
+];
+
+function getStationOnlineStatus(st) {
+  const powerVal = Number(st?.current_power_kw ?? st?.output_power_kw ?? st?.pv_power_kw ?? st?.power_kw ?? 0);
+  const dailyVal = Number(st?.daily_energy_kwh ?? st?.today_energy_kwh ?? st?.today_kwh ?? 0);
+  const isOffline = st?.status === "offline" || st?.status === "disconnected" || (powerVal === 0 && dailyVal === 0);
+  return isOffline ? "Offline" : "Online";
+}
+
 export function downloadExcelWorkbook(filename, sheets = []) {
   const wb = XLSX.utils.book_new();
   sheets.forEach(({ sheetName, rows, colWidths, merges }) => {
@@ -52,11 +72,42 @@ export function downloadCsv(filename, rows) {
   URL.revokeObjectURL(url);
 }
 
-function buildMetricSheetRows(metricType, targetList, yr, monthIndices, getStationMonthlyValuesFn, getStationRegionFn) {
+function buildMetricSheetRows(
+  metricType,
+  targetList,
+  yr,
+  monthIndices,
+  getStationMonthlyValuesFn,
+  getStationRegionFn,
+  headerConfig = {}
+) {
   const monthHeaders = monthIndices.map((mIdx) => ID_MONTH_NAMES[mIdx]);
   const headers = ["No", "Nama PLTS", ...monthHeaders, "Total"];
+  const lastColIdx = headers.length - 1;
 
-  const rows = [headers];
+  const rows = [];
+  const merges = [];
+  const titleText = String(headerConfig?.customTitle || "").trim();
+  const notesText = String(headerConfig?.customNotes || "").trim();
+
+  if (titleText) {
+    merges.push({ s: { r: rows.length, c: 0 }, e: { r: rows.length, c: lastColIdx } });
+    rows.push([titleText]);
+  }
+
+  if (notesText) {
+    const noteLines = notesText.split(/\r?\n/);
+    noteLines.forEach((line) => {
+      merges.push({ s: { r: rows.length, c: 0 }, e: { r: rows.length, c: lastColIdx } });
+      rows.push([line]);
+    });
+  }
+
+  if (titleText || notesText) {
+    rows.push([]); // Baris kosong pemisah sebelum tabel
+  }
+
+  rows.push(headers);
   const colTotals = Array(monthIndices.length).fill(0);
   let grandTotal = 0;
 
@@ -83,6 +134,8 @@ function buildMetricSheetRows(metricType, targetList, yr, monthIndices, getStati
       let val = Number(monthlyVals[mIdx]) || 0;
       if (metricType === "revenue") {
         val = Math.round(val);
+      } else if (metricType === "energy") {
+        val = Number(val.toFixed(3));
       } else {
         val = Math.round(val * 10) / 10;
       }
@@ -93,6 +146,8 @@ function buildMetricSheetRows(metricType, targetList, yr, monthIndices, getStati
 
     if (metricType === "revenue") {
       rowTotal = Math.round(rowTotal);
+    } else if (metricType === "energy") {
+      rowTotal = Number(rowTotal.toFixed(3));
     } else {
       rowTotal = Math.round(rowTotal * 10) / 10;
     }
@@ -107,9 +162,16 @@ function buildMetricSheetRows(metricType, targetList, yr, monthIndices, getStati
   });
 
   const formattedColTotals = colTotals.map((tot) => {
-    return metricType === "revenue" ? Math.round(tot) : Math.round(tot * 10) / 10;
+    if (metricType === "revenue") return Math.round(tot);
+    if (metricType === "energy") return Number(tot.toFixed(3));
+    return Math.round(tot * 10) / 10;
   });
-  const formattedGrandTotal = metricType === "revenue" ? Math.round(grandTotal) : Math.round(grandTotal * 10) / 10;
+  const formattedGrandTotal =
+    metricType === "revenue"
+      ? Math.round(grandTotal)
+      : metricType === "energy"
+      ? Number(grandTotal.toFixed(3))
+      : Math.round(grandTotal * 10) / 10;
 
   rows.push([
     "",
@@ -125,7 +187,7 @@ function buildMetricSheetRows(metricType, targetList, yr, monthIndices, getStati
     { wch: 18 },
   ];
 
-  return { rows, colWidths };
+  return { rows, colWidths, merges };
 }
 
 export default function ChartExportModal({
@@ -179,6 +241,11 @@ export default function ChartExportModal({
   const [includeEnergy, setIncludeEnergy] = useState(true);
   const [includeRevenue, setIncludeRevenue] = useState(true);
   const [includeEmission, setIncludeEmission] = useState(true);
+  const [selectedAsset, setSelectedAsset] = useState("all");
+  const [selectedVendor, setSelectedVendor] = useState("all");
+  const [selectedStatus, setSelectedStatus] = useState("all");
+  const [customTitle, setCustomTitle] = useState("");
+  const [customNotes, setCustomNotes] = useState("");
   const [isExporting, setIsExporting] = useState(false);
 
   // Filter stations based on user's region role if regional admin
@@ -195,6 +262,48 @@ export default function ChartExportModal({
     }
     return [...list].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
   }, [allStations, isRegionalAdmin, userRegion, currentRegion, getStationRegionFn]);
+
+  const assetOptions = useMemo(() => {
+    const counts = {};
+    let unassignedCount = 0;
+    availableStations.forEach((st) => {
+      const owner = (st.asset_owner || "").trim();
+      if (owner) {
+        counts[owner] = (counts[owner] || 0) + 1;
+      } else {
+        unassignedCount += 1;
+      }
+    });
+    ASSET_OWNER_PRESETS.forEach((p) => {
+      if (!(p in counts)) counts[p] = 0;
+    });
+    return {
+      entries: Object.entries(counts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
+      unassignedCount,
+    };
+  }, [availableStations]);
+
+  const filteredAllStations = useMemo(() => {
+    return availableStations.filter((st) => {
+      if (selectedAsset !== "all") {
+        const owner = (st.asset_owner || "").trim();
+        if (selectedAsset === "__unassigned__") {
+          if (owner !== "") return false;
+        } else if (owner !== selectedAsset) {
+          return false;
+        }
+      }
+      if (selectedVendor !== "all") {
+        const v = String(st.source || st.site?.platform || "SMA").toUpperCase();
+        if (v !== selectedVendor) return false;
+      }
+      if (selectedStatus !== "all") {
+        const stStatus = getStationOnlineStatus(st).toLowerCase();
+        if (stStatus !== selectedStatus.toLowerCase()) return false;
+      }
+      return true;
+    });
+  }, [availableStations, selectedAsset, selectedVendor, selectedStatus]);
 
   // Set default selected station if empty
   React.useEffect(() => {
@@ -216,10 +325,10 @@ export default function ChartExportModal({
       const yr = Number(selectedYear) || currentYear;
       const targetList = targetScope === "single"
         ? availableStations.filter((s) => String(s.id) === String(selectedStationId))
-        : availableStations;
+        : filteredAllStations;
 
       if (targetList.length === 0) {
-        alert("Pilih setidaknya satu stasiun PLTS untuk diexport.");
+        alert("Tidak ada stasiun PLTS yang sesuai dengan filter untuk diexport.");
         setIsExporting(false);
         return;
       }
@@ -238,17 +347,18 @@ export default function ChartExportModal({
         return;
       }
 
+      const headerConfig = { customTitle, customNotes };
       const sheets = [];
       if (includeEnergy) {
-        const energyData = buildMetricSheetRows("energy", targetList, yr, monthIndices, getStationMonthlyValuesFn, getStationRegionFn);
+        const energyData = buildMetricSheetRows("energy", targetList, yr, monthIndices, getStationMonthlyValuesFn, getStationRegionFn, headerConfig);
         sheets.push({ sheetName: "Produksi Energi (kWh)", ...energyData });
       }
       if (includeRevenue) {
-        const revData = buildMetricSheetRows("revenue", targetList, yr, monthIndices, getStationMonthlyValuesFn, getStationRegionFn);
+        const revData = buildMetricSheetRows("revenue", targetList, yr, monthIndices, getStationMonthlyValuesFn, getStationRegionFn, headerConfig);
         sheets.push({ sheetName: "Penghematan Biaya (Rp)", ...revData });
       }
       if (includeEmission) {
-        const emData = buildMetricSheetRows("emission", targetList, yr, monthIndices, getStationMonthlyValuesFn, getStationRegionFn);
+        const emData = buildMetricSheetRows("emission", targetList, yr, monthIndices, getStationMonthlyValuesFn, getStationRegionFn, headerConfig);
         sheets.push({ sheetName: "Reduksi Emisi (kg CO2)", ...emData });
       }
 
@@ -327,7 +437,7 @@ export default function ChartExportModal({
                 className={`export-pill-btn ${targetScope === "all" ? "active" : ""}`}
                 onClick={() => setTargetScope("all")}
               >
-                🏢 Semua PLTS ({availableStations.length} Gedung)
+                🏢 Semua PLTS ({filteredAllStations.length} Gedung)
               </button>
               <button
                 type="button"
@@ -337,6 +447,80 @@ export default function ChartExportModal({
                 📍 Pilih Gedung Spesifik
               </button>
             </div>
+
+            {targetScope === "all" && (
+              <div
+                style={{
+                  marginTop: "10px",
+                  padding: "10px 12px",
+                  borderRadius: "10px",
+                  background: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "8px",
+                }}
+              >
+                <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr", gap: "8px" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#475569", marginBottom: "4px" }}>
+                      Filter Pemilik Aset
+                    </label>
+                    <select
+                      className="export-select-input"
+                      value={selectedAsset}
+                      onChange={(e) => setSelectedAsset(e.target.value)}
+                      style={{ fontSize: "12px", padding: "6px 8px" }}
+                    >
+                      <option value="all">Semua Aset ({availableStations.length})</option>
+                      {assetOptions.entries.map(([ownerName, count]) => (
+                        <option key={ownerName} value={ownerName}>
+                          {ownerName} ({count})
+                        </option>
+                      ))}
+                      {assetOptions.unassignedCount > 0 && (
+                        <option value="__unassigned__">
+                          Belum Diatur ({assetOptions.unassignedCount})
+                        </option>
+                      )}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#475569", marginBottom: "4px" }}>
+                      Filter Vendor
+                    </label>
+                    <select
+                      className="export-select-input"
+                      value={selectedVendor}
+                      onChange={(e) => setSelectedVendor(e.target.value)}
+                      style={{ fontSize: "12px", padding: "6px 8px" }}
+                    >
+                      <option value="all">Semua Vendor</option>
+                      <option value="HUAWEI">Huawei</option>
+                      <option value="KEHUA">Kehua</option>
+                      <option value="SMA">SMA</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#475569", marginBottom: "4px" }}>
+                      Filter Status
+                    </label>
+                    <select
+                      className="export-select-input"
+                      value={selectedStatus}
+                      onChange={(e) => setSelectedStatus(e.target.value)}
+                      style={{ fontSize: "12px", padding: "6px 8px" }}
+                    >
+                      <option value="all">Semua Status</option>
+                      <option value="online">🟢 Online</option>
+                      <option value="offline">🔴 Offline</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {targetScope === "single" && (
               <div style={{ marginTop: "10px" }}>
@@ -498,7 +682,7 @@ export default function ChartExportModal({
             </div>
           </div>
 
-          {/* Section 3: Pilihan Kolom Metrik */}
+          {/* Section 4: Pilihan Kolom Metrik */}
           <div className="export-form-group" style={{ marginTop: "16px" }}>
             <label className="export-label">4. Metrik Data yang Dimasukkan</label>
             <div className="export-checkbox-row">
@@ -526,6 +710,51 @@ export default function ChartExportModal({
                 />
                 <span>🌿 Reduksi Emisi (kg & Ton CO₂)</span>
               </label>
+            </div>
+          </div>
+
+          {/* Section 5: Judul & Isi Keterangan Manual di Atas Tabel */}
+          <div
+            className="export-form-group"
+            style={{
+              marginTop: "16px",
+              padding: "12px",
+              borderRadius: "10px",
+              background: "#f8fafc",
+              border: "1px solid #e2e8f0",
+              display: "flex",
+              flexDirection: "column",
+              gap: "10px",
+            }}
+          >
+            <div>
+              <label className="export-label" style={{ marginBottom: "4px" }}>
+                5. Judul di Atas Tabel (Opsional — Ketik Manual)
+              </label>
+              <input
+                type="text"
+                className="export-select-input"
+                placeholder="Contoh: LAPORAN KINERJA PRODUKSI ENERGI PLTS DINAS PENDIDIKAN"
+                value={customTitle}
+                onChange={(e) => setCustomTitle(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label className="export-label" style={{ marginBottom: "4px" }}>
+                Isi / Keterangan Tambahan di Atas Tabel (Opsional — Bisa Beberapa Baris)
+              </label>
+              <textarea
+                className="export-select-input"
+                rows={2}
+                placeholder="Contoh: Periode Laporan Tahun 2026 (tekan Enter untuk baris baru)"
+                value={customNotes}
+                onChange={(e) => setCustomNotes(e.target.value)}
+                style={{ resize: "vertical", fontFamily: "inherit", lineHeight: 1.45 }}
+              />
+              <div style={{ marginTop: "4px", fontSize: "11px", color: "#64748b" }}>
+                Teks yang diketik akan ditaruh pada baris paling atas sebelum tabel di setiap sheet Excel. Kosongkan jika ingin langsung tabel.
+              </div>
             </div>
           </div>
 
