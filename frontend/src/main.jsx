@@ -5519,9 +5519,7 @@ function ExportStationListModal({ isOpen, onClose, stations = [], regionLabel = 
                 <textarea
                   className="station-modal-input"
                   rows={3}
-                  placeholder={"Contoh:
-Periode Laporan : Oktober 2026
-Keterangan : Data PLTS Aktif"}
+                  placeholder="Contoh: Periode Laporan Oktober 2026 (tekan Enter untuk baris baru)"
                   value={customNotes}
                   onChange={(e) => setCustomNotes(e.target.value)}
                   style={{ resize: "vertical", fontFamily: "inherit", lineHeight: 1.45 }}
