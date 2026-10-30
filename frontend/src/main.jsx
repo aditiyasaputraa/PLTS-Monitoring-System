@@ -5209,8 +5209,6 @@ function handleExportStationList(stations = [], regionLabel = "DKI Jakarta", fil
   rows.push([
     "No",
     "Nama PLTS",
-    "Wilayah",
-    "Kecamatan",
     "Alamat",
     "Status",
     "Aset",
@@ -5219,8 +5217,6 @@ function handleExportStationList(stations = [], regionLabel = "DKI Jakarta", fil
 
   stations.forEach((st, idx) => {
     const name = st.custom_name || st.name || st.raw_name || "-";
-    const wilayah = getRegionIndoName(st);
-    const kecamatan = st.kecamatan || getStationKecamatan(st);
     const address = st.address || "-";
     const status = getStationOnlineStatus(st);
     const asset = st.asset_owner || "-";
@@ -5229,8 +5225,6 @@ function handleExportStationList(stations = [], regionLabel = "DKI Jakarta", fil
     rows.push([
       idx + 1,
       name,
-      wilayah,
-      kecamatan,
       address,
       status,
       asset,
@@ -5245,8 +5239,6 @@ function handleExportStationList(stations = [], regionLabel = "DKI Jakarta", fil
   const colWidths = [
     { wch: 6 },  // No
     { wch: 35 }, // Nama PLTS
-    { wch: 18 }, // Wilayah
-    { wch: 20 }, // Kecamatan
     { wch: 65 }, // Alamat
     { wch: 14 }, // Status
     { wch: 32 }, // Aset
