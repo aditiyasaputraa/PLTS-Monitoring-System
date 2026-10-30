@@ -5192,9 +5192,16 @@ function formatShortOwner(owner) {
     .replace(" Setda", "");
 }
 
-function handleExportStationList(stations = [], regionLabel = "DKI Jakarta") {
+function getStationOnlineStatus(st) {
+  const powerVal = Number(st?.current_power_kw ?? st?.output_power_kw ?? st?.pv_power_kw ?? st?.power_kw ?? 0);
+  const dailyVal = Number(st?.daily_energy_kwh ?? st?.today_energy_kwh ?? st?.today_kwh ?? 0);
+  const isOffline = st?.status === "offline" || st?.status === "disconnected" || (powerVal === 0 && dailyVal === 0);
+  return isOffline ? "Offline" : "Online";
+}
+
+function handleExportStationList(stations = [], regionLabel = "DKI Jakarta", filterSummary = "") {
   if (!stations || stations.length === 0) {
-    alert("Tidak ada data stasiun PLTS untuk diekspor.");
+    alert("Tidak ada data stasiun PLTS yang sesuai dengan filter untuk diekspor.");
     return;
   }
 
@@ -5202,6 +5209,8 @@ function handleExportStationList(stations = [], regionLabel = "DKI Jakarta") {
   rows.push([
     "No",
     "Nama PLTS",
+    "Wilayah",
+    "Kecamatan",
     "Alamat",
     "Status",
     "Aset",
@@ -5210,19 +5219,18 @@ function handleExportStationList(stations = [], regionLabel = "DKI Jakarta") {
 
   stations.forEach((st, idx) => {
     const name = st.custom_name || st.name || st.raw_name || "-";
+    const wilayah = getRegionIndoName(st);
+    const kecamatan = st.kecamatan || getStationKecamatan(st);
     const address = st.address || "-";
-
-    const powerVal = Number(st.current_power_kw ?? st.output_power_kw ?? st.pv_power_kw ?? st.power_kw ?? 0);
-    const dailyVal = Number(st.daily_energy_kwh ?? st.today_energy_kwh ?? st.today_kwh ?? 0);
-    const isOffline = st.status === "offline" || st.status === "disconnected" || (powerVal === 0 && dailyVal === 0);
-    const status = isOffline ? "Offline" : "Online";
-
+    const status = getStationOnlineStatus(st);
     const asset = st.asset_owner || "-";
     const vendor = String(st.source || st.site?.platform || "SMA").toUpperCase();
 
     rows.push([
       idx + 1,
       name,
+      wilayah,
+      kecamatan,
       address,
       status,
       asset,
@@ -5232,16 +5240,264 @@ function handleExportStationList(stations = [], regionLabel = "DKI Jakarta") {
 
   const dateStr = new Date().toISOString().slice(0, 10);
   const cleanReg = regionLabel.replace(/\s+/g, "_");
-  const filename = `Daftar_PLTS_${cleanReg}_${dateStr}.xlsx`;
+  const cleanFilter = filterSummary ? `_${filterSummary.replace(/[^a-zA-Z0-9_-]/g, "")}` : "";
+  const filename = `Daftar_PLTS_${cleanReg}${cleanFilter}_${dateStr}.xlsx`;
   const colWidths = [
     { wch: 6 },  // No
     { wch: 35 }, // Nama PLTS
+    { wch: 18 }, // Wilayah
+    { wch: 20 }, // Kecamatan
     { wch: 65 }, // Alamat
-    { wch: 15 }, // Status
-    { wch: 30 }, // Aset
-    { wch: 15 }, // Vendor
+    { wch: 14 }, // Status
+    { wch: 32 }, // Aset
+    { wch: 14 }, // Vendor
   ];
   downloadExcel(filename, rows, "Daftar PLTS", colWidths);
+}
+
+function ExportStationListModal({ isOpen, onClose, stations = [], regionLabel = "DKI Jakarta" }) {
+  const [selectedAsset, setSelectedAsset] = useState("all");
+  const [selectedVendor, setSelectedVendor] = useState("all");
+  const [selectedStatus, setSelectedStatus] = useState("all");
+
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedAsset("all");
+      setSelectedVendor("all");
+      setSelectedStatus("all");
+    }
+  }, [isOpen]);
+
+  // Daftar unik pemilik aset dari data stasiun + preset
+  const assetOptions = useMemo(() => {
+    const counts = {};
+    let unassignedCount = 0;
+    stations.forEach((st) => {
+      const owner = (st.asset_owner || "").trim();
+      if (owner) {
+        counts[owner] = (counts[owner] || 0) + 1;
+      } else {
+        unassignedCount += 1;
+      }
+    });
+    ASSET_OWNER_PRESETS.forEach((p) => {
+      if (!(p in counts)) counts[p] = 0;
+    });
+    return {
+      entries: Object.entries(counts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
+      unassignedCount,
+    };
+  }, [stations]);
+
+  // Daftar unik vendor beserta jumlahnya
+  const vendorCounts = useMemo(() => {
+    const counts = { HUAWEI: 0, KEHUA: 0, SMA: 0 };
+    stations.forEach((st) => {
+      const v = String(st.source || st.site?.platform || "SMA").toUpperCase();
+      counts[v] = (counts[v] || 0) + 1;
+    });
+    return counts;
+  }, [stations]);
+
+  // Jumlah Online vs Offline
+  const statusCounts = useMemo(() => {
+    let online = 0;
+    let offline = 0;
+    stations.forEach((st) => {
+      if (getStationOnlineStatus(st) === "Online") online += 1;
+      else offline += 1;
+    });
+    return { online, offline };
+  }, [stations]);
+
+  // Hasil filter berdasarkan pilihan Aset, Vendor, dan Status
+  const filteredStations = useMemo(() => {
+    return stations.filter((st) => {
+      if (selectedAsset !== "all") {
+        const owner = (st.asset_owner || "").trim();
+        if (selectedAsset === "__unassigned__") {
+          if (owner !== "") return false;
+        } else if (owner !== selectedAsset) {
+          return false;
+        }
+      }
+      if (selectedVendor !== "all") {
+        const v = String(st.source || st.site?.platform || "SMA").toUpperCase();
+        if (v !== selectedVendor) return false;
+      }
+      if (selectedStatus !== "all") {
+        const stStatus = getStationOnlineStatus(st).toLowerCase();
+        if (stStatus !== selectedStatus.toLowerCase()) return false;
+      }
+      return true;
+    });
+  }, [stations, selectedAsset, selectedVendor, selectedStatus]);
+
+  if (!isOpen) return null;
+
+  const handleDownload = (e) => {
+    e.preventDefault();
+    const parts = [];
+    if (selectedAsset !== "all") {
+      parts.push(selectedAsset === "__unassigned__" ? "TanpaAset" : formatShortOwner(selectedAsset).replace(/\s+/g, ""));
+    }
+    if (selectedVendor !== "all") parts.push(selectedVendor);
+    if (selectedStatus !== "all") parts.push(selectedStatus.toUpperCase());
+
+    handleExportStationList(filteredStations, regionLabel, parts.join("_"));
+    onClose();
+  };
+
+  return (
+    <div className="station-modal-overlay" onClick={onClose}>
+      <div className="station-modal-card" style={{ maxWidth: "480px" }} onClick={(e) => e.stopPropagation()}>
+        <div className="station-modal-header">
+          <div>
+            <h3 className="station-modal-title">Export Daftar PLTS (Excel)</h3>
+            <span style={{ fontSize: "11.5px", color: "#8a998f" }}>
+              Wilayah: <strong style={{ color: "#34d399" }}>{regionLabel}</strong> · Pilih filter data yang ingin diunduh
+            </span>
+          </div>
+          <button type="button" className="station-modal-close" onClick={onClose} title="Tutup">
+            ✕
+          </button>
+        </div>
+
+        <form onSubmit={handleDownload}>
+          <div className="station-modal-body" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            {/* 1. Filter Per Pemilik Aset */}
+            <div className="station-modal-field">
+              <label className="station-modal-label">1. Filter Pemilik Aset (Per Aset)</label>
+              <select
+                className="station-modal-input"
+                value={selectedAsset}
+                onChange={(e) => setSelectedAsset(e.target.value)}
+                style={{ cursor: "pointer" }}
+              >
+                <option value="all">Semua Pemilik Aset ({stations.length} PLTS)</option>
+                {assetOptions.entries.map(([ownerName, count]) => (
+                  <option key={ownerName} value={ownerName}>
+                    {ownerName} ({count} PLTS)
+                  </option>
+                ))}
+                {assetOptions.unassignedCount > 0 && (
+                  <option value="__unassigned__">
+                    Belum Diatur / Tanpa Pemilik Aset ({assetOptions.unassignedCount} PLTS)
+                  </option>
+                )}
+              </select>
+            </div>
+
+            {/* 2. Filter Per Vendor */}
+            <div className="station-modal-field">
+              <label className="station-modal-label">2. Filter Vendor Inverter (Per Vendor)</label>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px" }}>
+                {[
+                  { id: "all", label: `Semua (${stations.length})` },
+                  { id: "HUAWEI", label: `Huawei (${vendorCounts.HUAWEI || 0})` },
+                  { id: "KEHUA", label: `Kehua (${vendorCounts.KEHUA || 0})` },
+                  { id: "SMA", label: `SMA (${vendorCounts.SMA || 0})` },
+                ].map((item) => {
+                  const active = selectedVendor === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setSelectedVendor(item.id)}
+                      style={{
+                        padding: "8px 6px",
+                        borderRadius: "8px",
+                        fontSize: "11.5px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        border: active ? "1px solid #10b981" : "1px solid rgba(255,255,255,0.12)",
+                        background: active ? "rgba(16, 185, 129, 0.18)" : "rgba(255,255,255,0.04)",
+                        color: active ? "#34d399" : "#cbd5ce",
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 3. Filter Status Online / Offline */}
+            <div className="station-modal-field">
+              <label className="station-modal-label">3. Filter Status Koneksi (Online / Offline)</label>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
+                {[
+                  { id: "all", label: `Semua (${stations.length})`, dotColor: null },
+                  { id: "online", label: `Online (${statusCounts.online})`, dotColor: "#10b981" },
+                  { id: "offline", label: `Offline (${statusCounts.offline})`, dotColor: "#ef4444" },
+                ].map((item) => {
+                  const active = selectedStatus === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setSelectedStatus(item.id)}
+                      style={{
+                        padding: "8px 10px",
+                        borderRadius: "8px",
+                        fontSize: "11.5px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px",
+                        border: active ? "1px solid #10b981" : "1px solid rgba(255,255,255,0.12)",
+                        background: active ? "rgba(16, 185, 129, 0.18)" : "rgba(255,255,255,0.04)",
+                        color: active ? "#34d399" : "#cbd5ce",
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      {item.dotColor && (
+                        <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: item.dotColor }} />
+                      )}
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Ringkasan Hasil Filter */}
+            <div style={{
+              padding: "10px 14px",
+              borderRadius: "10px",
+              background: "rgba(16, 185, 129, 0.08)",
+              border: "1px solid rgba(16, 185, 129, 0.22)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              fontSize: "12px",
+              color: "#d1fae5",
+            }}>
+              <span>Jumlah PLTS yang akan diekspor:</span>
+              <strong style={{ fontSize: "14px", color: "#34d399" }}>{filteredStations.length} Stasiun</strong>
+            </div>
+          </div>
+
+          <div className="station-modal-footer">
+            <button type="button" className="btn-modal-cancel" onClick={onClose}>
+              Batal
+            </button>
+            <button
+              type="submit"
+              className="btn-modal-save"
+              disabled={filteredStations.length === 0}
+              style={filteredStations.length === 0 ? { opacity: 0.45, cursor: "not-allowed" } : {}}
+            >
+              Download Excel ({filteredStations.length})
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
 }
 
 function StationListDarkCard({
@@ -5258,6 +5514,7 @@ function StationListDarkCard({
   const regionLabel = currentRegion?.shortName || currentRegion?.name || "DKI Jakarta";
   const [searchQuery, setSearchQuery] = useState("");
   const [editingStation, setEditingStation] = useState(null);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
 
   const displayLocations = useMemo(() => {
     const base = (allLocations && allLocations.length > 0) ? allLocations : (locations || []);
@@ -5291,8 +5548,8 @@ function StationListDarkCard({
         <button
           type="button"
           className="btn-export-station-list"
-          onClick={() => handleExportStationList(displayLocations, regionLabel)}
-          title="Download Daftar PLTS (Excel .xlsx)"
+          onClick={() => setExportModalOpen(true)}
+          title="Filter dan Download Daftar PLTS (Excel .xlsx)"
         >
           <DownloadIcon style={{ width: "12px", height: "12px" }} />
           <span>Export Excel</span>
@@ -5475,6 +5732,13 @@ function StationListDarkCard({
           currentUser={currentUser}
         />
       )}
+
+      <ExportStationListModal
+        isOpen={exportModalOpen}
+        onClose={() => setExportModalOpen(false)}
+        stations={displayLocations}
+        regionLabel={regionLabel}
+      />
     </div>
   );
 }
