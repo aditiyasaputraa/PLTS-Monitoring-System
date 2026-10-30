@@ -5199,13 +5199,39 @@ function getStationOnlineStatus(st) {
   return isOffline ? "Offline" : "Online";
 }
 
-function handleExportStationList(stations = [], regionLabel = "DKI Jakarta", filterSummary = "") {
+function handleExportStationList(
+  stations = [],
+  regionLabel = "DKI Jakarta",
+  filterSummary = "",
+  headerConfig = {}
+) {
   if (!stations || stations.length === 0) {
     alert("Tidak ada data stasiun PLTS yang sesuai dengan filter untuk diekspor.");
     return;
   }
 
   const rows = [];
+  const merges = [];
+  const titleText = String(headerConfig?.customTitle || "").trim();
+  const notesText = String(headerConfig?.customNotes || "").trim();
+
+  if (titleText) {
+    merges.push({ s: { r: rows.length, c: 0 }, e: { r: rows.length, c: 5 } });
+    rows.push([titleText]);
+  }
+
+  if (notesText) {
+    const noteLines = notesText.split(/\r?\n/);
+    noteLines.forEach((line) => {
+      merges.push({ s: { r: rows.length, c: 0 }, e: { r: rows.length, c: 5 } });
+      rows.push([line]);
+    });
+  }
+
+  if (titleText || notesText) {
+    rows.push([]); // Baris kosong pemisah sebelum tabel
+  }
+
   rows.push([
     "No",
     "Nama PLTS",
@@ -5244,13 +5270,15 @@ function handleExportStationList(stations = [], regionLabel = "DKI Jakarta", fil
     { wch: 32 }, // Aset
     { wch: 14 }, // Vendor
   ];
-  downloadExcel(filename, rows, "Daftar PLTS", colWidths);
+  downloadExcel(filename, rows, "Daftar PLTS", colWidths, merges);
 }
 
 function ExportStationListModal({ isOpen, onClose, stations = [], regionLabel = "DKI Jakarta" }) {
   const [selectedAsset, setSelectedAsset] = useState("all");
   const [selectedVendor, setSelectedVendor] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
+  const [customTitle, setCustomTitle] = useState("");
+  const [customNotes, setCustomNotes] = useState("");
 
   useEffect(() => {
     if (isOpen) {
@@ -5336,7 +5364,10 @@ function ExportStationListModal({ isOpen, onClose, stations = [], regionLabel = 
     if (selectedVendor !== "all") parts.push(selectedVendor);
     if (selectedStatus !== "all") parts.push(selectedStatus.toUpperCase());
 
-    handleExportStationList(filteredStations, regionLabel, parts.join("_"));
+    handleExportStationList(filteredStations, regionLabel, parts.join("_"), {
+      customTitle,
+      customNotes,
+    });
     onClose();
   };
 
@@ -5453,6 +5484,51 @@ function ExportStationListModal({ isOpen, onClose, stations = [], regionLabel = 
                     </button>
                   );
                 })}
+              </div>
+            </div>
+
+            {/* 4. Judul & Isi Keterangan Manual di Atas Tabel */}
+            <div
+              style={{
+                padding: "12px",
+                borderRadius: "10px",
+                background: "rgba(255, 255, 255, 0.03)",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "10px",
+              }}
+            >
+              <div className="station-modal-field" style={{ margin: 0 }}>
+                <label className="station-modal-label">
+                  4. Judul di Atas Tabel (Opsional ? Ketik Manual)
+                </label>
+                <input
+                  type="text"
+                  className="station-modal-input"
+                  placeholder="Contoh: DAFTAR PLTS DINAS PENDIDIKAN PROVINSI DKI JAKARTA"
+                  value={customTitle}
+                  onChange={(e) => setCustomTitle(e.target.value)}
+                />
+              </div>
+
+              <div className="station-modal-field" style={{ margin: 0 }}>
+                <label className="station-modal-label">
+                  Isi / Keterangan Tambahan di Atas Tabel (Opsional ? Bisa Beberapa Baris)
+                </label>
+                <textarea
+                  className="station-modal-input"
+                  rows={3}
+                  placeholder={"Contoh:
+Periode Laporan : Oktober 2026
+Keterangan : Data PLTS Aktif"}
+                  value={customNotes}
+                  onChange={(e) => setCustomNotes(e.target.value)}
+                  style={{ resize: "vertical", fontFamily: "inherit", lineHeight: 1.45 }}
+                />
+                <span style={{ fontSize: "11px", color: "#8a998f" }}>
+                  Teks yang diketik di atas akan otomatis ditempatkan pada baris paling atas sebelum tabel Excel. Kosongkan jika ingin langsung tabel.
+                </span>
               </div>
             </div>
 

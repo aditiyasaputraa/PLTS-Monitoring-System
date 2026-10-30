@@ -9,10 +9,13 @@ const ID_MONTH_NAMES = [
 
 export function downloadExcelWorkbook(filename, sheets = []) {
   const wb = XLSX.utils.book_new();
-  sheets.forEach(({ sheetName, rows, colWidths }) => {
+  sheets.forEach(({ sheetName, rows, colWidths, merges }) => {
     const ws = XLSX.utils.aoa_to_sheet(rows);
     if (colWidths && Array.isArray(colWidths)) {
       ws["!cols"] = colWidths;
+    }
+    if (merges && Array.isArray(merges) && merges.length > 0) {
+      ws["!merges"] = merges;
     }
     const cleanName = (sheetName || "Sheet")
       .replace(/[\\/?*\[\]:]/g, "")
@@ -24,8 +27,8 @@ export function downloadExcelWorkbook(filename, sheets = []) {
   XLSX.writeFile(wb, safeFilename);
 }
 
-export function downloadExcel(filename, rows, sheetName = "Data PLTS", colWidths = null) {
-  downloadExcelWorkbook(filename, [{ sheetName, rows, colWidths }]);
+export function downloadExcel(filename, rows, sheetName = "Data PLTS", colWidths = null, merges = null) {
+  downloadExcelWorkbook(filename, [{ sheetName, rows, colWidths, merges }]);
 }
 
 export function downloadCsv(filename, rows) {
