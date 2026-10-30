@@ -200,6 +200,20 @@ function getStationRegion(station) {
     return "jaksel";
   }
 
+  // Kepulauan Seribu
+  if (
+    name.includes("seribu") ||
+    name.includes("tidung") ||
+    name.includes("pramuka") ||
+    name.includes("panggang") ||
+    name.includes("untung jawa") ||
+    address.includes("seribu") ||
+    address.includes("tidung") ||
+    address.includes("pramuka")
+  ) {
+    return "seribu";
+  }
+
   // Jakarta Utara (Kehua & Huawei: SDN 09, SMPN 282, GOR Sekda, SDN Rawa Badak, SMAN 75, SDN Sukapura 02)
   if (
     name.includes("jakut") ||
@@ -3993,6 +4007,7 @@ function TodayEnergyBySiteChart({
       { id: "jakbar", name: "Jakarta Barat" },
       { id: "jaksel", name: "Jakarta Selatan" },
       { id: "jaktim", name: "Jakarta Timur" },
+      { id: "seribu", name: "Kep. Seribu" },
     ];
 
     const groups = {};
@@ -4009,6 +4024,7 @@ function TodayEnergyBySiteChart({
         else if (indo.includes("barat") || indo.includes("jakbar")) rId = "jakbar";
         else if (indo.includes("selatan") || indo.includes("jaksel")) rId = "jaksel";
         else if (indo.includes("timur") || indo.includes("jaktim")) rId = "jaktim";
+        else if (indo.includes("seribu")) rId = "seribu";
       }
 
       if (groups[rId]) {
@@ -4098,7 +4114,7 @@ function TodayEnergyBySiteChart({
                 setViewMode("region");
               }}
             >
-              🏢 Per Wilayah (5 Kota)
+              🏢 Per Wilayah (6 Wilayah)
             </button>
           )}
           <button
