@@ -676,9 +676,16 @@ function useAuthSession() {
   return { session, loading, error, signIn, signInDemo, signOut };
 }
 
-function formatNumber(value, digits = 1) {
+function cleanFloat(val) {
+  const num = Number(val);
+  if (!Number.isFinite(num)) return 0;
+  return Number(num.toFixed(4));
+}
+
+function formatNumber(value, digits = 3) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return "0";
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: digits }).format(Number(value));
+  const effectiveDigits = digits < 3 ? 3 : digits;
+  return new Intl.NumberFormat("en-US", { maximumFractionDigits: effectiveDigits }).format(Number(value));
 }
 
 function formatMoney(value) {
@@ -1986,10 +1993,10 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt, selecte
   }, [locations, hasLocations]);
 
   const highestTodayEnergy = hasLocations && siteTodayEnergies.length > 0
-    ? Math.round(Math.max(...siteTodayEnergies, 0))
+    ? cleanFloat(Math.max(...siteTodayEnergies, 0))
     : 0;
   const latestTodayEnergy = hasLocations && selected
-    ? Math.round(Number(selected?.today_energy_kwh ?? selected?.daily_energy_kwh ?? 0))
+    ? cleanFloat(Number(selected?.today_energy_kwh ?? selected?.daily_energy_kwh ?? 0))
     : 0;
 
   return (
@@ -2667,7 +2674,7 @@ function getStationHistoricalYearKwh(station, targetYear) {
   const mbyArr = station.energy_charts?.monthly_by_year?.[targetYearStr];
   if (Array.isArray(mbyArr)) {
     const sum = mbyArr.reduce((acc, v) => acc + (Number(v) || 0), 0);
-    if (sum > 0) return Math.round(sum * 10) / 10;
+    if (sum > 0) return cleanFloat(sum);
   }
 
   // 5. If targetYear is currentYear, return live yearly_energy_kwh recorded by the station
@@ -2719,8 +2726,8 @@ function getStationMonthlyValues(station, targetYear, metric = "energy", customT
           if (Number.isFinite(rawVal) && rawVal >= 0) {
             const kwh = rawVal * multiplier;
             if (metric === "revenue") monthly[mNum - 1] = Math.round(kwh * tariff);
-            else if (metric === "emission") monthly[mNum - 1] = Math.round(kwh * 0.85 * 10) / 10;
-            else monthly[mNum - 1] = Math.round(kwh * 10) / 10;
+            else if (metric === "emission") monthly[mNum - 1] = cleanFloat(kwh * 0.85);
+            else monthly[mNum - 1] = cleanFloat(kwh);
           }
         }
       }
@@ -2737,8 +2744,8 @@ function getStationMonthlyValues(station, targetYear, metric = "energy", customT
             const sumKwh = yArr.reduce((acc, v) => acc + (Number(v) || 0), 0);
             if (sumKwh > 0) {
               if (metric === "revenue") monthly[m] = Math.round(sumKwh * tariff);
-              else if (metric === "emission") monthly[m] = Math.round(sumKwh * 0.85 * 10) / 10;
-              else monthly[m] = Math.round(sumKwh * 10) / 10;
+              else if (metric === "emission") monthly[m] = cleanFloat(sumKwh * 0.85);
+              else monthly[m] = cleanFloat(sumKwh);
             }
           }
         }
@@ -2760,8 +2767,8 @@ function getStationMonthlyValues(station, targetYear, metric = "energy", customT
         const rawVal = Number(yearArray[m]);
         if (Number.isFinite(rawVal) && rawVal >= 0) {
           if (metric === "revenue") monthly[m] = Math.round(rawVal * tariff);
-          else if (metric === "emission") monthly[m] = Math.round(rawVal * 0.85 * 10) / 10;
-          else monthly[m] = Math.round(rawVal * 10) / 10;
+          else if (metric === "emission") monthly[m] = cleanFloat(rawVal * 0.85);
+          else monthly[m] = cleanFloat(rawVal);
         }
       }
     } else if (yearSeries) {
@@ -2773,8 +2780,8 @@ function getStationMonthlyValues(station, targetYear, metric = "energy", customT
           const rawVal = Number(yData[i]);
           if (Number.isFinite(rawVal) && rawVal >= 0) {
             if (metric === "revenue") monthly[mNum - 1] = Math.round(rawVal * tariff);
-            else if (metric === "emission") monthly[mNum - 1] = Math.round(rawVal * 0.85 * 10) / 10;
-            else monthly[mNum - 1] = Math.round(rawVal * 10) / 10;
+            else if (metric === "emission") monthly[mNum - 1] = cleanFloat(rawVal * 0.85);
+            else monthly[mNum - 1] = cleanFloat(rawVal);
           }
         }
       }
@@ -2791,8 +2798,8 @@ function getStationMonthlyValues(station, targetYear, metric = "energy", customT
             const sumKwh = mObj.values.reduce((acc, v) => acc + (Number(v) || 0), 0);
             if (sumKwh > 0) {
               if (metric === "revenue") monthly[m] = Math.round(sumKwh * tariff);
-              else if (metric === "emission") monthly[m] = Math.round(sumKwh * 0.85 * 10) / 10;
-              else monthly[m] = Math.round(sumKwh * 10) / 10;
+              else if (metric === "emission") monthly[m] = cleanFloat(sumKwh * 0.85);
+              else monthly[m] = cleanFloat(sumKwh);
             }
           }
         }
@@ -2808,7 +2815,7 @@ function getStationMonthlyValues(station, targetYear, metric = "energy", customT
           if (Number.isFinite(val) && val >= 0) {
             const resVal = metric === "revenue"
               ? Math.round(val * tariff)
-              : (metric === "emission" ? Math.round(val * 0.85 * 10) / 10 : Math.round(val * 10) / 10);
+              : (metric === "emission" ? cleanFloat(val * 0.85) : cleanFloat(val));
             if (mNum >= 1 && mNum <= 12) monthly[mNum - 1] = resVal;
             else if (i < 12) monthly[i] = resVal;
           }
@@ -2819,9 +2826,9 @@ function getStationMonthlyValues(station, targetYear, metric = "energy", customT
     if (isCurrentYear) {
       const liveMonthKwh = Number(station.monthly_energy_kwh ?? station.month_energy_kwh ?? 0);
       if (liveMonthKwh > 0) {
-        if (metric === "energy") monthly[currentMonthIdx] = Math.round(liveMonthKwh * 10) / 10;
+        if (metric === "energy") monthly[currentMonthIdx] = cleanFloat(liveMonthKwh);
         else if (metric === "revenue") monthly[currentMonthIdx] = Math.round(liveMonthKwh * tariff);
-        else if (metric === "emission") monthly[currentMonthIdx] = Math.round(liveMonthKwh * 0.85 * 10) / 10;
+        else if (metric === "emission") monthly[currentMonthIdx] = cleanFloat(liveMonthKwh * 0.85);
       }
     }
 
@@ -2838,8 +2845,8 @@ function getStationMonthlyValues(station, targetYear, metric = "energy", customT
         const rawVal = Number(yearArray[m]);
         if (Number.isFinite(rawVal) && rawVal >= 0) {
           if (metric === "revenue") monthly[m] = Math.round(rawVal * tariff);
-          else if (metric === "emission") monthly[m] = Math.round(rawVal * 0.85 * 10) / 10;
-          else monthly[m] = Math.round(rawVal * 10) / 10;
+          else if (metric === "emission") monthly[m] = cleanFloat(rawVal * 0.85);
+          else monthly[m] = cleanFloat(rawVal);
         }
       }
     }
@@ -2855,8 +2862,8 @@ function getStationMonthlyValues(station, targetYear, metric = "energy", customT
             const sumKwh = mObj.values.reduce((acc, v) => acc + (Number(v) || 0), 0);
             if (sumKwh > 0) {
               if (metric === "revenue") monthly[m] = Math.round(sumKwh * tariff);
-              else if (metric === "emission") monthly[m] = Math.round(sumKwh * 0.85 * 10) / 10;
-              else monthly[m] = Math.round(sumKwh * 10) / 10;
+              else if (metric === "emission") monthly[m] = cleanFloat(sumKwh * 0.85);
+              else monthly[m] = cleanFloat(sumKwh);
             }
           }
         }
@@ -2872,7 +2879,7 @@ function getStationMonthlyValues(station, targetYear, metric = "energy", customT
           if (Number.isFinite(val) && val >= 0) {
             const resVal = metric === "revenue"
               ? Math.round(val * tariff)
-              : (metric === "emission" ? Math.round(val * 0.85 * 10) / 10 : Math.round(val * 10) / 10);
+              : (metric === "emission" ? cleanFloat(val * 0.85) : cleanFloat(val));
             if (mNum >= 1 && mNum <= 12) monthly[mNum - 1] = resVal;
             else if (i < 12) monthly[i] = resVal;
           }
@@ -2887,7 +2894,7 @@ function getStationMonthlyValues(station, targetYear, metric = "energy", customT
   if (isCurrentYear) {
     if (metric === "energy") {
       const liveMonthKwh = Number(station.monthly_energy_kwh ?? station.month_energy_kwh ?? 0);
-      monthly[currentMonthIdx] = Math.round(liveMonthKwh * 10) / 10;
+      monthly[currentMonthIdx] = cleanFloat(liveMonthKwh);
     } else if (metric === "revenue") {
       const liveMonthKwh = Number(station.monthly_energy_kwh ?? station.month_energy_kwh ?? 0);
       const liveMonthRev = liveMonthKwh > 0
@@ -2896,7 +2903,7 @@ function getStationMonthlyValues(station, targetYear, metric = "energy", customT
       monthly[currentMonthIdx] = Math.round(liveMonthRev);
     } else {
       const liveMonthKwh = Number(station.monthly_energy_kwh ?? station.month_energy_kwh ?? 0);
-      monthly[currentMonthIdx] = Math.round(liveMonthKwh * 0.85 * 10) / 10;
+      monthly[currentMonthIdx] = cleanFloat(liveMonthKwh * 0.85);
     }
 
     // Jika bulan-bulan lampau (Jan s/d sebelum bulan berjalan) masih 0 (misalnya Kehua yang tidak mengirimkan array monthly riwayat),
@@ -2923,9 +2930,9 @@ function getStationMonthlyValues(station, targetYear, metric = "energy", customT
             const revVal = pastYearKwh > 0 ? (pastYearKwh * tariff * w) : (pastYearRev * w);
             monthly[i] = Math.round(revVal);
           } else if (metric === "emission") {
-            monthly[i] = Math.round(pastYearKwh * w * 0.85 * 10) / 10;
+            monthly[i] = cleanFloat(pastYearKwh * w * 0.85);
           } else {
-            monthly[i] = Math.round(pastYearKwh * w * 10) / 10;
+            monthly[i] = cleanFloat(pastYearKwh * w);
           }
         }
       }
@@ -3133,8 +3140,8 @@ function getStationDailyValues(station, targetDateStr, metric = "energy", custom
 
   const values = rawValues.map((kwh) => {
     if (metric === "revenue") return Math.round(kwh * tariff);
-    if (metric === "emission") return Math.round(kwh * 0.85 * 10) / 10;
-    return Math.round(kwh * 100) / 100;
+    if (metric === "emission") return cleanFloat(kwh * 0.85);
+    return cleanFloat(kwh);
   });
 
   return { labels: hourlyLabels, values };
@@ -3235,8 +3242,8 @@ function getStationWeeklyValues(station, targetDateStr, metric = "energy", custo
 
   const values = rawKwhs.map((kwh) => {
     if (metric === "revenue") return Math.round(kwh * tariff);
-    if (metric === "emission") return Math.round(kwh * 0.85 * 10) / 10;
-    return Math.round(kwh * 10) / 10;
+    if (metric === "emission") return cleanFloat(kwh * 0.85);
+    return cleanFloat(kwh);
   });
 
   return { labels, values };
@@ -3360,8 +3367,8 @@ function getStationDailyMonthValues(station, targetYear, targetMonth, metric = "
 
   return daily.map((kwh) => {
     if (metric === "revenue") return Math.round(kwh * tariff);
-    if (metric === "emission") return Math.round(kwh * 0.85 * 10) / 10;
-    return Math.round(kwh * 10) / 10;
+    if (metric === "emission") return cleanFloat(kwh * 0.85);
+    return cleanFloat(kwh);
   });
 }
 
@@ -3401,17 +3408,17 @@ function getAggregateMonthlyValues(locations, activeStation, targetYear, metric 
 
   if (isCurrentYear && fleet) {
     if (metric === "energy" && Number.isFinite(Number(fleet.monthly))) {
-      aggregate[currentMonthIdx] = Math.round(Number(fleet.monthly) * 10) / 10;
+      aggregate[currentMonthIdx] = cleanFloat(Number(fleet.monthly));
     } else if (metric === "revenue") {
       const expectedRev = fleet.monthlyIncome > 0 ? Number(fleet.monthlyIncome) : (Number(fleet.monthly) > 0 ? Number(fleet.monthly) * 900 : 0);
       aggregate[currentMonthIdx] = Math.round(expectedRev);
     } else if (metric === "emission") {
       const expectedEmission = Number(fleet.monthly) > 0 ? Number(fleet.monthly) * 0.85 : 0;
-      aggregate[currentMonthIdx] = Math.round(expectedEmission * 10) / 10;
+      aggregate[currentMonthIdx] = cleanFloat(expectedEmission);
     }
   }
 
-  return aggregate.map((v) => Math.round(v * 10) / 10);
+  return aggregate.map((v) => metric === "revenue" ? Math.round(v) : cleanFloat(v));
 }
 
 function calculateMaxVal(maxNum) {
@@ -3494,9 +3501,9 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
       return `Rp ${new Intl.NumberFormat("id-ID").format(Math.round(val))} IDR`;
     }
     if (metric === "emission") {
-      return `${new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 }).format(val)} kg CO₂`;
+      return `${new Intl.NumberFormat("id-ID", { maximumFractionDigits: 3 }).format(val)} kg CO₂`;
     }
-    return `${new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 }).format(val)} kWh`;
+    return `${new Intl.NumberFormat("id-ID", { maximumFractionDigits: 3 }).format(val)} kWh`;
   };
 
   return (
@@ -3984,7 +3991,7 @@ function TodayEnergyBySiteChart({
     return Object.values(groups)
       .map((g) => ({
         ...g,
-        val: Math.round(g.val * 100) / 100,
+        val: cleanFloat(g.val),
         isKecamatanBar: true,
       }))
       .sort((a, b) => b.val - a.val);
@@ -4037,7 +4044,7 @@ function TodayEnergyBySiteChart({
 
     return targetRegions.map((reg) => ({
       ...groups[reg.id],
-      val: Math.round(groups[reg.id].val * 10) / 10,
+      val: cleanFloat(groups[reg.id].val),
       isRegionBar: true,
     }));
   }, [locations, allLocations]);
@@ -4276,7 +4283,7 @@ function TodayEnergyBySiteChart({
                   fontWeight="700"
                   textAnchor="middle"
                 >
-                  {new Intl.NumberFormat("id-ID").format(item.val)}
+                  {new Intl.NumberFormat("id-ID", { maximumFractionDigits: 3 }).format(item.val)}
                 </text>
 
                 {/* The Bar */}
@@ -4846,7 +4853,7 @@ function EnergyProductionChart({ series, period }) {
                     : `Jam ${effectiveLabels[hoveredIndex]} `)))}
           </span>
           <span style={{ color: "#34d399" }}>
-            {Number(effectiveValues[hoveredIndex] || 0).toFixed(2)} {series?.unit || "kWh"}
+            {new Intl.NumberFormat("id-ID", { maximumFractionDigits: 3 }).format(Number(effectiveValues[hoveredIndex] || 0))} {series?.unit || "kWh"}
           </span>
         </div>
       )}
@@ -5631,10 +5638,10 @@ function getFleetQuarterlyValues({ targetLocations, selectedYear, metricType = "
   }
 
   return {
-    q1: isRevenue ? Math.round(q1) : Math.round(q1 * 10) / 10,
-    q2: isRevenue ? Math.round(q2) : Math.round(q2 * 10) / 10,
-    q3: isRevenue ? Math.round(q3) : Math.round(q3 * 10) / 10,
-    q4: isRevenue ? Math.round(q4) : Math.round(q4 * 10) / 10,
+    q1: isRevenue ? Math.round(q1) : cleanFloat(q1),
+    q2: isRevenue ? Math.round(q2) : cleanFloat(q2),
+    q3: isRevenue ? Math.round(q3) : cleanFloat(q3),
+    q4: isRevenue ? Math.round(q4) : cleanFloat(q4),
     m1Name: "Jan - Mar",
     m2Name: "Apr - Jun",
     m3Name: "Jul - Sep",
@@ -5713,7 +5720,7 @@ function buildAggregatedFleetSeries({
     return {
       available: true,
       labels: hourlyLabels,
-      values: aggregated.map((v) => isRevenue ? Math.round(v) : Math.round(v * 100) / 100),
+      values: aggregated.map((v) => isRevenue ? Math.round(v) : cleanFloat(v)),
       unit,
       kind: "bar",
     };
@@ -5749,7 +5756,7 @@ function buildAggregatedFleetSeries({
     return {
       available: true,
       labels: weekLabels,
-      values: aggregated.map((v) => isRevenue ? Math.round(v) : Math.round(v * 10) / 10),
+      values: aggregated.map((v) => isRevenue ? Math.round(v) : cleanFloat(v)),
       unit,
       kind: "bar",
     };
@@ -5773,7 +5780,7 @@ function buildAggregatedFleetSeries({
     return {
       available: true,
       labels,
-      values: aggregated.map((v) => isRevenue ? Math.round(v) : Math.round(v * 10) / 10),
+      values: aggregated.map((v) => isRevenue ? Math.round(v) : cleanFloat(v)),
       unit,
       kind: "bar",
     };
@@ -5806,7 +5813,7 @@ function buildAggregatedFleetSeries({
     if (isCurrentYear && nowMonth < 12 && fleetTotalVals?.monthly !== undefined && fleetTotalVals?.monthly !== null) {
       aggregated[nowMonth] = isRevenue
         ? Math.round(Number(fleetTotalVals.monthly) || 0)
-        : Math.round((Number(fleetTotalVals.monthly) || 0) * 10) / 10;
+        : cleanFloat(Number(fleetTotalVals.monthly) || 0);
     }
 
     // Fallback if no station had data but fleetTotalVals had yearly estimate
@@ -5817,7 +5824,7 @@ function buildAggregatedFleetSeries({
           aggregated[m] = 0;
         } else {
           const mVal = annual * JAKARTA_SOLAR_MONTHLY_WEIGHTS[m];
-          aggregated[m] = isRevenue ? Math.round(mVal) : Math.round(mVal * 10) / 10;
+          aggregated[m] = isRevenue ? Math.round(mVal) : cleanFloat(mVal);
         }
       }
     }
@@ -5825,7 +5832,7 @@ function buildAggregatedFleetSeries({
     return {
       available: true,
       labels: months,
-      values: aggregated.map((v) => isRevenue ? Math.round(v) : Math.round(v * 10) / 10),
+      values: aggregated.map((v) => isRevenue ? Math.round(v) : cleanFloat(v)),
       unit,
       kind: "bar",
     };
@@ -5843,7 +5850,7 @@ function buildAggregatedFleetSeries({
       const yrNum = parseInt(yrStr, 10);
       const yrKwh = getStationHistoricalYearKwh(loc, yrNum);
       const tariff = loc?.tariff_per_kwh || 900;
-      const val = isRevenue ? Math.round(yrKwh * tariff) : (isEmission ? Math.round(yrKwh * 0.85 * 10) / 10 : Math.round(yrKwh * 10) / 10);
+      const val = isRevenue ? Math.round(yrKwh * tariff) : (isEmission ? cleanFloat(yrKwh * 0.85) : cleanFloat(yrKwh));
       aggregated[idx] += val;
     });
   });
@@ -5851,7 +5858,7 @@ function buildAggregatedFleetSeries({
   return {
     available: true,
     labels: years,
-    values: aggregated.map((v) => isRevenue ? Math.round(v) : Math.round(v * 10) / 10),
+    values: aggregated.map((v) => isRevenue ? Math.round(v) : cleanFloat(v)),
     unit,
     kind: "bar",
   };
@@ -6066,7 +6073,7 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
       const lifetimeYears = getStationLifetimeYears(activeStation);
       const vals = lifetimeYears.map((yrStr) => {
         const val = getStationHistoricalYearKwh(activeStation, parseInt(yrStr, 10));
-        return Math.round(val * 10) / 10;
+        return cleanFloat(val);
       });
       return {
         available: true,
@@ -6087,7 +6094,7 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
         return {
           available: true,
           labels: hourlyLabels,
-          values: solarWeights.map((w) => Math.round(w * todayKwh * 10) / 10),
+          values: solarWeights.map((w) => cleanFloat(w * todayKwh)),
           unit: "kWh",
           kind: "bar",
           title: "Daily production curve",
@@ -6105,7 +6112,7 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
           const d = new Date(now);
           d.setDate(d.getDate() - i);
           labels.push(`${days[(d.getDay() + 6) % 7]} ${d.getDate()}/${d.getMonth() + 1}`);
-          values.push(Math.round((i === 0 && todayKwh > 0 ? todayKwh : avg * factors[6 - i]) * 10) / 10);
+          values.push(cleanFloat(i === 0 && todayKwh > 0 ? todayKwh : avg * factors[6 - i]));
         }
         return {
           available: true,
@@ -6128,9 +6135,9 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
         const values = labels.map((_, i) => {
           if (isFutureMonth) return 0;
           if (isCurrentMonth && (i + 1 > now.getDate())) return 0;
-          if (isCurrentMonth && (i + 1 === now.getDate()) && todayKwh > 0) return Math.round(todayKwh * 10) / 10;
+          if (isCurrentMonth && (i + 1 === now.getDate()) && todayKwh > 0) return cleanFloat(todayKwh);
           const factor = 0.85 + (((i + selectedMonth) * 7) % 30) / 100;
-          return Math.round(avg * factor * 10) / 10;
+          return cleanFloat(avg * factor);
         });
         return {
           available: true,
@@ -6152,9 +6159,9 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
         const values = months.map((_, i) => {
           if (isFutureYear) return 0;
           if (isCurrentYear && i > nowMonth) return 0;
-          if (isCurrentYear && i === nowMonth && monthKwh > 0) return Math.round(monthKwh * 10) / 10;
+          if (isCurrentYear && i === nowMonth && monthKwh > 0) return cleanFloat(monthKwh);
           const factor = 0.9 + (((i + (selectedYear % 5)) * 5) % 20) / 100;
-          return Math.round(avgMonth * factor * 10) / 10;
+          return cleanFloat(avgMonth * factor);
         });
         return {
           available: true,
