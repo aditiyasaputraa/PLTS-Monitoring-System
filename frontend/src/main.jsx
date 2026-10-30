@@ -250,6 +250,111 @@ function getRegionIndoName(loc) {
   return "Jakarta Utara";
 }
 
+const JAKARTA_KECAMATAN_RULES = [
+  // Jakarta Pusat (8)
+  { name: "Cempaka Putih", region: "jakpus", keywords: ["cempaka putih", "rawasari"] },
+  { name: "Gambir", region: "jakpus", keywords: ["gambir", "petojo", "cideng", "duri pulo", "kebon kelapa", "dpe", "smpn 72", "smpn 94", "smkn 2"] },
+  { name: "Johar Baru", region: "jakpus", keywords: ["johar baru", "kampung rawa", "galur", "tanah tinggi", "smpn 2 ", "smpn 2 jkt", "sman 27"] },
+  { name: "Kemayoran", region: "jakpus", keywords: ["kemayoran", "cempaka baru", "gunung sahari selatan", "harapan mulya", "kebon kosong", "serdang", "sumur batu", "utan panjang"] },
+  { name: "Menteng", region: "jakpus", keywords: ["menteng", "pegangsaan", "cikini", "gondangdia", "kebon sirih", "smpn 8 ", "smpn 08"] },
+  { name: "Sawah Besar", region: "jakpus", keywords: ["sawah besar", "pasar baru", "gunung sahari utara", "mangga dua selatan", "karang anyar", "kartini"] },
+  { name: "Senen", region: "jakpus", keywords: ["senen", "paseban", "kwitang", "kenari", "kramat", "bungur"] },
+  { name: "Tanah Abang", region: "jakpus", keywords: ["tanah abang", "bendungan hilir", "karet tengsin", "kebon melati", "kebon kacang", "kampung bali", "petamburan", "gelora", "smkn 38"] },
+
+  // Jakarta Utara (6)
+  { name: "Cilincing", region: "jakut", keywords: ["cilincing", "sukapura", "rorotan", "semper", "marunda", "kalibaru", "sekda saefullah", "sman 75"] },
+  { name: "Kelapa Gading", region: "jakut", keywords: ["kelapa gading", "pegangsaan dua"] },
+  { name: "Koja", region: "jakut", keywords: ["koja", "rawa badak", "tugu utara", "tugu selatan", "lagoa", "islamic center"] },
+  { name: "Pademangan", region: "jakut", keywords: ["pademangan", "ancol", "bahtera jaya"] },
+  { name: "Penjaringan", region: "jakut", keywords: ["penjaringan", "pluit", "pejagalan", "kapuk muara", "kamal muara", "smpn 112"] },
+  { name: "Tanjung Priok", region: "jakut", keywords: ["tanjung priok", "tj. priok", "tj priok", "sunter", "kebon bawang", "papanggo", " Sungai bambu", "sungai bambu", "warakas", "smpn 282", "sdn 09"] },
+
+  // Jakarta Barat (8)
+  { name: "Cengkareng", region: "jakbar", keywords: ["cengkareng", "duri kosambi", "kapuk", "kedaung kali angke", "rawa buaya", "smpn 201"] },
+  { name: "Grogol Petamburan", region: "jakbar", keywords: ["grogol petamburan", "grogol", "tanjung duren", "tomang", "jelambar", "wijaya kusuma"] },
+  { name: "Kalideres", region: "jakbar", keywords: ["kalideres", "kamal", "pegadungan", "semanan", "tegal alur", "smpn 190", "smpn 204", "smpn 205"] },
+  { name: "Kebon Jeruk", region: "jakbar", keywords: ["kebon jeruk", "sukabumi utara", "sukabumi selatan", "duri kepa", "kedoya", "kelapa dua"] },
+  { name: "Kembangan", region: "jakbar", keywords: ["kembangan", "meruya", "srengseng", "joglo", "puri indah", "sman 85"] },
+  { name: "Palmerah", region: "jakbar", keywords: ["palmerah", "kemanggisan", "slipi", "kota bambu", "jatipulo", "smpn 88"] },
+  { name: "Taman Sari", region: "jakbar", keywords: ["taman sari", "tamansari", "pinangsia", "glodok", "keagungan", "krukut", "mangga besar", "maphar", "tangki"] },
+  { name: "Tambora", region: "jakbar", keywords: ["tambora", "angke", "duri utara", "duri selatan", "jembatan besi", "jembatan lima", "kali anyar", "krendang", "pekojan", "roa malaka", "tanah sereal", "smpn 54"] },
+
+  // Jakarta Selatan (10)
+  { name: "Cilandak", region: "jaksel", keywords: ["cilandak", "cipete selatan", "gandaria selatan", "lebak bulus", "pondok labu"] },
+  { name: "Jagakarsa", region: "jaksel", keywords: ["jagakarsa", "ciganjur", "cipedak", "lenteng agung", "srengseng sawah", "tanjung barat", "smkn 63", "smpn 175"] },
+  { name: "Kebayoran Baru", region: "jaksel", keywords: ["kebayoran baru", "selong", "gunung", "kramat pela", "gandaria utara", "cipete utara", "pulo", "melawai", "petogogan", "rawa barat", "senayan", "smkn 29"] },
+  { name: "Kebayoran Lama", region: "jaksel", keywords: ["kebayoran lama", "grogol utara", "grogol selatan", "cipulir", "pondok pinang", "pondok indah", "smpn 31"] },
+  { name: "Mampang Prapatan", region: "jaksel", keywords: ["mampang prapatan", "mampang", "bangka", "pela mampang", "tegal parang", "kuningan barat"] },
+  { name: "Pancoran", region: "jaksel", keywords: ["pancoran", "kalibata", "rawa jati", "rawajati", "duren tiga", "cikoko", "pengadegan", "smpn 182"] },
+  { name: "Pasar Minggu", region: "jaksel", keywords: ["pasar minggu", "pejaten", "ragunan", "jaha", "cililitan kecil", "kebagusan", "jati padang", "jatipadang"] },
+  { name: "Pesanggrahan", region: "jaksel", keywords: ["pesanggrahan", "ulujami", "petukangan", "bintaro", "smpn 267"] },
+  { name: "Setiabudi", region: "jaksel", keywords: ["setiabudi", "karet", "karet semanggi", "karet kuningan", "kuningan timur", "menteng atas", "pasar manggis", "guntur", "pmptsp"] },
+  { name: "Tebet", region: "jaksel", keywords: ["tebet", "bukit duri", "kebon baru", "manggarai", "menteng dalam", "sman 8", "sman 08"] },
+
+  // Jakarta Timur (10)
+  { name: "Cakung", region: "jaktim", keywords: ["cakung", "jatinegara kaum", "penggilingan", "pulo gebang", "pulogebang", "rawa terate", "ujung menteng", "smpn 172"] },
+  { name: "Cipayung", region: "jaktim", keywords: ["cipayung", "lubang buaya", "ceger", "munjul", "pondok ranggon", "cilangkap", "setu", "bambu apus"] },
+  { name: "Ciracas", region: "jaktim", keywords: ["ciracas", "cibubur", "kelapa dua wetan", "rambutan", "susukan", "sman 105"] },
+  { name: "Duren Sawit", region: "jaktim", keywords: ["duren sawit", "pondok bambu", "klender", "pondok kelapa", "malaka jaya", "malaka sari", "pondok kopi", "smpn 51", "smpn 213", "smpn 255"] },
+  { name: "Jatinegara", region: "jaktim", keywords: ["jatinegara", "bali mester", "kampung melayu", "bidaracina", "cipinang cempedak", "rawa bunga", "cipinang besar", "cipinang muara"] },
+  { name: "Kramat Jati", region: "jaktim", keywords: ["kramat jati", "kramatjati", "batu ampar", "balekambang", "kampung tengah", "dukuh", "cawang", "cililitan"] },
+  { name: "Makasar", region: "jaktim", keywords: ["makasar", "makassar", "pinang ranti", "halim", "cipinang melayu", "kebon pala"] },
+  { name: "Matraman", region: "jaktim", keywords: ["matraman", "pisangan baru", "utan kayu", "kayu manis", "pal meriam", "kebon manggis"] },
+  { name: "Pasar Rebo", region: "jaktim", keywords: ["pasar rebo", "pekayon", "kampung gedong", "ciantung", "cijantung", "baru", "kalisari"] },
+  { name: "Pulo Gadung", region: "jaktim", keywords: ["pulo gadung", "pulogadung", "rawamangun", "kayu putih", "jati", "pisangan timur", "cipinang", "knpi"] },
+
+  // Kepulauan Seribu (2)
+  { name: "Kep. Seribu Selatan", region: "seribu", keywords: ["tidung", "pari", "untung jawa", "seribu selatan"] },
+  { name: "Kep. Seribu Utara", region: "seribu", keywords: ["pramuka", "panggang", "kelapa", "harapan", "seribu utara", "seribu"] },
+];
+
+function getStationKecamatan(station) {
+  if (!station) return "Lainnya";
+  if (station.kecamatan && String(station.kecamatan).trim()) {
+    return String(station.kecamatan).trim();
+  }
+
+  const name = String(station.name || station.raw_name || "").toLowerCase();
+  const address = String(station.address || "").toLowerCase();
+  const combined = `${name} ${address}`;
+  const stationReg = station.region ? String(station.region).toLowerCase() : getStationRegion(station);
+
+  // 1. Cek kecocokan nama kecamatan langsung pada nama PLTS atau alamat
+  for (const item of JAKARTA_KECAMATAN_RULES) {
+    const kecLower = item.name.toLowerCase();
+    if (name.includes(kecLower) || address.includes(kecLower)) {
+      return item.name;
+    }
+  }
+
+  // 2. Cek berdasarkan kata kunci kelurahan / nama sekolah / gedung di wilayah yang sesuai
+  for (const item of JAKARTA_KECAMATAN_RULES) {
+    if (stationReg && item.region === stationReg) {
+      if (item.keywords.some((kw) => combined.includes(kw.toLowerCase()))) {
+        return item.name;
+      }
+    }
+  }
+
+  // 3. Cek lintas wilayah jika belum ketemu
+  for (const item of JAKARTA_KECAMATAN_RULES) {
+    if (item.keywords.some((kw) => combined.includes(kw.toLowerCase()))) {
+      return item.name;
+    }
+  }
+
+  // 4. Fallback kecocokan per kota agar selalu rapi
+  const fallbackByRegion = {
+    jakpus: "Gambir",
+    jakut: "Tanjung Priok",
+    jakbar: "Cengkareng",
+    jaksel: "Pasar Minggu",
+    jaktim: "Duren Sawit",
+    seribu: "Kep. Seribu Utara",
+  };
+  return fallbackByRegion[stationReg] || "Gambir";
+}
+
 function apiBase() {
   const configuredApiBase = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
   if (configuredApiBase) return configuredApiBase;
@@ -3809,28 +3914,73 @@ function TodayEnergyBySiteChart({
     );
   }
 
-  // View mode: "all" (paginated by 10) or "region" (aggregate 5 cities)
+  // View mode: "all" (paginated by 10), "region" (aggregate 5 cities), or "kecamatan" (aggregate by district)
   const [viewMode, setViewMode] = useState("all");
+  const [selectedKecamatan, setSelectedKecamatan] = useState("all");
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 10;
 
-  // Reset page whenever region, locations, or viewMode changes
+  // Reset page & kecamatan filter whenever region or locations change
   useEffect(() => {
     setPage(1);
-  }, [selectedRegion, locations, viewMode]);
+    setSelectedKecamatan("all");
+  }, [selectedRegion, locations]);
+
+  // Reset page whenever viewMode or selectedKecamatan changes
+  useEffect(() => {
+    setPage(1);
+  }, [viewMode, selectedKecamatan]);
 
   // Normalize site data and sort descending by today energy
-  const allSitesData = useMemo(() => {
+  const allSitesRaw = useMemo(() => {
     const fallbacks = [1.7, 1.5, 3.1, 0.08, 0.08, 4.1];
     return locations.map((loc, idx) => {
       const realVal = Number(loc.today_energy_kwh ?? loc.daily_energy_kwh ?? 0);
       const val = realVal > 0 ? realVal : (fallbacks[idx % fallbacks.length] || 1.5);
+      const kecamatan = getStationKecamatan(loc);
       return {
         ...loc,
         val,
+        kecamatan,
       };
     }).sort((a, b) => b.val - a.val);
   }, [locations]);
+
+  // List of available kecamatan in current locations for dropdown & aggregation
+  const kecamatanAggregateData = useMemo(() => {
+    const groups = {};
+    allSitesRaw.forEach((loc) => {
+      const kecName = loc.kecamatan || "Lainnya";
+      if (!groups[kecName]) {
+        groups[kecName] = {
+          id: kecName,
+          name: kecName,
+          regionName: getRegionIndoName(loc),
+          val: 0,
+          count: 0,
+          capacity: 0,
+          topStationUid: loc.uid,
+        };
+      }
+      groups[kecName].val += loc.val;
+      groups[kecName].count += 1;
+      groups[kecName].capacity += Number(loc.installed_capacity_kwp ?? loc.capacity ?? 0);
+    });
+
+    return Object.values(groups)
+      .map((g) => ({
+        ...g,
+        val: Math.round(g.val * 100) / 100,
+        isKecamatanBar: true,
+      }))
+      .sort((a, b) => b.val - a.val);
+  }, [allSitesRaw]);
+
+  // Filtered site data when a specific kecamatan is chosen from the dropdown
+  const allSitesData = useMemo(() => {
+    if (selectedKecamatan === "all") return allSitesRaw;
+    return allSitesRaw.filter((loc) => loc.kecamatan === selectedKecamatan);
+  }, [allSitesRaw, selectedKecamatan]);
 
   // Aggregate by region (for "region" mode)
   const regionAggregateData = useMemo(() => {
@@ -3876,7 +4026,8 @@ function TodayEnergyBySiteChart({
     }));
   }, [locations, allLocations]);
 
-  const totalPages = Math.max(1, Math.ceil(allSitesData.length / PAGE_SIZE));
+  const activePaginatedList = viewMode === "kecamatan" ? kecamatanAggregateData : allSitesData;
+  const totalPages = Math.max(1, Math.ceil(activePaginatedList.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
 
   // Filter display data based on active viewMode
@@ -3885,8 +4036,8 @@ function TodayEnergyBySiteChart({
       return regionAggregateData;
     }
     const start = (currentPage - 1) * PAGE_SIZE;
-    return allSitesData.slice(start, start + PAGE_SIZE);
-  }, [viewMode, currentPage, allSitesData, regionAggregateData]);
+    return activePaginatedList.slice(start, start + PAGE_SIZE);
+  }, [viewMode, currentPage, activePaginatedList, regionAggregateData]);
 
   const rawMax = Math.max(...displayData.map((s) => s.val), 4);
   let yMax = 4;
@@ -3914,11 +4065,11 @@ function TodayEnergyBySiteChart({
   const barWidth = viewMode === "region" ? 44 : Math.min(34, Math.max(18, slotWidth * 0.46));
 
   const startIdx = (currentPage - 1) * PAGE_SIZE + 1;
-  const endIdx = Math.min(currentPage * PAGE_SIZE, allSitesData.length);
+  const endIdx = Math.min(currentPage * PAGE_SIZE, activePaginatedList.length);
 
   return (
     <div className="today-energy-chart-wrap">
-      {/* Controls Header: Tabs on Left + Pagination Controls on Right */}
+      {/* Controls Header: Tabs & Dropdown on Left + Pagination Controls on Right */}
       <div style={{
         display: "flex",
         alignItems: "center",
@@ -3927,28 +4078,77 @@ function TodayEnergyBySiteChart({
         flexWrap: "wrap",
         marginBottom: "10px",
       }}>
-        {/* Left: View Mode Tabs */}
-        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+        {/* Left: View Mode Tabs + Kecamatan Dropdown */}
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
           <button
             type="button"
             className={`chart-tab-pill ${viewMode === "all" ? "active" : ""}`}
             onClick={() => setViewMode("all")}
           >
-            📊 {selectedRegion === "all" ? `Semua PLTS (${allSitesData.length})` : `PLTS (${allSitesData.length})`}
+            📊 {selectedKecamatan !== "all"
+              ? `Kec. ${selectedKecamatan} (${allSitesData.length})`
+              : (selectedRegion === "all" ? `Semua PLTS (${allSitesData.length})` : `PLTS (${allSitesData.length})`)}
           </button>
           {selectedRegion === "all" && (
             <button
               type="button"
               className={`chart-tab-pill ${viewMode === "region" ? "active" : ""}`}
-              onClick={() => setViewMode("region")}
+              onClick={() => {
+                setSelectedKecamatan("all");
+                setViewMode("region");
+              }}
             >
               🏢 Per Wilayah (5 Kota)
             </button>
           )}
+          <button
+            type="button"
+            className={`chart-tab-pill ${viewMode === "kecamatan" ? "active" : ""}`}
+            onClick={() => {
+              setSelectedKecamatan("all");
+              setViewMode("kecamatan");
+            }}
+          >
+            📍 Per Kecamatan ({kecamatanAggregateData.length})
+          </button>
+
+          {/* Dropdown Filter Spesifik Kecamatan */}
+          {kecamatanAggregateData.length > 0 && (
+            <select
+              value={selectedKecamatan}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSelectedKecamatan(val);
+                if (val !== "all") {
+                  setViewMode("all");
+                }
+              }}
+              style={{
+                padding: "4px 24px 4px 10px",
+                fontSize: "11px",
+                fontWeight: 600,
+                borderRadius: "20px",
+                border: selectedKecamatan !== "all" ? "1px solid #1b804e" : "1px solid #dbe3dc",
+                background: selectedKecamatan !== "all" ? "#edf4ee" : "#f7faf7",
+                color: selectedKecamatan !== "all" ? "#1b804e" : "#586b5e",
+                cursor: "pointer",
+                outline: "none",
+                height: "26px",
+              }}
+              title="Filter PLTS berdasarkan Kecamatan"
+            >
+              <option value="all">Semua Kecamatan ({kecamatanAggregateData.length})</option>
+              {kecamatanAggregateData.map((kec) => (
+                <option key={kec.name} value={kec.name}>
+                  Kec. {kec.name} ({kec.count} PLTS)
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         {/* Right: Pagination Controls for 10-per-page */}
-        {viewMode === "all" && totalPages > 1 && (
+        {(viewMode === "all" || viewMode === "kecamatan") && totalPages > 1 && (
           <div style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
             <span style={{ fontSize: "11px", fontWeight: 600, color: "#586b5e" }}>
               Halaman {currentPage} / {totalPages} <span style={{ color: "#8a9d90", fontWeight: 500 }}>({startIdx}–{endIdx})</span>
@@ -4018,9 +4218,12 @@ function TodayEnergyBySiteChart({
             const barY = plotBottom - barHeight;
             const isSelected = item.uid === selectedId;
             const isRegion = item.isRegionBar;
+            const isKecamatan = item.isKecamatanBar;
             const labelText = isRegion
               ? item.name
-              : formatStationLabel(item.name, true);
+              : isKecamatan
+                ? (item.name.length > 14 ? `${item.name.slice(0, 12)}...` : item.name)
+                : formatStationLabel(item.name, true);
 
             return (
               <g
@@ -4029,6 +4232,12 @@ function TodayEnergyBySiteChart({
                 onClick={() => {
                   if (isRegion && onSelectRegion) {
                     onSelectRegion(item.id);
+                  } else if (isKecamatan) {
+                    setSelectedKecamatan(item.name);
+                    setViewMode("all");
+                    if (onSelect && item.topStationUid) {
+                      onSelect(item.topStationUid);
+                    }
                   } else if (onSelect && item.uid) {
                     onSelect(item.uid);
                   }
@@ -4037,7 +4246,9 @@ function TodayEnergyBySiteChart({
                 <title>
                   {isRegion
                     ? `${item.name}: ${item.val} kWh (${item.count} PLTS) - Klik untuk lihat wilayah ini`
-                    : `${item.name}: ${item.val} kWh (${getRegionIndoName(item)})`}
+                    : isKecamatan
+                      ? `Kec. ${item.name} (${item.regionName}): ${item.val} kWh (${item.count} PLTS) - Klik untuk lihat daftar PLTS di kecamatan ini`
+                      : `${item.name}: ${item.val} kWh (Kec. ${item.kecamatan || getStationKecamatan(item)}, ${getRegionIndoName(item)})`}
                 </title>
 
                 {/* Value label on top of bar */}
@@ -4071,7 +4282,7 @@ function TodayEnergyBySiteChart({
                   y={plotBottom + 12}
                   fill={isSelected ? "#1b804e" : "#44554a"}
                   fontSize={isRegion ? "10" : "8"}
-                  fontWeight={isSelected || isRegion ? "700" : "600"}
+                  fontWeight={isSelected || isRegion || isKecamatan ? "700" : "600"}
                   textAnchor={isRegion ? "middle" : "end"}
                   transform={isRegion ? undefined : `rotate(-32, ${slotCenter}, ${plotBottom + 12})`}
                 >
