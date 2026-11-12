@@ -267,7 +267,7 @@ class SupabaseStore:
                 "summary": summary,
                 "updated_at": updated_at,
             }
-            client.table(config.current_table).upsert(current_row, on_conflict="id").execute()
+            client.table(config.current_table).upsert(current_row, on_conflict="id", returning="minimal").execute()
             history_saved = self._save_history_if_due(
                 client=client,
                 config=config,
@@ -285,6 +285,7 @@ class SupabaseStore:
                     client.table(config.daily_table).upsert(
                         daily_rows,
                         on_conflict="platform,station_id,bucket_date",
+                        returning="minimal",
                     ).execute()
                     daily_rollups_saved = len(daily_rows)
             except Exception as exc:
@@ -300,6 +301,7 @@ class SupabaseStore:
                     client.table(config.hourly_table).upsert(
                         hourly_rows,
                         on_conflict="platform,station_id,bucket_hour",
+                        returning="minimal",
                     ).execute()
                     hourly_rollups_saved = len(hourly_rows)
             except Exception as exc:
@@ -350,11 +352,11 @@ class SupabaseStore:
             "payload": payload,
             "summary": summary,
         }
-        client.table(config.history_table).upsert(history_row, on_conflict="run_id").execute()
+        client.table(config.history_table).upsert(history_row, on_conflict="run_id", returning="minimal").execute()
 
         if config.history_retention_days > 0:
             cutoff = utc_iso(utc_now() - timedelta(days=config.history_retention_days))
-            client.table(config.history_table).delete().lt("scraped_at", cutoff).execute()
+            client.table(config.history_table).delete(returning="minimal").lt("scraped_at", cutoff).execute()
 
         return True
 

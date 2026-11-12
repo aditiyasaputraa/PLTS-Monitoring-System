@@ -127,48 +127,55 @@ export function getAccountPassword(envKey) {
 }
 
 /**
- * Mencari profil akun berdasarkan input email/username dan password
- * (Fallback offline / unit testing - autentikasi utama berjalan via Supabase Auth)
+ * Mencocokkan input username, email, ID, atau alias wilayah ke akun di REGIONAL_ACCOUNTS.
  */
-export function authenticateLocalAccount(emailOrUsername, password) {
+export function findRegionalAccount(emailOrUsername) {
   const cleanInput = (emailOrUsername || "").trim().toLowerCase();
-  const cleanPass = (password || "").trim();
-
-  if (!cleanInput || !cleanPass) return null;
+  if (!cleanInput) return null;
 
   for (const acc of REGIONAL_ACCOUNTS) {
     const matchUsername = acc.username.toLowerCase() === cleanInput;
     const matchEmail = acc.email.toLowerCase() === cleanInput;
-    const matchAlias = cleanInput.includes(acc.region) || (acc.username && cleanInput === acc.username.replace(".", ""));
+    const matchId = acc.id && acc.id.toLowerCase() === cleanInput;
+    const matchCompactUsername = acc.username && cleanInput === acc.username.replace(".", "");
+    const matchSuperAlias = acc.username === "admin" && cleanInput === "superadmin";
+    const matchRegionKeyword = acc.region && acc.region !== "all" && cleanInput.includes(acc.region);
 
-    if (matchUsername || matchEmail || matchAlias) {
-      const configuredPass = getAccountPassword(acc.envKey);
-
-      // Verifikasi terhadap environment variable jika diset
-      if (configuredPass && cleanPass === configuredPass) {
-        return {
-          id: acc.id,
-          username: acc.username,
-          email: acc.email,
-          role: acc.role,
-          region: acc.region,
-          regionName: acc.regionName,
-          name: acc.name,
-        };
-      }
+    if (
+      matchUsername ||
+      matchEmail ||
+      matchId ||
+      matchCompactUsername ||
+      matchSuperAlias ||
+      matchRegionKeyword
+    ) {
+      return acc;
     }
   }
+  return null;
+}
 
-  // Fallback demo/operator jika diakses sebagai demo
-  if (cleanInput === "demo" || cleanInput === "operator") {
+/**
+ * Mencari profil akun berdasarkan input email/username dan password
+ * (Fallback offline / unit testing - autentikasi utama berjalan via Supabase Auth)
+ */
+export function authenticateLocalAccount(emailOrUsername, password) {
+  const cleanPass = (password || "").trim();
+  const acc = findRegionalAccount(emailOrUsername);
+  if (!acc || !cleanPass) return null;
+
+  const configuredPass = getAccountPassword(acc.envKey);
+
+  // Verifikasi terhadap environment variable jika diset
+  if (configuredPass && cleanPass === configuredPass) {
     return {
-      id: "operator",
-      username: "operator",
-      email: "operator.plts@jakarta.go.id",
-      role: "viewer",
-      region: "all",
-      regionName: "DKI Jakarta (Demo)",
-      name: "Operator PLTS (Demo)",
+      id: acc.id,
+      username: acc.username,
+      email: acc.email,
+      role: acc.role,
+      region: acc.region,
+      regionName: acc.regionName,
+      name: acc.name,
     };
   }
 

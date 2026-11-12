@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   REGIONAL_ACCOUNTS,
+  findRegionalAccount,
   authenticateLocalAccount,
   canUserEditStation,
   canUserEditCategoryTariff,
@@ -63,6 +64,13 @@ test("rejects invalid passwords or unknown users", () => {
   assert.equal(authenticateLocalAccount("admin.pusat", "wrongpass"), null);
   assert.equal(authenticateLocalAccount("admin.seribu", "12345"), null);
   assert.equal(authenticateLocalAccount("random.user", "test_env_pass_superadmin"), null);
+  // Regression test: words containing "all" must not falsely match super_admin (region === "all")
+  assert.equal(findRegionalAccount("call"), null);
+  assert.equal(authenticateLocalAccount("wall", "test_env_pass_superadmin"), null);
+  // "superadmin" alias resolves cleanly to super_admin
+  const superByAlias = authenticateLocalAccount("superadmin", "test_env_pass_superadmin");
+  assert.ok(superByAlias);
+  assert.equal(superByAlias.role, "super_admin");
 });
 
 test("maps regional accounts correctly for Supabase Auth integration", () => {

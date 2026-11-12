@@ -122,5 +122,39 @@ class SupabaseStoreEnvironmentTests(unittest.TestCase):
         self.assertIn("anonymous JWT", store.config_error)
 
 
+class SupabaseStoreEgressTests(unittest.TestCase):
+    def test_save_snapshot_uses_minimal_returning_on_writes(self):
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        table_builder = mock_client.table.return_value
+        table_builder.select.return_value.eq.return_value.limit.return_value.execute.return_value.data = []
+        table_builder.select.return_value.order.return_value.limit.return_value.execute.return_value.data = []
+
+        with patch.dict(
+            os.environ,
+            {
+                "SUPABASE_URL": "https://example.supabase.co",
+                "SUPABASE_SECRET_KEY": "sb_secret_server_key",
+                "HISTORY_INTERVAL_SECONDS": "0",
+                "HISTORY_RETENTION_DAYS": "30",
+            },
+            clear=True,
+        ), patch("supabase_store.create_client", return_value=mock_client):
+            store = SupabaseStore.from_env()
+            result = store.save_snapshot(
+                run_id="run-1",
+                scraped_at="2026-11-12T03:00:00+00:00",
+                payload={"by_site": {}},
+                summary={"total_stations": 0},
+            )
+
+        self.assertTrue(result["current_saved"])
+        self.assertTrue(result["history_saved"])
+        for call in table_builder.upsert.call_args_list:
+            self.assertEqual(call.kwargs.get("returning"), "minimal")
+        table_builder.delete.assert_called_once_with(returning="minimal")
+
+
 if __name__ == "__main__":
     unittest.main()

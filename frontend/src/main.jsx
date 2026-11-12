@@ -6,6 +6,8 @@ import { getEnergySeries, getRevenueSeries, getEmissionSeries, normalizeUnitStri
 import { getStationTariff, useTariffSettings, detectStationCategory } from "./tariffs.js";
 import {
   REGIONAL_ACCOUNTS,
+  findRegionalAccount,
+  getAccountPassword,
   authenticateLocalAccount,
   canUserEditStation,
   canUserEditTariffs,
@@ -441,17 +443,7 @@ function normalizeSession(payload) {
 }
 
 function resolveAuthEmail(input) {
-  const clean = (input || "").trim().toLowerCase();
-  if (clean === "admin" || clean === "superadmin") {
-    return "adminplts@sudinaker.go.id";
-  }
-  const acc = REGIONAL_ACCOUNTS.find(
-    (a) =>
-      a.username.toLowerCase() === clean ||
-      a.email.toLowerCase() === clean ||
-      a.id.toLowerCase() === clean ||
-      clean.includes(a.region)
-  );
+  const acc = findRegionalAccount(input);
   if (acc && acc.email) return acc.email;
   return (input || "").trim();
 }
@@ -524,6 +516,7 @@ async function signInWithPassword(email, password) {
 
   // 1. Prioritas Utama: Autentikasi Server-Side Resmi via Supabase Auth
   const authEmail = resolveAuthEmail(cleanEmail);
+  let supabaseAuthError = null;
   try {
     const payload = await authRequest("/auth/v1/token?grant_type=password", {
       email: authEmail,
@@ -539,6 +532,7 @@ async function signInWithPassword(email, password) {
     if (msg.includes("invalid login credentials") || msg.includes("invalid_grant")) {
       throw new Error(`Username/Email atau password salah untuk "${cleanEmail}". Silakan periksa kembali.`);
     }
+    supabaseAuthError = err;
     console.warn("Supabase Auth error/offline, mencoba fallback lokal:", err);
   }
 
@@ -619,6 +613,29 @@ async function signInWithPassword(email, password) {
     };
     storeSession(localSession);
     return localSession;
+  }
+
+  const sbErrMsg = String(supabaseAuthError?.message || "").toLowerCase();
+  const isSupabaseRestricted =
+    sbErrMsg.includes("exceed_egress_quota") ||
+    sbErrMsg.includes("restricted") ||
+    sbErrMsg.includes("402") ||
+    sbErrMsg.includes("payment required");
+
+  if (isSupabaseRestricted) {
+    const matchedAcc = findRegionalAccount(cleanEmail);
+    if (matchedAcc) {
+      const configuredPass = getAccountPassword(matchedAcc.envKey);
+      if (!configuredPass) {
+        throw new Error(
+          `Supabase Auth sedang dibatasi (kuota egress bulanan habis / HTTP 402) dan password fallback (${matchedAcc.envKey}) belum diset di environment aplikasi.`
+        );
+      }
+      throw new Error(`Password salah untuk akun "${cleanEmail}". Silakan periksa kembali.`);
+    }
+    throw new Error(
+      "Server autentikasi Supabase sedang dibatasi (kuota egress bulanan habis), sehingga akun tersebut belum dapat diverifikasi."
+    );
   }
 
   throw new Error("Login gagal. Periksa kembali username/email dan password Anda.");
@@ -706,6 +723,13 @@ function validCoordinate(value) {
   return Number.isFinite(n) && n !== 0;
 }
 
+const SNAPSHOT_VERSION_KEY = "plts_last_snapshot_version";
+
+function buildSnapshotVersionKey(meta) {
+  if (!meta) return "";
+  return `${meta.run_id || ""}|${meta.updated_at || meta.scraped_at || ""}`;
+}
+
 function useMonitoringData(session, onUnauthorized) {
   const [data, setData] = useState(() => {
     try {
@@ -718,32 +742,74 @@ function useMonitoringData(session, onUnauthorized) {
     return null;
   });
   const [error, setError] = useState(null);
+  const dataRef = useRef(data);
+  dataRef.current = data;
+  const snapshotVersionRef = useRef((() => {
+    try {
+      if (!data) return "";
+      return localStorage.getItem(SNAPSHOT_VERSION_KEY) || "";
+    } catch (_) {
+      return "";
+    }
+  })());
+  const lastCheckAtRef = useRef(0);
   const loadRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
 
-    const load = async () => {
+    const load = async (forceFull = false) => {
+      if (!forceFull && typeof document !== "undefined" && document.hidden) {
+        return;
+      }
+      lastCheckAtRef.current = Date.now();
+
       try {
         const { url, key } = authConfig();
+        const sbHeaders = {
+          apikey: key,
+          Authorization: `Bearer ${key}`,
+          Accept: "application/json",
+        };
+
+        // 1. Cek versi snapshot dulu (hanya ~150 byte) agar tidak mengunduh ulang payload ber-MB jika data belum berubah
+        let remoteVersion = "";
+        if (!forceFull && dataRef.current && snapshotVersionRef.current) {
+          const metaRes = await fetchWithTimeout(
+            `${url}/rest/v1/monitoring_current?select=run_id,scraped_at,updated_at&limit=1`,
+            { headers: sbHeaders },
+            6_000
+          );
+          if (metaRes.ok) {
+            const metaRows = await metaRes.json();
+            remoteVersion = buildSnapshotVersionKey(Array.isArray(metaRows) ? metaRows[0] : null);
+            if (remoteVersion && remoteVersion === snapshotVersionRef.current) {
+              if (!cancelled) setError(null);
+              return;
+            }
+          }
+        }
+
+        // 2. Unduh payload penuh hanya saat pertama kali, versi berubah, atau manual refresh
         const sbResponse = await fetchWithTimeout(
-          `${url}/rest/v1/monitoring_current?select=payload&limit=1`,
-          {
-            headers: {
-              apikey: key,
-              Authorization: `Bearer ${key}`,
-              Accept: "application/json",
-            },
-          },
+          `${url}/rest/v1/monitoring_current?select=run_id,scraped_at,updated_at,payload&limit=1`,
+          { headers: sbHeaders },
           8_000
         );
 
         if (sbResponse.ok) {
           const rows = await sbResponse.json();
-          if (!cancelled && Array.isArray(rows) && rows.length > 0 && rows[0]?.payload?.by_site) {
-            setData(rows[0].payload);
+          const row = Array.isArray(rows) ? rows[0] : null;
+          if (!cancelled && row?.payload?.by_site) {
+            const versionKey = buildSnapshotVersionKey(row) || remoteVersion;
+            snapshotVersionRef.current = versionKey;
+            dataRef.current = row.payload;
+            setData(row.payload);
             try {
-              localStorage.setItem("plts_last_snapshot", JSON.stringify(rows[0].payload));
+              localStorage.setItem("plts_last_snapshot", JSON.stringify(row.payload));
+              if (versionKey) {
+                localStorage.setItem(SNAPSHOT_VERSION_KEY, versionKey);
+              }
             } catch (_) { }
             setError(null);
             return;
@@ -761,6 +827,7 @@ function useMonitoringData(session, onUnauthorized) {
           if (res.ok) {
             const json = await res.json();
             if (!cancelled && json?.by_site) {
+              dataRef.current = json;
               setData(json);
               try {
                 localStorage.setItem("plts_last_snapshot", JSON.stringify(json));
@@ -772,22 +839,35 @@ function useMonitoringData(session, onUnauthorized) {
         } catch (_) { }
       }
 
-      if (!cancelled && !data) {
+      if (!cancelled && !dataRef.current) {
         setError("Gagal memuat data monitoring dari Supabase Cloud");
       }
     };
 
+    const pollMs = Math.max(60_000, Number(import.meta.env.VITE_POLL_INTERVAL_MS || 60_000) || 60_000);
+    const handleVisibilityChange = () => {
+      if (!document.hidden && Date.now() - lastCheckAtRef.current >= 15_000) {
+        load(false);
+      }
+    };
+
     loadRef.current = load;
-    load();
-    const timer = window.setInterval(load, 30_000);
+    load(false);
+    const timer = window.setInterval(() => load(false), pollMs);
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+    }
 
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
+      }
     };
   }, [session?.access_token]);
 
-  const refresh = useCallback(() => loadRef.current?.(), []);
+  const refresh = useCallback(() => loadRef.current?.(true), []);
   return { data, error, refresh };
 }
 
@@ -811,7 +891,7 @@ function useStationMetadata() {
         const { url, key } = authConfig();
         if (!url || !key) return;
         const res = await fetchWithTimeout(
-          `${url}/rest/v1/station_metadata?select=*`,
+          `${url}/rest/v1/station_metadata?select=station_key,platform,station_id,custom_name,asset_owner,notes,updated_at`,
           {
             headers: {
               apikey: key,
@@ -872,7 +952,7 @@ function useStationMetadata() {
             apikey: key,
             Authorization: `Bearer ${key}`,
             "Content-Type": "application/json",
-            Prefer: "resolution=merge-duplicates",
+            Prefer: "resolution=merge-duplicates,return=minimal",
           },
           body: JSON.stringify({
             station_key: stationKey,
