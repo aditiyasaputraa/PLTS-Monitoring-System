@@ -1138,7 +1138,7 @@ function AppFooter() {
           </div>
           <div className="app-footer-credits">
             <p className="app-footer-credit-line">
-              Inisiasi &amp; Konsep Awal oleh <strong>Mahasiswa Politeknik Negeri Jakarta (PNJ)</strong>
+              Inisiasi &amp; Konsep Awal oleh <strong>Tim PKM Politeknik Negeri Jakarta (PNJ)</strong>
             </p>
             <p className="app-footer-credit-line">
               Dikembangkan &amp; Disempurnakan oleh <strong>Aditiya Saputra (Mahasiswa UBSI Kaliabang)</strong>
@@ -1282,7 +1282,7 @@ function LoginPage({ onSignIn, initialError }) {
           JaksPV • Jakarta Solar PV Monitoring System
         </div>
         <div className="login-footer-credits">
-          Inisiasi &amp; Konsep Awal oleh <strong>Mahasiswa Politeknik Negeri Jakarta (PNJ)</strong>
+          Inisiasi &amp; Konsep Awal oleh <strong>Tim PKM Politeknik Negeri Jakarta (PNJ)</strong>
           <br />
           Dikembangkan &amp; Disempurnakan oleh <strong>Aditiya Saputra (Mahasiswa UBSI Kaliabang)</strong>
         </div>
