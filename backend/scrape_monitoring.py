@@ -1002,7 +1002,7 @@ def kehua_extra_station_calls(
             "site": "kehua",
             "name": "getTopologyInfo",
             "method": "POST",
-            "url": f"{base_url}/necp/server-maintenance/monitor/getTopologyInfo",
+            "url": f"{base_url}/necp/server-monitor/station/getTopologyInfo",
             "headers": {
                 "Accept": "application/json, text/plain, */*",
                 "Content-Type": "application/x-www-form-urlencoded",
@@ -2129,7 +2129,7 @@ def normalize_kehua_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[d
                                     last_power = valid_floats[-1]
                                     if last_power > 0:
                                         target_st = by_id.get(key_to_merge, {})
-                                        if not target_st.get("current_power_kw"):
+                                        if target_st.get("current_power_kw") is None:
                                             merge(key_to_merge, {
                                                 "current_power_kw": round(last_power, 2),
                                                 "output_power_kw": round(last_power, 2),
@@ -2863,7 +2863,7 @@ def normalize_sma_overview(grouped: dict[str, list[dict[str, Any]]], stations: l
         "trouble_station_count": 0,
         "no_device_station_count": 0,
         "capacity_kwp": round(total_capacity, 2),
-        "current_power_kw": round(total_power, 2),
+        "current_power_kw": round(total_power, 3),
         "daily_energy_kwh": round(daily_energy, 4),
         "monthly_energy_kwh": round(monthly_energy, 4),
         "yearly_energy_kwh": round(yearly_energy, 4),

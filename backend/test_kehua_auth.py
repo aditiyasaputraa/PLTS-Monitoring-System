@@ -2,7 +2,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-from scrape_monitoring import kehua_password_cipher, kehua_request_sign, prepare_session
+from scrape_monitoring import kehua_extra_station_calls, kehua_password_cipher, kehua_request_sign, prepare_session
 
 
 class FakeResponse:
@@ -105,6 +105,21 @@ class KehuaAuthenticationTests(unittest.TestCase):
 
         self.assertEqual(meta["password_login"], {"success": False, "reason": "credentials_not_configured"})
         self.assertEqual(len(session.requests), 1)
+
+    def test_kehua_extra_station_calls_uses_station_topology_endpoint(self):
+        card_call = {
+            "response_body": {
+                "code": "0",
+                "data": {"result": [{"stationId": 17483, "companyId": 100, "areaCode": "ID"}]},
+            }
+        }
+        calls = kehua_extra_station_calls({"base_url": "https://energy.kehua.com"}, card_call)
+        topo_calls = [c for c in calls if c.get("name") == "getTopologyInfo"]
+        self.assertEqual(len(topo_calls), 1)
+        self.assertEqual(
+            topo_calls[0]["url"],
+            "https://energy.kehua.com/necp/server-monitor/station/getTopologyInfo",
+        )
 
 
 if __name__ == "__main__":

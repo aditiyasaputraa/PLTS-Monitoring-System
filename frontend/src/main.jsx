@@ -1464,7 +1464,6 @@ function Dashboard({ session, onSignOut }) {
         address = "SDN Sukapura 02 Pagi, Jl. Komp. KBN No. 2, Sukapura, Cilincing, Jakarta Utara 14140";
       }
 
-      const isOfflineStation = station.status === "offline" || station.status === "disconnected";
       const rawPower = Number(
         station.current_power_kw ??
         station.output_power_kw ??
@@ -1472,20 +1471,7 @@ function Dashboard({ session, onSignOut }) {
         station.power_kw ??
         0
       );
-      const stationTodayKwh = Number(station.daily_energy_kwh ?? station.today_energy_kwh ?? 0);
-
-      let resolvedPower = 0;
-      if (rawPower > 0) {
-        resolvedPower = rawPower;
-      } else if (!isOfflineStation && stationTodayKwh > 0) {
-        const now = new Date();
-        const jakartaHour = (now.getUTCHours() + 7 + now.getUTCMinutes() / 60) % 24;
-        if (jakartaHour >= 6 && jakartaHour <= 18) {
-          const solarFactor = Math.sin(((jakartaHour - 6) / 12) * Math.PI);
-          const peak = Math.min(stationTodayKwh / 4.2, Number(station.capacity_kwp || station.inverter_power_kw || 15) * 0.85);
-          resolvedPower = Math.round(peak * solarFactor * 10) / 10;
-        }
-      }
+      const resolvedPower = Number.isFinite(rawPower) && rawPower >= 0 ? rawPower : 0;
 
       return {
         ...station,
