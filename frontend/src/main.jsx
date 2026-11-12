@@ -7044,6 +7044,13 @@ function RevenueProductionChart({ series, period, isKehua }) {
         viewBox={`0 0 ${svgWidth} ${svgHeight}`}
         style={{ width: "100%", height: "100%", display: "block", overflow: "visible" }}
       >
+        <defs>
+          <linearGradient id="revenueBarHover" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#0d5731" />
+            <stop offset="100%" stopColor="#22c55e" />
+          </linearGradient>
+        </defs>
+
         {/* Horizontal Grid lines and Y labels */}
         {yTicks.map((tick, i) => {
           const ratio = (tick - yTicks[0]) / (yTicks[yTicks.length - 1] - yTicks[0] || 1);
@@ -7104,8 +7111,8 @@ function RevenueProductionChart({ series, period, isKehua }) {
                   height={barHeight}
                   rx="3"
                   ry="3"
-                  fill={isHovered ? "#0d5731" : (isCurrentActive ? "#18633b" : "#cee5d5")}
-                  opacity={isHovered ? 1 : 0.95}
+                  fill={isHovered ? "url(#revenueBarHover)" : (i % 2 === 0 ? "#1b804e" : "#5bb980")}
+                  opacity={isHovered ? 1 : 0.9}
                   style={{ transition: "all 0.2s ease" }}
                 />
               )}
@@ -8023,6 +8030,13 @@ function EmissionProductionChart({ series, period }) {
         viewBox={`0 0 ${svgWidth} ${svgHeight}`}
         style={{ width: "100%", height: "100%", display: "block", overflow: "visible" }}
       >
+        <defs>
+          <linearGradient id="emissionBarHover" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#0d5731" />
+            <stop offset="100%" stopColor="#22c55e" />
+          </linearGradient>
+        </defs>
+
         {/* Horizontal Grid lines and Y labels */}
         {yTicks.map((tick, i) => {
           const ratio = (tick - yTicks[0]) / (yTicks[yTicks.length - 1] - yTicks[0] || 1);
@@ -8084,8 +8098,8 @@ function EmissionProductionChart({ series, period }) {
                   height={barHeight}
                   rx="3"
                   ry="3"
-                  fill={isHovered ? "#047857" : (isCurrentActive ? "#059669" : "#a7f3d0")}
-                  opacity={isHovered ? 1 : 0.95}
+                  fill={isHovered ? "url(#emissionBarHover)" : (i % 2 === 0 ? "#1b804e" : "#5bb980")}
+                  opacity={isHovered ? 1 : 0.9}
                   style={{ transition: "all 0.2s ease" }}
                 />
               )}
