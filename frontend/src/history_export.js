@@ -499,6 +499,10 @@ async function exportDirectFromSupabase({ startDate, endDate, resolution, platfo
 
 async function download(form, button, stationDropdown) {
   setError();
+  const session = readSession();
+  if (session?.user?.role === "viewer" || session?.user?.user_metadata?.role === "viewer") {
+    throw new Error("Akses Ditolak: Akun Viewer bersifat Read-Only (Hanya Melihat) dan tidak dapat mendownload data.");
+  }
   const formData = new FormData(form);
   const startDate = String(formData.get("start_date") || "");
   const endDate = String(formData.get("end_date") || "");
@@ -599,10 +603,13 @@ async function download(form, button, stationDropdown) {
 function mountHeaderTrigger(trigger) {
   const slot = document.querySelector("#top-nav-export-slot");
   const controls = document.querySelector(".top-nav-controls");
-  const hasSession = Boolean(readSession()?.access_token);
+  const session = readSession();
+  const hasSession = Boolean(session?.access_token);
+  const isViewer = session?.user?.role === "viewer" || session?.user?.user_metadata?.role === "viewer";
 
-  if ((!slot && !controls) || !hasSession) {
+  if ((!slot && !controls) || !hasSession || isViewer) {
     trigger.hidden = true;
+    if (trigger.parentElement) trigger.parentElement.removeChild(trigger);
     return;
   }
 

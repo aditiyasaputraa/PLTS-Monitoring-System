@@ -317,7 +317,8 @@ export default function ChartExportModal({
     }
   }, [isOpen, initialStationId, availableStations, selectedStationId]);
 
-  if (!isOpen) return null;
+  const isViewer = currentUser?.role === "viewer" || currentUser?.user_metadata?.role === "viewer";
+  if (!isOpen || isViewer) return null;
 
   const handleExport = () => {
     setIsExporting(true);

@@ -105,7 +105,8 @@ export default function TariffSettingsModal({
     return Object.keys(tariffConfig?.customRates || {}).length;
   }, [tariffConfig]);
 
-  if (!isOpen) return null;
+  const isViewer = currentUser?.role === "viewer" || currentUser?.user_metadata?.role === "viewer";
+  if (!isOpen || isViewer) return null;
 
   return (
     <div className="tariff-modal-backdrop" onClick={onClose}>

@@ -8,6 +8,7 @@ import {
   canUserEditCategoryTariff,
   canUserEditStationTariff,
   canUserOpenTariffSettings,
+  canUserExportData,
 } from "./auth_roles.js";
 
 // Setup dummy environment variables for test execution only (NO real passwords in git)
@@ -191,4 +192,10 @@ test("allows regional admins to edit tariffs in their own region but locks other
   assert.equal(canUserEditStationTariff(viewer, stationPusat, getRegion), false);
   assert.equal(canUserEditStationTariff(viewer, stationBarat, getRegion), false);
   assert.equal(canUserOpenTariffSettings(viewer), false);
+
+  // Viewer CANNOT export or download data (Super Admin & Admin Wilayah can)
+  assert.equal(canUserExportData(superAdmin), true);
+  assert.equal(canUserExportData(pusat), true);
+  assert.equal(canUserExportData(barat), true);
+  assert.equal(canUserExportData(viewer), false);
 });

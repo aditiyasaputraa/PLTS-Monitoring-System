@@ -274,6 +274,16 @@ export function canUserEditStationTariff(user, station, getStationRegionFn) {
 }
 
 /**
+ * Memeriksa apakah user dapat mengunduh / mengekspor data (Super Admin & Admin Wilayah)
+ * Viewer dilarang mengunduh / mengekspor data (tugasnya murni hanya melihat / read-only).
+ */
+export function canUserExportData(user) {
+  if (!user) return false;
+  const role = user.role || user.user_metadata?.role || "viewer";
+  return role !== "viewer";
+}
+
+/**
  * Alias kompatibilitas
  */
 export function canUserEditTariffs(user) {

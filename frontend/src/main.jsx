@@ -14,6 +14,7 @@ import {
   canUserEditCategoryTariff,
   canUserEditStationTariff,
   canUserOpenTariffSettings,
+  canUserExportData,
 } from "./auth_roles.js";
 import TariffSettingsModal from "./TariffSettingsModal.jsx";
 import ChartExportModal, { downloadExcel, downloadCsv } from "./ChartExportModal.jsx";
@@ -1311,9 +1312,13 @@ function Dashboard({ session, onSignOut }) {
   const [exportInitialStationId, setExportInitialStationId] = useState("all");
 
   const handleOpenChartExport = useCallback((stationId = "all") => {
+    if (!canUserExportData(session?.user)) {
+      alert("Akses Ditolak: Akun Viewer bersifat Read-Only (Hanya Melihat) dan tidak dapat mengunduh data.");
+      return;
+    }
     setExportInitialStationId(stationId || "all");
     setChartExportOpen(true);
-  }, []);
+  }, [session?.user]);
   const [activeTab, setActiveTab] = useState(() => readUiState().activeTab);
   const [selectedId, setSelectedId] = useState(() => readUiState().selectedId);
   const [selectedRegion, setSelectedRegion] = useState(() => readUiState().selectedRegion || "all");
@@ -1572,9 +1577,9 @@ function Dashboard({ session, onSignOut }) {
   }, []);
 
   const handleUpdateStation = useCallback((st, updates) => {
-    if (!canUserEditStation(session?.user, st, getStationRegion)) {
-      alert("Akses Ditolak: Anda hanya memiliki izin mengedit PLTS di wilayah tugas Anda.");
-      return Promise.reject(new Error("Unauthorized region edit"));
+    if (session?.user?.role === "viewer" || !canUserEditStation(session?.user, st, getStationRegion)) {
+      alert("Akses Ditolak: Akun Viewer bersifat Read-Only (Hanya Melihat) dan tidak dapat mengedit data.");
+      return Promise.reject(new Error("Unauthorized edit"));
     }
     const key = st.uid || `${st.source || st.platform}-${st.id}`;
     return updateStationMetadata(key, updates, st);
@@ -1889,15 +1894,17 @@ function Dashboard({ session, onSignOut }) {
                 <CalendarIcon style={{ width: "13px", height: "13px", color: "#6a7c70" }} />
                 <span>{formattedUpdatedDate}</span>
               </div>
-              <button
-                type="button"
-                className="action-btn-outline"
-                onClick={() => handleOpenChartExport(selectedId || "all")}
-                title="Download Data Grafik Kinerja PLTS (CSV)"
-              >
-                <DownloadIcon style={{ width: "13px", height: "13px" }} />
-                <span>Export</span>
-              </button>
+              {canUserExportData(session?.user) && (
+                <button
+                  type="button"
+                  className="action-btn-outline"
+                  onClick={() => handleOpenChartExport(selectedId || "all")}
+                  title="Download Data Grafik Kinerja PLTS (CSV)"
+                >
+                  <DownloadIcon style={{ width: "13px", height: "13px" }} />
+                  <span>Export</span>
+                </button>
+              )}
               <button type="button" className="action-btn-outline" style={{ padding: "7px 10px" }} title="Notifikasi normal">
                 <BellIcon style={{ width: "14px", height: "14px", color: "#6a7c70" }} />
               </button>
@@ -5097,6 +5104,9 @@ const ASSET_OWNER_PRESETS = [
 ];
 
 function EditStationModal({ station, onClose, onSave, currentUser }) {
+  if (currentUser?.role === "viewer" || currentUser?.user_metadata?.role === "viewer") {
+    return null;
+  }
   const [customName, setCustomName] = useState(station.custom_name || station.name || "");
   const [assetOwner, setAssetOwner] = useState(station.asset_owner || "");
   const [isSaving, setIsSaving] = useState(false);
@@ -5681,15 +5691,17 @@ function StationListDarkCard({
           <span className="station-list-title">DAFTAR PLTS ({regionLabel.toUpperCase()})</span>
           <span className="station-list-count">{displayLocations.length} stasiun</span>
         </div>
-        <button
-          type="button"
-          className="btn-export-station-list"
-          onClick={() => setExportModalOpen(true)}
-          title="Filter dan Download Daftar PLTS (Excel .xlsx)"
-        >
-          <DownloadIcon style={{ width: "12px", height: "12px" }} />
-          <span>Export Excel</span>
-        </button>
+        {canUserExportData(currentUser) && (
+          <button
+            type="button"
+            className="btn-export-station-list"
+            onClick={() => setExportModalOpen(true)}
+            title="Filter dan Download Daftar PLTS (Excel .xlsx)"
+          >
+            <DownloadIcon style={{ width: "12px", height: "12px" }} />
+            <span>Export Excel</span>
+          </button>
+        )}
       </div>
 
       {/* Search Input */}
@@ -5835,17 +5847,16 @@ function StationListDarkCard({
                           </svg>
                         </button>
                       ) : (
-                        <button
-                          type="button"
+                        <span
                           className="btn-edit-station is-locked"
-                          title="Terkunci: Anda hanya dapat mengedit PLTS di wilayah tugas Anda"
-                          disabled
+                          title={currentUser?.role === "viewer" ? "Akun Viewer (Read-Only / Hanya Lihat)" : "Terkunci: Anda hanya dapat mengedit PLTS di wilayah tugas Anda"}
+                          style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "not-allowed" }}
                         >
                           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                             <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                           </svg>
-                        </button>
+                        </span>
                       )}
                     </td>
                   </tr>
@@ -5856,7 +5867,7 @@ function StationListDarkCard({
         </table>
       </div>
 
-      {editingStation && (
+      {editingStation && currentUser?.role !== "viewer" && (
         <EditStationModal
           station={editingStation}
           onClose={() => setEditingStation(null)}
@@ -6718,7 +6729,7 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
                   <YearDropdownPill value={selectedYear} onChange={setSelectedYear} years={availableYears} />
                 )}
                 <span className="unit-pill-badge">{series?.unit || "kWh"}</span>
-                {onOpenChartExport && (
+                {canUserExportData(currentUser) && onOpenChartExport && (
                   <button
                     type="button"
                     className="btn-curve-export"
@@ -6855,7 +6866,7 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
                   <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} years={availableYears} />
                 )}
                 <span className="unit-pill-badge">{fleetSeries?.unit || "kWh"}</span>
-                {onOpenChartExport && (
+                {canUserExportData(currentUser) && onOpenChartExport && (
                   <button
                     type="button"
                     className="btn-curve-export"
@@ -7638,18 +7649,20 @@ function RevenueView({
                 <p className="curve-subtitle">{curveSubtitle}</p>
               </div>
               <div className="curve-controls">
-                <button
-                  type="button"
-                  className="tariff-settings-trigger-btn"
-                  onClick={onOpenTariffModal}
-                  title={canUserEditTariffs(currentUser)
-                    ? "Atur tarif dasar listrik PLN per kategori gedung atau kustom per stasiun"
-                    : "Lihat tarif dasar listrik PLN (Mode Hanya Lihat untuk Akun Wilayah)"
-                  }
-                >
-                  <span>{canUserEditTariffs(currentUser) ? "⚙️ Atur Tarif" : "👁️ Lihat Tarif"}</span>
-                  {customCount > 0 && <span className="tariff-badge-custom-count">{customCount}</span>}
-                </button>
+                {canUserOpenTariffSettings(currentUser) && (
+                  <button
+                    type="button"
+                    className="tariff-settings-trigger-btn"
+                    onClick={onOpenTariffModal}
+                    title={canUserEditTariffs(currentUser)
+                      ? "Atur tarif dasar listrik PLN per kategori gedung atau kustom per stasiun"
+                      : "Lihat tarif dasar listrik PLN (Mode Hanya Lihat untuk Akun Wilayah)"
+                    }
+                  >
+                    <span>{canUserEditTariffs(currentUser) ? "⚙️ Atur Tarif" : "👁️ Lihat Tarif"}</span>
+                    {customCount > 0 && <span className="tariff-badge-custom-count">{customCount}</span>}
+                  </button>
+                )}
                 <div className="period-toggle-pill">
                   <button
                     type="button"
@@ -7700,7 +7713,7 @@ function RevenueView({
                   <YearDropdownPill value={selectedYear} onChange={setSelectedYear} years={availableYears} />
                 )}
                 <span className="unit-pill-badge">{series?.unit || "IDR"}</span>
-                {onOpenChartExport && (
+                {canUserExportData(currentUser) && onOpenChartExport && (
                   <button
                     type="button"
                     className="btn-curve-export"
@@ -7837,7 +7850,7 @@ function RevenueView({
                   <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} years={availableYears} />
                 )}
                 <span className="unit-pill-badge">{fleetSeries?.unit || "IDR"}</span>
-                {onOpenChartExport && (
+                {canUserExportData(currentUser) && onOpenChartExport && (
                   <button
                     type="button"
                     className="btn-curve-export"
@@ -8660,7 +8673,7 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
                   <YearDropdownPill value={selectedYear} onChange={setSelectedYear} years={availableYears} />
                 )}
                 <span className="unit-pill-badge">{series?.unit || "kg CO₂"}</span>
-                {onOpenChartExport && (
+                {canUserExportData(currentUser) && onOpenChartExport && (
                   <button
                     type="button"
                     className="btn-curve-export"
@@ -8797,7 +8810,7 @@ function EmissionView({ location, fleet, locations, allLocations, onSelect, sele
                   <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} years={availableYears} />
                 )}
                 <span className="unit-pill-badge">{fleetSeries?.unit || "kg CO₂"}</span>
-                {onOpenChartExport && (
+                {canUserExportData(currentUser) && onOpenChartExport && (
                   <button
                     type="button"
                     className="btn-curve-export"
