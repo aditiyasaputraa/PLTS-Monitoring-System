@@ -1141,7 +1141,7 @@ function AppFooter() {
               Inisiasi &amp; Konsep Awal oleh <strong>Tim PKM Politeknik Negeri Jakarta (PNJ)</strong>
             </p>
             <p className="app-footer-credit-line">
-              Dikembangkan &amp; Disempurnakan oleh <strong>Seksi Energi dan Aditiya Saputra (Mahasiswa UBSI Kaliabang)</strong>
+              Dikembangkan &amp; Disempurnakan oleh <strong>Seksi Energi JU dan Aditiya Saputra (Mahasiswa UBSI Kaliabang)</strong>
             </p>
           </div>
         </div>
@@ -1284,7 +1284,7 @@ function LoginPage({ onSignIn, initialError }) {
         <div className="login-footer-credits">
           Inisiasi &amp; Konsep Awal oleh <strong>Tim PKM Politeknik Negeri Jakarta (PNJ)</strong>
           <br />
-          Dikembangkan &amp; Disempurnakan oleh <strong>Seksi Energi dan Aditiya Saputra (Mahasiswa UBSI Kaliabang)</strong>
+          Dikembangkan &amp; Disempurnakan oleh <strong>Seksi Energi JU dan Aditiya Saputra (Mahasiswa UBSI Kaliabang)</strong>
         </div>
         <div className="login-footer-copy">
           © {new Date().getFullYear()} JaksPV. All rights reserved.
