@@ -2,7 +2,12 @@ import unittest
 from datetime import datetime, timezone
 from urllib.parse import parse_qs, urlparse
 
-from scrape_monitoring import huawei_energy_balance_by_station, huawei_energy_balance_calls
+from scrape_monitoring import (
+    huawei_energy_balance_by_station,
+    huawei_energy_balance_calls,
+    normalize_huawei_stations,
+    normalize_kehua_stations,
+)
 
 
 class HuaweiEnergyChartTests(unittest.TestCase):
@@ -58,6 +63,88 @@ class HuaweiEnergyChartTests(unittest.TestCase):
 
         self.assertEqual(result["energy_charts"]["daily"]["values"], [64.67, 62.14, 60.4, None])
         self.assertEqual(result["energy_charts"]["monthly"]["values"], [2084.12, 1990.17, 2814.79, 2925.45])
+
+    def test_huawei_power_fallback_from_inverter_or_5min_and_status_alignment(self):
+        grouped = {
+            "station-list": [{
+                "response_body": {"data": {"list": [
+                    {
+                        "dn": "NE=51294066",
+                        "name": "Puskesmas Pasar Rebo",
+                        "plantStatus": "connected",
+                        "currentPower": 0.0,
+                        "dailyEnergy": 67.5,
+                    },
+                    {
+                        "dn": "NE=110759320",
+                        "name": "SDN Rawa Badak Utara 19",
+                        "plantStatus": "connected",
+                        "currentPower": 0.0,
+                        "dailyEnergy": 0.0,
+                    },
+                    {
+                        "dn": "NE=51230152",
+                        "name": "SDN Tugu Utara 09",
+                        "plantStatus": "disconnected",
+                        "currentPower": 6.11,
+                        "inverterPower": 6.112,
+                        "dailyEnergy": 90.99,
+                    },
+                ]}},
+            }],
+            "energy-balance-daily": [{
+                "url": "https://example/energy-balance?stationDn=NE%3D51294066&timeDim=2",
+                "response_body": {"data": {
+                    "xAxis": ["14:40", "14:45", "14:50"],
+                    "productPower": ["3.339", "2.107", "--"],
+                }},
+            }],
+        }
+
+        stations = {s["station_id"]: s for s in normalize_huawei_stations(grouped)}
+        self.assertEqual(stations["NE=51294066"]["current_power_kw"], 2.107)
+        self.assertEqual(stations["NE=51294066"]["status"], "normal")
+        self.assertEqual(stations["NE=110759320"]["current_power_kw"], 0.0)
+        self.assertEqual(stations["NE=110759320"]["status"], "offline")
+        self.assertEqual(stations["NE=51230152"]["current_power_kw"], 6.11)
+        self.assertEqual(stations["NE=51230152"]["status"], "normal")
+
+    def test_kehua_power_fallback_and_vacant_status_alignment(self):
+        grouped = {
+            "listStationInfoByCondition": [{
+                "response_body": {"data": {"result": [
+                    {
+                        "stationId": 17774,
+                        "stationName": "SDN Cengkareng Timur 07",
+                        "stationStatus": 3,
+                        "activePower": 0.0,
+                        "dayElec": 7.8,
+                    },
+                    {
+                        "stationId": 17483,
+                        "stationName": "SDN 09 JAKUT",
+                        "stationStatus": 4,
+                        "activePower": 3.7,
+                        "dayElec": 41.0,
+                    },
+                ]}},
+            }],
+            "getTopologyInfo": [{
+                "payload_raw": "stationId=17483",
+                "response_body": {"data": {
+                    "outputPower": 0.0,
+                    "outputPowerUnit": "kW",
+                    "pvPower": 3.7,
+                    "pvPowerUnit": "kW",
+                }},
+            }],
+        }
+
+        stations = {s["station_id"]: s for s in normalize_kehua_stations(grouped)}
+        self.assertEqual(stations["17774"]["current_power_kw"], 0.0)
+        self.assertEqual(stations["17774"]["status"], "offline")
+        self.assertEqual(stations["17483"]["current_power_kw"], 3.7)
+        self.assertEqual(stations["17483"]["status"], "normal")
 
 
 if __name__ == "__main__":

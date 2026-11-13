@@ -1703,6 +1703,30 @@ def normalize_huawei_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[
         station.update(kpi_by_station.get(str(item.get("dn") or ""), {}))
         station.update(energy_balance_by_station.get(str(item.get("dn") or ""), {}))
 
+        # Resolve live power fallback when station-list currentPower momentarily drops to 0
+        cur_pwr = to_float(station.get("current_power_kw"))
+        inv_pwr = to_float(station.get("inverter_power_kw"))
+        if not cur_pwr or cur_pwr <= 0:
+            if inv_pwr is not None and inv_pwr > 0:
+                station["current_power_kw"] = inv_pwr
+                cur_pwr = inv_pwr
+            elif station.get("status") != "offline" or (to_float(station.get("daily_energy_kwh")) or 0) > 0:
+                dp5 = station.get("daily_power_5min")
+                if isinstance(dp5, dict):
+                    gen_series = dp5.get("generation_power_kw")
+                    if isinstance(gen_series, list):
+                        non_null_gen = [to_float(v) for v in gen_series if to_float(v) is not None]
+                        if non_null_gen and non_null_gen[-1] is not None and non_null_gen[-1] > 0:
+                            station["current_power_kw"] = round(non_null_gen[-1], 3)
+                            cur_pwr = station["current_power_kw"]
+
+        # Align Huawei station status with actual live power / daily generation
+        if cur_pwr is not None and cur_pwr > 0:
+            if station.get("status") in (None, "offline", "disconnected"):
+                station["status"] = "normal"
+        elif (cur_pwr is None or cur_pwr <= 0) and (to_float(station.get("daily_energy_kwh")) or 0) <= 0:
+            station["status"] = "offline"
+
         st_name_l = str(station.get("name") or "").lower()
         if "204" in st_name_l:
             station["latitude"] = -6.13980
@@ -2085,8 +2109,15 @@ def normalize_kehua_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[d
             if key_to_merge:
                 active_power = power_to_kw(topology.get("outputPower"), topology.get("outputPowerUnit"))
                 pv_power = power_to_kw(topology.get("pvPower"), topology.get("pvPowerUnit"))
+                existing_power = to_float(by_id.get(key_to_merge, {}).get("current_power_kw"))
+                resolved_power = (
+                    active_power if (active_power is not None and active_power > 0)
+                    else (pv_power if (pv_power is not None and pv_power > 0)
+                          else (existing_power if (existing_power is not None and existing_power > 0)
+                                else (active_power if active_power is not None else pv_power)))
+                )
                 merge(key_to_merge, {
-                    "current_power_kw": active_power if active_power is not None else pv_power,
+                    "current_power_kw": resolved_power,
                     "pv_power_kw": pv_power,
                     "grid_power_kw": power_to_kw(topology.get("gridPower"), topology.get("gridPowerUnit")),
                     "load_power_kw": power_to_kw(topology.get("loadPower"), topology.get("loadPowerUnit")),
@@ -2129,7 +2160,7 @@ def normalize_kehua_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[d
                                     last_power = valid_floats[-1]
                                     if last_power > 0:
                                         target_st = by_id.get(key_to_merge, {})
-                                        if target_st.get("current_power_kw") is None:
+                                        if not to_float(target_st.get("current_power_kw")):
                                             merge(key_to_merge, {
                                                 "current_power_kw": round(last_power, 2),
                                                 "output_power_kw": round(last_power, 2),
@@ -2283,6 +2314,13 @@ def normalize_kehua_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[d
             station["inverter_power_kw"] = station.get("capacity_kwp") or 15.0
             station["inverter_model"] = "SPI15K-B"
             station["inverter_count"] = 1
+
+        kehua_pwr = to_float(station.get("current_power_kw"))
+        if kehua_pwr is not None and kehua_pwr > 0:
+            if station.get("status") in (None, "offline", "vacant"):
+                station["status"] = "normal"
+        elif (kehua_pwr is None or kehua_pwr <= 0) and station.get("status") == "vacant":
+            station["status"] = "offline"
 
     return list(by_id.values())
 
@@ -2555,10 +2593,20 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
                                     if date_part.startswith(current_month_prefix):
                                         month_daily_labels.append(day_str)
                                         month_daily_values.append(kwh)
-                                        daily_kwh = kwh
+                                        if date_part == today_date_str:
+                                            daily_kwh = kwh
 
         if sum(today_hourly_values) > 0:
             daily_kwh = round(sum(today_hourly_values), 3)
+
+        # Fallback for SMA current_power_kw when gauge endpoint momentarily returns null during active daylight hours
+        if current_power_kw <= 0 and 6 <= jakarta_now.hour <= 17:
+            cur_hr_val = today_hourly_values[jakarta_now.hour] if 0 <= jakarta_now.hour < 24 else 0.0
+            prev_hr_val = today_hourly_values[jakarta_now.hour - 1] if 0 <= jakarta_now.hour - 1 < 24 else 0.0
+            if cur_hr_val > 0:
+                current_power_kw = round(cur_hr_val, 3)
+            elif prev_hr_val > 0 and jakarta_now.minute < 20:
+                current_power_kw = round(prev_hr_val, 3)
 
         monthly_kwh = round(sum(month_daily_values), 2) if month_daily_values else daily_kwh
 

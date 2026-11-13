@@ -977,6 +977,22 @@ function useStationMetadata() {
   return { metadata, updateStation };
 }
 
+function isStationOffline(st) {
+  if (!st) return true;
+  const powerVal = Number(
+    st.current_power_kw ??
+    (st.platform === "huawei" || st.source === "huawei" ? st.inverter_power_kw : null) ??
+    st.output_power_kw ??
+    st.pv_power_kw ??
+    st.power_kw ??
+    0
+  );
+  if (Number.isFinite(powerVal) && powerVal > 0) {
+    return false;
+  }
+  return true;
+}
+
 function SitePickerDropdown({
   selected,
   locations,
@@ -986,6 +1002,7 @@ function SitePickerDropdown({
   onSelect,
   dropdownRef,
 }) {
+  const isSelectedOffline = isStationOffline(selected);
   return (
     <div style={{ position: "relative" }} ref={dropdownRef}>
       <button
@@ -1005,8 +1022,8 @@ function SitePickerDropdown({
             height: "7px",
             borderRadius: "50%",
             flexShrink: 0,
-            background: selected?.status === "offline" || selected?.status === "disconnected" ? "#ef4444" : "#10b981",
-            boxShadow: selected?.status === "offline" || selected?.status === "disconnected"
+            background: isSelectedOffline ? "#ef4444" : "#10b981",
+            boxShadow: isSelectedOffline
               ? "0 0 6px rgba(239, 68, 68, 0.7)"
               : "0 0 6px rgba(16, 185, 129, 0.7)",
           }}
@@ -1069,7 +1086,7 @@ function SitePickerDropdown({
               </div>
             ) : (
               locations.map((loc) => {
-                const isLocOffline = loc.status === "offline" || loc.status === "disconnected";
+                const isLocOffline = isStationOffline(loc);
                 const isLocSelected = loc.uid === selected?.uid;
                 return (
                   <button
@@ -1471,17 +1488,44 @@ function Dashboard({ session, onSignOut }) {
         address = "SDN Sukapura 02 Pagi, Jl. Komp. KBN No. 2, Sukapura, Cilincing, Jakarta Utara 14140";
       }
 
-      const rawPower = Number(
-        station.current_power_kw ??
-        station.output_power_kw ??
-        station.pv_power_kw ??
-        station.power_kw ??
-        0
-      );
-      const resolvedPower = Number.isFinite(rawPower) && rawPower >= 0 ? rawPower : 0;
+      const powerCandidates = [
+        station.current_power_kw,
+        site.platform === "huawei" ? station.inverter_power_kw : null,
+        station.output_power_kw,
+        station.pv_power_kw,
+        station.power_kw,
+      ];
+      let resolvedPower = 0;
+      for (const cand of powerCandidates) {
+        const num = Number(cand);
+        if (Number.isFinite(num) && num > 0) {
+          resolvedPower = num;
+          break;
+        }
+      }
+      if (resolvedPower <= 0 && site.platform === "huawei" && station.status !== "offline" && dailyKwh > 0) {
+        const genSeries = station.daily_power_5min?.generation_power_kw;
+        if (Array.isArray(genSeries)) {
+          for (let i = genSeries.length - 1; i >= 0; i--) {
+            const rawVal = genSeries[i];
+            if (rawVal !== null && rawVal !== undefined) {
+              const v = Number(rawVal);
+              if (Number.isFinite(v) && v > 0) {
+                resolvedPower = v;
+              }
+              break;
+            }
+          }
+        }
+      }
+
+      const resolvedStatus = resolvedPower > 0
+        ? (station.status === "offline" || station.status === "disconnected" || station.status === "vacant" || !station.status ? "normal" : station.status)
+        : "offline";
 
       return {
         ...station,
+        status: resolvedStatus,
         current_power_kw: resolvedPower,
         id,
         name,
@@ -2156,7 +2200,7 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt, selecte
             <div className="site-name-status-row">
               <span className="site-selected-title">{selected?.name || "Belum Ada PLTS Terpasang"}</span>
               {selected ? (
-                selected?.status === "offline" || selected?.status === "disconnected" ? (
+                isStationOffline(selected) ? (
                   <span className="offline-pill">
                     <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#ef4444" }} />
                     Offline
@@ -2394,8 +2438,8 @@ function OverviewView({ fleet, selected, locations, onSelect, updatedAt, selecte
             </div>
             <div className="spec-row">
               <span className="spec-label">Status</span>
-              <span className={`spec-val ${selected ? (selected?.status === "offline" || selected?.status === "disconnected" ? "offline" : (selected?.status === "abnormal" ? "abnormal" : "normal")) : ""}`}>
-                {selected?.status || "—"}
+              <span className={`spec-val ${selected ? (isStationOffline(selected) ? "offline" : (selected?.status === "abnormal" ? "abnormal" : "normal")) : ""}`}>
+                {selected ? (isStationOffline(selected) ? "offline" : (selected?.status === "abnormal" ? "abnormal" : "normal")) : "—"}
               </span>
             </div>
             <div className="spec-row">
@@ -4451,7 +4495,7 @@ function MiniStationMap({ location }) {
 
   const lat = Number(location?.latitude) || -6.2088;
   const lng = Number(location?.longitude) || 106.8456;
-  const isOffline = location?.status === "offline" || location?.status === "disconnected";
+  const isOffline = isStationOffline(location);
 
   const handleToggleMode = (newMode) => {
     if (newMode === mapMode) return;
@@ -4641,7 +4685,7 @@ function FullFleetMap({ locations, selectedId, onSelect }) {
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
 
       const el = document.createElement("div");
-      el.className = `station-map-marker ${loc.status === "offline" ? "offline" : "online"} ${loc.uid === selectedId ? "selected" : ""}`;
+      el.className = `station-map-marker ${isStationOffline(loc) ? "offline" : "online"} ${loc.uid === selectedId ? "selected" : ""}`;
       el.addEventListener("click", () => onSelect(loc.uid));
 
       const marker = new maplibregl.Marker({ element: el })
@@ -5298,10 +5342,7 @@ function formatShortOwner(owner) {
 }
 
 function getStationOnlineStatus(st) {
-  const powerVal = Number(st?.current_power_kw ?? st?.output_power_kw ?? st?.pv_power_kw ?? st?.power_kw ?? 0);
-  const dailyVal = Number(st?.daily_energy_kwh ?? st?.today_energy_kwh ?? st?.today_kwh ?? 0);
-  const isOffline = st?.status === "offline" || st?.status === "disconnected" || (powerVal === 0 && dailyVal === 0);
-  return isOffline ? "Offline" : "Online";
+  return isStationOffline(st) ? "Offline" : "Online";
 }
 
 function handleExportStationList(
@@ -5788,9 +5829,7 @@ function StationListDarkCard({
                   (loc.uid && activeStation?.uid && loc.uid === activeStation.uid) ||
                   (loc.id && activeStation?.id && loc.id === activeStation.id) ||
                   (loc.name && activeStation?.name && loc.name === activeStation.name);
-                const powerVal = Number(loc.current_power_kw ?? loc.output_power_kw ?? loc.pv_power_kw ?? loc.power_kw ?? 0);
-                const dailyVal = Number(loc.daily_energy_kwh ?? loc.today_energy_kwh ?? 0);
-                const isOffline = loc.status === "offline" || loc.status === "disconnected" || (powerVal === 0 && dailyVal === 0);
+                const isOffline = isStationOffline(loc);
                 const vendor = (loc.source || "sma").toLowerCase();
                 const canEditThisStation = canUserEditStation(currentUser, loc, getStationRegion);
 
@@ -8961,7 +9000,7 @@ function buildFleet(sites, locations) {
   const monthlyIncome = locations.reduce((sum, l) => sum + (Number(l.monthly_income) || 0), 0);
   const yearlyIncome = locations.reduce((sum, l) => sum + (Number(l.yearly_income) || 0), 0);
 
-  const offline = locations.filter((l) => l.status === "offline" || l.status === "disconnected").length;
+  const offline = locations.filter((l) => isStationOffline(l)).length;
   const online = Math.max(0, locations.length - offline);
 
   return {
