@@ -3100,8 +3100,15 @@ function getStationDailyValues(station, targetDateStr, metric = "energy", custom
       } else {
         const liveKwh = Number(station?.daily_energy_kwh ?? station?.today_energy_kwh ?? 0);
         if (liveKwh > 0) {
-          for (let h = 0; h < 24; h++) {
-            rawValues[h] = Math.round(solarWeights[h] * liveKwh * 100) / 100;
+          const maxH = isToday ? Math.min(23, now.getHours()) : 23;
+          let elapsedWeight = 0;
+          for (let h = 0; h <= maxH; h++) {
+            elapsedWeight += solarWeights[h];
+          }
+          if (elapsedWeight > 0) {
+            for (let h = 0; h <= maxH; h++) {
+              rawValues[h] = Math.round((solarWeights[h] / elapsedWeight) * liveKwh * 100) / 100;
+            }
           }
         }
       }
@@ -3164,8 +3171,15 @@ function getStationDailyValues(station, targetDateStr, metric = "energy", custom
       } else {
         const liveTodayKwh = Number(station?.daily_energy_kwh ?? station?.today_energy_kwh ?? 0);
         if (liveTodayKwh > 0) {
-          for (let h = 0; h < 24; h++) {
-            rawValues[h] = Math.round(solarWeights[h] * liveTodayKwh * 100) / 100;
+          const maxH = isToday ? Math.min(23, now.getHours()) : 23;
+          let elapsedWeight = 0;
+          for (let h = 0; h <= maxH; h++) {
+            elapsedWeight += solarWeights[h];
+          }
+          if (elapsedWeight > 0) {
+            for (let h = 0; h <= maxH; h++) {
+              rawValues[h] = Math.round((solarWeights[h] / elapsedWeight) * liveTodayKwh * 100) / 100;
+            }
           }
         }
       }
@@ -3202,15 +3216,26 @@ function getStationDailyValues(station, targetDateStr, metric = "energy", custom
   // Live scale for today if daily_energy_kwh is known and sum of hours differs
   if (isToday) {
     const liveTodayKwh = Number(station?.daily_energy_kwh ?? station?.today_energy_kwh ?? 0);
-    const sumCalc = rawValues.reduce((a, b) => a + b, 0);
+    const maxH = Math.min(23, now.getHours());
+    // Zero out any future hours beyond current hour
+    for (let h = maxH + 1; h < 24; h++) {
+      rawValues[h] = 0;
+    }
+    const sumCalc = rawValues.slice(0, maxH + 1).reduce((a, b) => a + b, 0);
     if (liveTodayKwh > 0 && sumCalc > 0 && Math.abs(sumCalc - liveTodayKwh) > 0.5) {
       const scale = liveTodayKwh / sumCalc;
-      for (let h = 0; h < 24; h++) {
+      for (let h = 0; h <= maxH; h++) {
         rawValues[h] = rawValues[h] * scale;
       }
     } else if (liveTodayKwh > 0 && sumCalc === 0) {
-      for (let h = 0; h < 24; h++) {
-        rawValues[h] = Math.round(solarWeights[h] * liveTodayKwh * 100) / 100;
+      let elapsedWeight = 0;
+      for (let h = 0; h <= maxH; h++) {
+        elapsedWeight += solarWeights[h];
+      }
+      if (elapsedWeight > 0) {
+        for (let h = 0; h <= maxH; h++) {
+          rawValues[h] = Math.round((solarWeights[h] / elapsedWeight) * liveTodayKwh * 100) / 100;
+        }
       }
     }
   }
@@ -6502,14 +6527,25 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
       if (period === "day" || period === "today") {
         const hourlyLabels = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`);
         const solarWeights = [0, 0, 0, 0, 0, 0, 0.02, 0.05, 0.09, 0.13, 0.16, 0.18, 0.16, 0.11, 0.06, 0.03, 0.01, 0, 0, 0, 0, 0, 0, 0];
+        const nowHour = new Date().getHours();
+        let elapsedWeight = 0;
+        for (let h = 0; h <= nowHour; h++) {
+          elapsedWeight += solarWeights[h];
+        }
+        const hourlyVals = Array(24).fill(0);
+        if (todayKwh > 0 && elapsedWeight > 0) {
+          for (let h = 0; h <= nowHour; h++) {
+            hourlyVals[h] = cleanFloat((solarWeights[h] / elapsedWeight) * todayKwh);
+          }
+        }
         return {
           available: true,
           labels: hourlyLabels,
-          values: solarWeights.map((w) => cleanFloat(w * todayKwh)),
+          values: hourlyVals,
           unit: "kWh",
           kind: "bar",
           title: "Daily production curve",
-          caption: "Estimasi generasi per jam",
+          caption: `Generasi per jam hari ini (s/d ${String(nowHour).padStart(2, "0")}:00)`,
         };
       }
       if (period === "week") {

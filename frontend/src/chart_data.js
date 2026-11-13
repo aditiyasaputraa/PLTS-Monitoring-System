@@ -76,7 +76,7 @@ function extractKehuaHourlyFromPowerTrend(charts) {
   const entries = Object.entries(spt.series);
   if (!entries.length) return null;
   entries.sort(([left], [right]) => left.localeCompare(right));
-  const [, latestData] = entries.at(-1);
+  const [latestKey, latestData] = entries.at(-1);
   const x = latestData?.x;
   const y = latestData?.y?.y_data_elec || latestData?.y?.y_data || (Array.isArray(latestData?.y) ? latestData.y : null);
   if (!Array.isArray(x) || !Array.isArray(y) || x.length === 0) return null;
@@ -101,6 +101,7 @@ function extractKehuaHourlyFromPowerTrend(charts) {
   const totalKwh = hourlyKwh.reduce((acc, v) => acc + v, 0);
 
   return {
+    date: latestKey,
     labels: Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`),
     values: hourlyKwh,
     totalKwh,
@@ -153,14 +154,33 @@ function generateSolarDayCurve(totalKwh, title) {
     0.16, 0.11, 0.06, 0.03, 0.01, 0,
     0, 0, 0, 0, 0, 0,
   ];
-  const hourlyValues = solarWeights.map((w) => Math.round(w * totalKwh * 10) / 10);
+
+  const now = new Date();
+  const currentHour = now.getHours();
+  // Time-cap: Never predict future hours for today's running solar generation
+  const maxHour = Math.min(23, currentHour);
+
+  let elapsedWeight = 0;
+  for (let h = 0; h <= maxHour; h++) {
+    elapsedWeight += solarWeights[h];
+  }
+
+  const hourlyValues = Array(24).fill(0);
+  if (totalKwh > 0 && elapsedWeight > 0) {
+    for (let h = 0; h <= maxHour; h++) {
+      if (solarWeights[h] > 0) {
+        hourlyValues[h] = Math.round((solarWeights[h] / elapsedWeight) * totalKwh * 10) / 10;
+      }
+    }
+  }
+
   return makeSeries({
     labels: hourlyLabels,
     values: hourlyValues,
     unit: "kWh",
     kind: "bar",
     title,
-    caption: "Profil generasi per jam",
+    caption: `Generasi per jam hari ini (s/d ${String(currentHour).padStart(2, "0")}:00)`,
   });
 }
 
@@ -590,28 +610,38 @@ export function getEnergySeries(location, period) {
           });
         }
         const activeKwh = rawTodayKwh > 0 ? rawTodayKwh : effectiveToday;
-        const scale = activeKwh / powerTrend.totalKwh;
-        const scaledValues = powerTrend.values.map((v) => Math.round(v * scale * 100) / 100);
+        const now = new Date();
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+        const isToday = !powerTrend.date || powerTrend.date === todayStr;
+        const nowHour = now.getHours();
+        const cappedValues = powerTrend.values.map((v, h) => (!isToday || h <= nowHour ? v : 0));
+        const cappedTotal = cappedValues.reduce((acc, v) => acc + v, 0);
+        const scale = cappedTotal > 0 ? (activeKwh / cappedTotal) : (powerTrend.totalKwh > 0 ? activeKwh / powerTrend.totalKwh : 1);
+        const scaledValues = cappedValues.map((v) => Math.round(v * scale * 100) / 100);
         return makeSeries({
           labels: powerTrend.labels,
           values: scaledValues,
           unit: "kWh",
           kind: "bar",
           title,
-          caption: "Generasi per jam hari ini (tren daya Kehua)",
+          caption: isToday ? `Generasi per jam hari ini (s/d ${String(nowHour).padStart(2, "0")}:00)` : "Generasi per jam",
         });
       }
 
       // 2. If daily_generation has healthy data and is not cut off in the morning
       if (charts.daily_generation?.x?.length && rawTodayKwh > 0 && dgSum > 0 && (dgMaxHour > 10 || rawTodayKwh <= dgSum * 1.2)) {
-        const scaledValues = dgY.map((v) => Math.round(((v || 0) / dgSum) * rawTodayKwh * 100) / 100);
+        const nowHour = new Date().getHours();
+        const cappedY = dgY.map((v, h) => (h <= nowHour ? (v || 0) : 0));
+        const cappedSum = cappedY.reduce((acc, v) => acc + v, 0);
+        const scale = cappedSum > 0 ? (rawTodayKwh / cappedSum) : 1;
+        const scaledValues = cappedY.map((v) => Math.round(v * scale * 100) / 100);
         return makeSeries({
           labels: charts.daily_generation.x,
           values: scaledValues,
           unit: "kWh",
           kind: "bar",
           title,
-          caption: "Generasi per jam hari ini",
+          caption: `Generasi per jam hari ini (s/d ${String(nowHour).padStart(2, "0")}:00)`,
         });
       }
 
