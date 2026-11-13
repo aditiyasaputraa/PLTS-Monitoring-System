@@ -74,6 +74,16 @@ export const REGIONAL_ACCOUNTS = [
     name: "Admin Dinas Pusat",
     envKey: "VITE_AUTH_SUPERADMIN_PASS",
   },
+  {
+    id: "viewer",
+    username: "viewer",
+    email: "viewer@jakarta.go.id",
+    role: "viewer",
+    region: "all",
+    regionName: "Provinsi DKI Jakarta",
+    name: "Viewer PLTS",
+    envKey: "VITE_AUTH_VIEWER_PASS",
+  },
 ];
 
 /**
@@ -97,6 +107,8 @@ function readStaticViteEnv(envKey) {
           return import.meta.env.VITE_AUTH_ADMIN_SERIBU_PASS;
         case "VITE_AUTH_SUPERADMIN_PASS":
           return import.meta.env.VITE_AUTH_SUPERADMIN_PASS;
+        case "VITE_AUTH_VIEWER_PASS":
+          return import.meta.env.VITE_AUTH_VIEWER_PASS;
         default:
           return "";
       }
@@ -139,6 +151,7 @@ export function findRegionalAccount(emailOrUsername) {
     const matchId = acc.id && acc.id.toLowerCase() === cleanInput;
     const matchCompactUsername = acc.username && cleanInput === acc.username.replace(".", "");
     const matchSuperAlias = acc.username === "admin" && cleanInput === "superadmin";
+    const matchViewerAlias = acc.username === "viewer" && (cleanInput === "guest" || cleanInput === "tamu");
     const matchRegionKeyword = acc.region && acc.region !== "all" && cleanInput.includes(acc.region);
 
     if (
@@ -147,6 +160,7 @@ export function findRegionalAccount(emailOrUsername) {
       matchId ||
       matchCompactUsername ||
       matchSuperAlias ||
+      matchViewerAlias ||
       matchRegionKeyword
     ) {
       return acc;
@@ -208,14 +222,14 @@ export function canUserEditStation(user, station, getStationRegionFn) {
   const rawUserRegion = user.region || user.user_metadata?.region || "";
   const userRegion = normalizeRegionCode(rawUserRegion);
 
-  // Super admin / Administrator Provinsi dapat mengedit seluruh stasiun
-  if (role === "super_admin" || userRegion === "all") {
-    return true;
-  }
-
-  // Viewer / Demo hanya bisa melihat
+  // Viewer / Demo hanya bisa melihat (Read Only)
   if (role === "viewer") {
     return false;
+  }
+
+  // Super admin / Administrator Provinsi dapat mengedit seluruh stasiun
+  if (role === "super_admin") {
+    return true;
   }
 
   if (!station) return false;
@@ -244,6 +258,7 @@ export function canUserOpenTariffSettings(user) {
 export function canUserEditCategoryTariff(user) {
   if (!user) return false;
   const role = user.role || user.user_metadata?.role || "viewer";
+  if (role === "viewer") return false;
   const userRegion = normalizeRegionCode(user.region || user.user_metadata?.region || "");
   return role === "super_admin" || userRegion === "all";
 }

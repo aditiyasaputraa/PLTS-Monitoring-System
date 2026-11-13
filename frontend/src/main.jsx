@@ -435,6 +435,8 @@ function normalizeSession(payload) {
       session.user.user_metadata.regionName = matchingAcc.regionName;
       session.user.user_metadata.title = matchingAcc.role === "super_admin"
         ? "Super Admin DKI Jakarta"
+        : matchingAcc.role === "viewer"
+        ? "Viewer PLTS (Read Only)"
         : `Admin Wilayah ${matchingAcc.regionName}`;
     }
   }
@@ -1824,10 +1826,10 @@ function Dashboard({ session, onSignOut }) {
             {session?.user && (
               <div
                 className="user-nav-badge"
-                title={`Login sebagai: ${session.user.role === 'super_admin' ? 'Admin Dinas Pusat' : 'Admin Sudin ' + (session.user.user_metadata?.regionName || '')}`}
+                title={`Login sebagai: ${session.user.role === 'super_admin' ? 'Admin Dinas Pusat' : session.user.role === 'viewer' ? 'Viewer Tamu (Hanya Melihat)' : 'Admin Sudin ' + (session.user.user_metadata?.regionName || '')}`}
               >
                 <span className="user-nav-avatar">
-                  {session.user.role === "super_admin" ? "👑" : "🏢"}
+                  {session.user.role === "super_admin" ? "👑" : session.user.role === "viewer" ? "👁️" : "🏢"}
                 </span>
                 <div className="user-nav-info">
                   <span className="user-nav-name">
@@ -1835,10 +1837,12 @@ function Dashboard({ session, onSignOut }) {
                       ? "Admin Dinas Pusat"
                       : session.user.role === "regional_admin"
                       ? "Admin Sudin"
+                      : session.user.role === "viewer"
+                      ? "Viewer PLTS"
                       : (session.user.user_metadata?.name || session.user.email)}
                   </span>
-                  <span className={`user-nav-role-pill role-${session.user.region || 'all'}`}>
-                    {session.user.user_metadata?.regionName || "DKI Jakarta"}
+                  <span className={`user-nav-role-pill role-${session.user.role === 'viewer' ? 'viewer' : (session.user.region || 'all')}`}>
+                    {session.user.role === "viewer" ? "Viewer (Read Only)" : (session.user.user_metadata?.regionName || "DKI Jakarta")}
                   </span>
                 </div>
               </div>

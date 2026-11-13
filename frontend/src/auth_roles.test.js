@@ -18,6 +18,7 @@ process.env.VITE_AUTH_ADMIN_SELATAN_PASS = "test_env_pass_selatan";
 process.env.VITE_AUTH_ADMIN_TIMUR_PASS = "test_env_pass_timur";
 process.env.VITE_AUTH_ADMIN_SERIBU_PASS = "test_env_pass_seribu";
 process.env.VITE_AUTH_SUPERADMIN_PASS = "test_env_pass_superadmin";
+process.env.VITE_AUTH_VIEWER_PASS = "test_env_pass_viewer";
 
 test("authenticates all 6 regional accounts and super admin from environment variables", () => {
   // 1. Jakarta Pusat
@@ -58,6 +59,13 @@ test("authenticates all 6 regional accounts and super admin from environment var
   assert.ok(superAdmin);
   assert.equal(superAdmin.region, "all");
   assert.equal(superAdmin.role, "super_admin");
+
+  // Viewer
+  const viewer = authenticateLocalAccount("viewer", "test_env_pass_viewer");
+  assert.ok(viewer);
+  assert.equal(viewer.email, "viewer@jakarta.go.id");
+  assert.equal(viewer.region, "all");
+  assert.equal(viewer.role, "viewer");
 });
 
 test("rejects invalid passwords or unknown users", () => {
@@ -135,14 +143,21 @@ test("enforces scoped editing permissions per region", () => {
   // Super Admin can edit any station
   assert.equal(canUserEditStation(superAdmin, stationJakbar, getRegion), true);
   assert.equal(canUserEditStation(superAdmin, stationJakut, getRegion), true);
+
+  // Viewer CANNOT edit any station
+  const viewer = authenticateLocalAccount("viewer", "test_env_pass_viewer");
+  assert.equal(canUserEditStation(viewer, stationJakbar, getRegion), false);
+  assert.equal(canUserEditStation(viewer, stationJakut, getRegion), false);
 });
 
 test("restricts category global tariff edits to super admin", () => {
   const adminBarat = authenticateLocalAccount("admin.barat", "test_env_pass_barat");
   const superAdmin = authenticateLocalAccount("admin", "test_env_pass_superadmin");
+  const viewer = authenticateLocalAccount("viewer", "test_env_pass_viewer");
 
   assert.equal(canUserEditCategoryTariff(adminBarat), false);
   assert.equal(canUserEditCategoryTariff(superAdmin), true);
+  assert.equal(canUserEditCategoryTariff(viewer), false);
 });
 
 test("allows regional admins to edit tariffs in their own region but locks other regions", () => {
@@ -170,4 +185,10 @@ test("allows regional admins to edit tariffs in their own region but locks other
   assert.equal(canUserOpenTariffSettings(pusat), true);
   assert.equal(canUserOpenTariffSettings(barat), true);
   assert.equal(canUserOpenTariffSettings(superAdmin), true);
+
+  // Viewer CANNOT edit station tariffs and CANNOT open tariff settings in edit mode
+  const viewer = authenticateLocalAccount("viewer", "test_env_pass_viewer");
+  assert.equal(canUserEditStationTariff(viewer, stationPusat, getRegion), false);
+  assert.equal(canUserEditStationTariff(viewer, stationBarat, getRegion), false);
+  assert.equal(canUserOpenTariffSettings(viewer), false);
 });
