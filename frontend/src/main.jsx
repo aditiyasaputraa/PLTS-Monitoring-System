@@ -1474,7 +1474,7 @@ function Dashboard({ session, onSignOut }) {
         latitude = -6.136909;
         longitude = 106.965655;
         address = "GOR Sekda Saefullah, Jl. Sungai Kendal No. 17, Rorotan, Cilincing, Jakarta Utara 14140";
-      } else if (nameLower.includes("rawa badak")) {
+      } else if (nameLower.includes("rawa badak") && (nameLower.includes("03") || nameLower.includes("selatan 03"))) {
         latitude = -6.124710;
         longitude = 106.902798;
         address = "SDN Rawa Badak Selatan 03 Pagi, Jl. Mayangsari I No. 58, Rawa Badak Selatan, Koja, Jakarta Utara 14230";
