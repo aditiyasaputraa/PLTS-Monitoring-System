@@ -1703,6 +1703,28 @@ def normalize_huawei_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[
         station.update(kpi_by_station.get(str(item.get("dn") or ""), {}))
         station.update(energy_balance_by_station.get(str(item.get("dn") or ""), {}))
 
+        # Normalize UTC+8 (Asia/Singapore) station timestamps to WIB (Asia/Jakarta, UTC+7)
+        if str(station.get("timezone") or "") in ("Asia/Singapore", "GMT+8", "UTC+8"):
+            station["timezone"] = "Asia/Jakarta"
+            dp5_tz = station.get("daily_power_5min")
+            if isinstance(dp5_tz, dict) and isinstance(dp5_tz.get("x"), list):
+                shifted_x = []
+                for lbl in dp5_tz["x"]:
+                    lbl_s = str(lbl or "")
+                    if ":" in lbl_s:
+                        parts = lbl_s.split(" ")
+                        t_part = parts[-1]
+                        hm = t_part.split(":")
+                        try:
+                            h_val = (int(hm[0]) - 1) % 24
+                            new_t = f"{h_val:02d}:{':'.join(hm[1:])}"
+                            shifted_x.append(f"{parts[0]} {new_t}" if len(parts) > 1 else new_t)
+                            continue
+                        except ValueError:
+                            pass
+                    shifted_x.append(lbl)
+                dp5_tz["x"] = shifted_x
+
         # Resolve live power fallback when station-list currentPower momentarily drops to 0
         cur_pwr = to_float(station.get("current_power_kw"))
         inv_pwr = to_float(station.get("inverter_power_kw"))
@@ -1942,19 +1964,22 @@ def normalize_huawei_overview(grouped: dict[str, list[dict[str, Any]]], stations
     total_data = total if isinstance(total, dict) else {}
     status = first_data(grouped, "station-status-count")
     status_data = status if isinstance(status, dict) else {}
+    normal_cnt = sum(1 for s in stations if s.get("status") == "normal") if stations else to_int(status_data.get("connected") if isinstance(status_data, dict) else None)
+    offline_cnt = sum(1 for s in stations if s.get("status") == "offline") if stations else to_int(status_data.get("disconnected") if isinstance(status_data, dict) else None)
+    trouble_cnt = sum(1 for s in stations if s.get("status") not in ("normal", "offline")) if stations else to_int(status_data.get("trouble") if isinstance(status_data, dict) else None)
     return compact_non_null({
         "station_count": len(stations),
-        "connected_station_count": to_int(status_data.get("connected") if isinstance(status_data, dict) else None),
-        "disconnected_station_count": to_int(status_data.get("disconnected") if isinstance(status_data, dict) else None),
-        "trouble_station_count": to_int(status_data.get("trouble") if isinstance(status_data, dict) else None),
+        "connected_station_count": normal_cnt,
+        "disconnected_station_count": offline_cnt,
+        "trouble_station_count": trouble_cnt,
         "capacity_kwp": sum_numbers(stations, "capacity_kwp"),
-        "inverter_power_kw": power_to_kw(total_data.get("inverterPower"), "kW") if isinstance(total_data, dict) else None,
-        "current_power_kw": power_to_kw(total_data.get("currentPower"), "kW") if isinstance(total_data, dict) else None,
-        "daily_energy_kwh": energy_to_kwh(total_data.get("dailyEnergy"), "kWh") if isinstance(total_data, dict) else None,
+        "inverter_power_kw": sum_numbers(stations, "inverter_power_kw") or (power_to_kw(total_data.get("inverterPower"), "kW") if isinstance(total_data, dict) else None),
+        "current_power_kw": sum_numbers(stations, "current_power_kw") or (power_to_kw(total_data.get("currentPower"), "kW") if isinstance(total_data, dict) else None),
+        "daily_energy_kwh": sum_numbers(stations, "daily_energy_kwh") or (energy_to_kwh(total_data.get("dailyEnergy"), "kWh") if isinstance(total_data, dict) else None),
         "monthly_energy_kwh": sum_numbers(stations, "monthly_energy_kwh"),
         "yearly_energy_kwh": sum_numbers(stations, "yearly_energy_kwh"),
-        "cumulative_energy_kwh": energy_to_kwh(total_data.get("cumulativeEnergy"), "kWh") if isinstance(total_data, dict) else None,
-        "daily_income": to_float(total_data.get("dailyIncome")) if isinstance(total_data, dict) else None,
+        "cumulative_energy_kwh": sum_numbers(stations, "cumulative_energy_kwh") or (energy_to_kwh(total_data.get("cumulativeEnergy"), "kWh") if isinstance(total_data, dict) else None),
+        "daily_income": sum_numbers(stations, "daily_income") or (to_float(total_data.get("dailyIncome")) if isinstance(total_data, dict) else None),
         "monthly_income": sum_numbers(stations, "monthly_income"),
         "yearly_income": sum_numbers(stations, "yearly_income"),
         "cumulative_income": sum_numbers(stations, "cumulative_income"),
@@ -2319,8 +2344,11 @@ def normalize_kehua_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[d
         if kehua_pwr is not None and kehua_pwr > 0:
             if station.get("status") in (None, "offline", "vacant"):
                 station["status"] = "normal"
-        elif (kehua_pwr is None or kehua_pwr <= 0) and station.get("status") == "vacant":
+        elif (kehua_pwr is None or kehua_pwr <= 0) and (station.get("status") == "vacant" or (daily_kwh is None or daily_kwh <= 0)):
             station["status"] = "offline"
+
+        if str(station.get("timezone") or "") in ("GMT+8", "UTC+8", "Asia/Singapore"):
+            station["timezone"] = "GMT+7"
 
     return list(by_id.values())
 
@@ -2542,7 +2570,8 @@ def normalize_sma_stations(grouped: dict[str, list[dict[str, Any]]]) -> list[dic
                             time_str = str(v.get("time") or "")
                             try:
                                 t_utc = datetime.fromisoformat(time_str.replace("Z", "+00:00"))
-                                t_jkt = t_utc.astimezone(timezone(timedelta(hours=7)))
+                                # SMA OneHour Dif timestamps mark the END of the 1-hour interval
+                                t_jkt = t_utc.astimezone(timezone(timedelta(hours=7))) - timedelta(minutes=1)
                                 d_key = t_jkt.strftime("%Y-%m-%d")
                                 if d_key not in hourly_by_date:
                                     hourly_by_date[d_key] = [0.0] * 24

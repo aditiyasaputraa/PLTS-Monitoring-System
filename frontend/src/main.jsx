@@ -3192,6 +3192,8 @@ function getStationDailyValues(station, targetDateStr, metric = "energy", custom
         const hourKwSum = Array(24).fill(0);
         const hourCount = Array(24).fill(0);
         const hasTimeLabels = typeof p5.x[0] === "string" && p5.x[0].includes(":");
+        const tzRaw = String(station?.timezone || station?.site?.timezone || "");
+        const tzShift = (tzRaw.includes("Singapore") || tzRaw.includes("+8")) ? -1 : 0;
         p5.generation_power_kw.forEach((rawKw, idx) => {
           const kw = Number(rawKw);
           if (!Number.isFinite(kw)) return;
@@ -3200,7 +3202,7 @@ function getStationDailyValues(station, targetDateStr, metric = "energy", custom
             const timePart = String(p5.x[idx]).includes(" ") ? String(p5.x[idx]).split(" ")[1] : String(p5.x[idx]);
             const hourPart = parseInt(timePart.split(":")[0], 10);
             if (Number.isFinite(hourPart) && hourPart >= 0 && hourPart <= 23) {
-              h = hourPart;
+              h = (hourPart + tzShift + 24) % 24;
             }
           }
           if (h < 0) h = Math.floor(idx / 12);

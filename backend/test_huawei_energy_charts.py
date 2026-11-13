@@ -146,6 +146,34 @@ class HuaweiEnergyChartTests(unittest.TestCase):
         self.assertEqual(stations["17483"]["current_power_kw"], 3.7)
         self.assertEqual(stations["17483"]["status"], "normal")
 
+    def test_huawei_singapore_timezone_shifts_5min_labels_to_wib(self):
+        grouped = {
+            "station-list": [{
+                "response_body": {"data": {"list": [
+                    {
+                        "dn": "NE=53774247",
+                        "name": "UPPPD Jatinegara",
+                        "plantStatus": "connected",
+                        "timeZone": "Asia/Singapore",
+                        "currentPower": 4.89,
+                        "dailyEnergy": 72.1,
+                    },
+                ]}},
+            }],
+            "energy-balance-daily": [{
+                "url": "https://example/energy-balance?stationDn=NE%3D53774247&timeDim=2",
+                "response_body": {"data": {
+                    "xAxis": ["2026-11-13 06:35", "2026-11-13 16:00"],
+                    "productPower": ["0.5", "4.891"],
+                }},
+            }],
+        }
+
+        stations = {s["station_id"]: s for s in normalize_huawei_stations(grouped)}
+        st = stations["NE=53774247"]
+        self.assertEqual(st["timezone"], "Asia/Jakarta")
+        self.assertEqual(st["daily_power_5min"]["x"], ["2026-11-13 05:35", "2026-11-13 15:00"])
+
 
 if __name__ == "__main__":
     unittest.main()

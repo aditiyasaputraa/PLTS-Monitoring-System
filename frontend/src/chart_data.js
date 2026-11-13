@@ -435,6 +435,9 @@ export function getEnergySeries(location, period) {
         const hourCount = Array(24).fill(0);
 
         const hasTimeLabels = typeof p5.x[0] === "string" && p5.x[0].includes(":");
+        const tzRaw = String(location?.timezone || location?.site?.timezone || "");
+        const tzShift = (tzRaw.includes("Singapore") || tzRaw.includes("+8")) ? -1 : 0;
+        const nowHour = new Date().getHours();
 
         p5.generation_power_kw.forEach((rawKw, idx) => {
           const kw = Number(rawKw);
@@ -445,13 +448,13 @@ export function getEnergySeries(location, period) {
             const timePart = String(p5.x[idx]).includes(" ") ? String(p5.x[idx]).split(" ")[1] : String(p5.x[idx]);
             const hourPart = parseInt(timePart.split(":")[0], 10);
             if (Number.isFinite(hourPart) && hourPart >= 0 && hourPart <= 23) {
-              h = hourPart;
+              h = (hourPart + tzShift + 24) % 24;
             }
           }
           if (h < 0) {
             h = Math.floor(idx / 12);
           }
-          if (h >= 0 && h < 24) {
+          if (h >= 0 && h < 24 && h <= nowHour) {
             hourKwSum[h] += kw;
             hourCount[h] += 1;
           }
@@ -774,8 +777,10 @@ export function getEnergySeries(location, period) {
 
     if (normPeriod === "day") {
       const todayChart = location?.energy_charts?.today || location?.energy_charts?.hourly;
-      if (todayChart) {
-        return chartSeries(todayChart, {
+      if (todayChart && Array.isArray(todayChart.values)) {
+        const nowHour = new Date().getHours();
+        const cappedValues = todayChart.values.map((v, h) => (h <= nowHour ? (Number(v) || 0) : 0));
+        return chartSeries({ ...todayChart, values: cappedValues }, {
           unit: "kWh",
           kind: "bar",
           title,
