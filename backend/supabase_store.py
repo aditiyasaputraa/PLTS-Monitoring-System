@@ -95,6 +95,47 @@ def merge_payload_preserve_history(existing: dict[str, Any] | None, incoming: di
                             if k not in new_sub or not new_sub[k]:
                                 new_sub[k] = v
 
+        # 3. Preserve stations from existing snapshot if a sub-account was not present in incoming
+        incoming_ids = {
+            str(s.get("station_id") or s.get("id") or "")
+            for s in incoming_stations
+            if isinstance(s, dict)
+        }
+        incoming_names = {
+            str(s.get("name") or "")
+            for s in incoming_stations
+            if isinstance(s, dict)
+        }
+        added_preserved = False
+        for old_st in existing_stations:
+            if not isinstance(old_st, dict):
+                continue
+            old_id = str(old_st.get("station_id") or old_st.get("id") or "")
+            old_name = str(old_st.get("name") or "")
+            if old_id in ("38722", "50483", "50639"):
+                continue
+            if old_id and old_id not in incoming_ids and (not old_name or old_name not in incoming_names):
+                incoming_stations.append(old_st)
+                incoming_ids.add(old_id)
+                if old_name:
+                    incoming_names.add(old_name)
+                added_preserved = True
+
+        if added_preserved:
+            ov = incoming_site.setdefault("overview", {})
+            norm_cnt = sum(1 for s in incoming_stations if isinstance(s, dict) and s.get("status") == "normal")
+            off_cnt = sum(1 for s in incoming_stations if isinstance(s, dict) and s.get("status") == "offline")
+            flt_cnt = sum(1 for s in incoming_stations if isinstance(s, dict) and s.get("status") not in ("normal", "offline"))
+            ov["station_count"] = len(incoming_stations)
+            ov["connected_station_count"] = norm_cnt
+            ov["disconnected_station_count"] = off_cnt
+            ov["trouble_station_count"] = flt_cnt
+            for metric_field in ("capacity_kwp", "current_power_kw", "daily_energy_kwh", "monthly_energy_kwh", "yearly_energy_kwh", "cumulative_energy_kwh"):
+                ov[metric_field] = round(
+                    sum(float(s.get(metric_field) or 0) for s in incoming_stations if isinstance(s, dict)),
+                    3,
+                )
+
     return incoming
 
 

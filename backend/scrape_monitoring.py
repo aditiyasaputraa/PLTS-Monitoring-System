@@ -1534,15 +1534,15 @@ def build_normalized_site(site_result: dict[str, Any]) -> dict[str, Any]:
             addr_l = str(st.get("address") or "").lower()
             s_text = f"{st_name_l} {addr_l}"
             matched_region = None
-            if any(k in st_name_l for k in ["cengkareng", "tambora", "smpn 205", "sman 85", "smpn 204", "sukabumi utara", "kalideres"]):
+            if any(k in st_name_l for k in ["cengkareng", "tambora", "smpn 205", "sman 85", "smpn 204", "sukabumi utara", "kalideres", "smpn 197"]):
                 matched_region = "Jakarta Barat"
-            elif any(k in st_name_l for k in ["sawah besar", "gambir", "cempaka baru", "smpn 39", "kampung rawa", "smpn 08", "smpn 8 ", "perpustakaan arsip", "dppap", "paseban"]):
+            elif any(k in st_name_l for k in ["sawah besar", "gambir", "cempaka baru", "cempaka putih", "smpn 39", "kampung rawa", "smpn 08", "smpn 8 ", "perpustakaan arsip", "dppap", "paseban"]):
                 matched_region = "Jakarta Pusat"
             elif any(k in st_name_l for k in ["pmptsp", "ragunan", "setiabudi", "jagakarsa", "pasar minggu", "smpn 175", "pejaten timur", "petukangan", "smkn 29", "grogol utara", "kalibata", "cilandak", "kebayoran"]):
                 matched_region = "Jakarta Selatan"
-            elif any(k in st_name_l for k in ["makassar", "pasar rebo", "ciracas", "rawamangun", "klender", "duren sawit", "pulogadung", "pulo gadung", "matraman", "knpi", "smpn 172", "cakung"]):
+            elif any(k in st_name_l for k in ["makassar", "pasar rebo", "ciracas", "rawamangun", "klender", "duren sawit", "pulogadung", "pulo gadung", "matraman", "knpi", "smpn 172", "cakung", "smpn 144", "p3d"]):
                 matched_region = "Jakarta Timur"
-            elif any(k in st_name_l for k in ["koja", "tanjung priok", "cilincing", "penjaringan", "islamic center", "tugu utara", "smpn 112", "bahtera jaya", "rawa badak", "pademangan", "smpn 244", "semper barat", "sekda saefullah", "sman 75", "sukapura"]):
+            elif any(k in st_name_l for k in ["koja", "tanjung priok", "cilincing", "penjaringan", "islamic center", "tugu utara", "smpn 112", "bahtera jaya", "rawa badak", "pademangan", "smpn 244", "semper barat", "semper timur", "sekda saefullah", "sman 75", "sukapura"]):
                 matched_region = "Jakarta Utara"
             elif "jakarta pusat" in s_text or "jkt pusat" in s_text or "jakpus" in s_text or "central jakarta" in s_text:
                 matched_region = "Jakarta Pusat"
