@@ -3605,44 +3605,210 @@ function formatYTick(val, metric) {
   return String(Math.round(val));
 }
 
+function getComparisonYearPalette(metric, rankIdx) {
+  if (rankIdx === 0) {
+    if (metric === "revenue") {
+      return {
+        bar: "#84cc16",
+        barMuted: "#d9f99d",
+        barHover: "#65a30d",
+        line: "#4d7c0f",
+        dot: "#4d7c0f",
+        pillBg: "#ecfccb",
+        pillBorder: "#bef264",
+        pillText: "#3f6212",
+        tooltipColor: "#a3e635",
+      };
+    }
+    if (metric === "emission") {
+      return {
+        bar: "#059669",
+        barMuted: "#a7f3d0",
+        barHover: "#047857",
+        line: "#059669",
+        dot: "#059669",
+        pillBg: "#d1fae5",
+        pillBorder: "#6ee7b7",
+        pillText: "#065f46",
+        tooltipColor: "#34d399",
+      };
+    }
+    return {
+      bar: "#0d4a2b",
+      barMuted: "#bce3c4",
+      barHover: "#08331d",
+      line: "#16a34a",
+      dot: "#0d4a2b",
+      pillBg: "#e6f4ea",
+      pillBorder: "#a7d7b5",
+      pillText: "#0d4a2b",
+      tooltipColor: "#4ade80",
+    };
+  }
+
+  const extraPalettes = [
+    {
+      bar: "#3b82f6",
+      barMuted: "#bfdbfe",
+      barHover: "#1d4ed8",
+      line: "#2563eb",
+      dot: "#2563eb",
+      pillBg: "#eff6ff",
+      pillBorder: "#bfdbfe",
+      pillText: "#1e40af",
+      tooltipColor: "#60a5fa",
+    },
+    {
+      bar: "#f59e0b",
+      barMuted: "#fde68a",
+      barHover: "#d97706",
+      line: "#d97706",
+      dot: "#d97706",
+      pillBg: "#fffbeb",
+      pillBorder: "#fde68a",
+      pillText: "#92400e",
+      tooltipColor: "#fbbf24",
+    },
+    {
+      bar: "#8b5cf6",
+      barMuted: "#ddd6fe",
+      barHover: "#6d28d9",
+      line: "#7c3aed",
+      dot: "#7c3aed",
+      pillBg: "#f5f3ff",
+      pillBorder: "#ddd6fe",
+      pillText: "#5b21b6",
+      tooltipColor: "#c084fc",
+    },
+    {
+      bar: "#ec4899",
+      barMuted: "#fbcfe8",
+      barHover: "#be185d",
+      line: "#db2777",
+      dot: "#db2777",
+      pillBg: "#fdf2f8",
+      pillBorder: "#fbcfe8",
+      pillText: "#9d174d",
+      tooltipColor: "#f472b6",
+    },
+    {
+      bar: "#06b6d4",
+      barMuted: "#a5f3fc",
+      barHover: "#0e7490",
+      line: "#0891b2",
+      dot: "#0891b2",
+      pillBg: "#ecfeff",
+      pillBorder: "#a5f3fc",
+      pillText: "#155e75",
+      tooltipColor: "#22d3ee",
+    },
+  ];
+
+  return extraPalettes[(rankIdx - 1) % extraPalettes.length];
+}
+
 function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, onSelect }) {
-  const [metric, setMetric] = useState("energy"); // "energy" | "revenue"
+  const [metric, setMetric] = useState("energy"); // "energy" | "revenue" | "emission"
   const [hoveredIdx, setHoveredIdx] = useState(null);
+  const [yearMenuOpen, setYearMenuOpen] = useState(false);
+  const yearMenuRef = useRef(null);
 
   const availableYears = useMemo(() => getAvailableProductionYears(locations, null), [locations]);
-  const [selectedYear, setSelectedYear] = useState(() => availableYears[0] || new Date().getFullYear());
+  const [selectedYears, setSelectedYears] = useState(() => [availableYears[0] || new Date().getFullYear()]);
 
   useEffect(() => {
-    if (availableYears.length > 0 && !availableYears.includes(selectedYear)) {
-      setSelectedYear(availableYears[0]);
+    if (availableYears.length > 0) {
+      setSelectedYears((prev) => {
+        const valid = prev.filter((y) => availableYears.includes(y));
+        return valid.length > 0 ? valid : [availableYears[0]];
+      });
     }
-  }, [availableYears, selectedYear]);
+  }, [availableYears]);
+
+  useEffect(() => {
+    if (!yearMenuOpen) return;
+    const handleClickOutside = (e) => {
+      if (yearMenuRef.current && !yearMenuRef.current.contains(e.target)) {
+        setYearMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [yearMenuOpen]);
+
+  // Descending order for legend & menu priority (newest year gets primary palette)
+  const yearsDesc = useMemo(() => [...selectedYears].sort((a, b) => b - a), [selectedYears]);
+  // Ascending order for left-to-right bars inside each month
+  const yearsAsc = useMemo(() => [...selectedYears].sort((a, b) => a - b), [selectedYears]);
+  const primaryYear = yearsDesc[0] || new Date().getFullYear();
+  const isMultiYear = yearsDesc.length > 1;
+
+  // Precompute monthly values for all available years so the dropdown can show yearly totals & chart can compare
+  const allYearsDataMap = useMemo(() => {
+    const map = {};
+    for (const yr of availableYears) {
+      const vals = getAggregateMonthlyValues(locations, null, yr, metric, fleet);
+      const total = vals.reduce((acc, v) => acc + (Number(v) || 0), 0);
+      map[yr] = { values: vals, total };
+    }
+    return map;
+  }, [locations, availableYears, metric, fleet]);
 
   const monthlyValues = useMemo(() => {
-    return getAggregateMonthlyValues(locations, null, selectedYear, metric, fleet);
-  }, [locations, selectedYear, metric, fleet]);
+    return allYearsDataMap[primaryYear]?.values || Array(12).fill(0);
+  }, [allYearsDataMap, primaryYear]);
+
+  const toggleYearSelection = useCallback((yr) => {
+    setSelectedYears((prev) => {
+      if (prev.includes(yr)) {
+        if (prev.length <= 1) return prev; // Minimal 1 tahun tetap terpilih
+        return prev.filter((item) => item !== yr);
+      }
+      return [...prev, yr].sort((a, b) => b - a);
+    });
+  }, []);
 
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const now = new Date();
-  const isCurrentYear = selectedYear === now.getFullYear();
+  const currentYear = now.getFullYear();
+  const isCurrentYear = primaryYear === currentYear;
   const currentMonthIdx = now.getMonth();
 
-  const rawMax = Math.max(...monthlyValues.map((v) => Number(v) || 0), 0);
+  const rawMax = useMemo(() => {
+    let max = 0;
+    for (const yr of yearsDesc) {
+      const vals = allYearsDataMap[yr]?.values || [];
+      for (const v of vals) {
+        const num = Number(v) || 0;
+        if (num > max) max = num;
+      }
+    }
+    return max;
+  }, [yearsDesc, allYearsDataMap]);
+
   const hasData = rawMax > 0;
   const maxVal = calculateMaxVal(rawMax);
 
   const yTicks = [0, maxVal * 0.333, maxVal * 0.667, maxVal];
 
-  let lastIndexWithData = -1;
-  for (let i = monthlyValues.length - 1; i >= 0; i--) {
-    if (Number(monthlyValues[i]) > 0) {
-      lastIndexWithData = i;
-      break;
+  const getTrendlineEndIdx = useCallback((yr, vals) => {
+    let lastIdx = -1;
+    for (let i = vals.length - 1; i >= 0; i--) {
+      if (Number(vals[i]) > 0) {
+        lastIdx = i;
+        break;
+      }
     }
-  }
-  const trendlineEndIdx = isCurrentYear
-    ? Math.max(currentMonthIdx, lastIndexWithData)
-    : (lastIndexWithData >= 0 ? lastIndexWithData : 11);
+    if (yr === currentYear) {
+      return Math.max(currentMonthIdx, lastIdx);
+    }
+    return lastIdx >= 0 ? lastIdx : -1;
+  }, [currentYear, currentMonthIdx]);
+
+  const trendlineEndIdx = useMemo(
+    () => getTrendlineEndIdx(primaryYear, monthlyValues),
+    [getTrendlineEndIdx, primaryYear, monthlyValues]
+  );
 
   const formatTooltip = (val) => {
     if (metric === "revenue") {
@@ -3654,14 +3820,42 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
     return `${new Intl.NumberFormat("id-ID", { maximumFractionDigits: 3 }).format(val)} kWh`;
   };
 
+  const formatCompactTotal = (val) => {
+    const num = Number(val) || 0;
+    if (num <= 0) return "0";
+    if (metric === "revenue") {
+      if (num >= 1_000_000_000) return `Rp ${(num / 1e9).toFixed(2)} M`;
+      if (num >= 1_000_000) return `Rp ${(num / 1e6).toFixed(1)} Jt`;
+      return `Rp ${new Intl.NumberFormat("id-ID").format(Math.round(num))}`;
+    }
+    if (metric === "emission") {
+      if (num >= 1_000) return `${(num / 1000).toFixed(1)} ton CO₂`;
+      return `${Math.round(num)} kg CO₂`;
+    }
+    if (num >= 1_000_000) return `${(num / 1e6).toFixed(2)} GWh`;
+    if (num >= 1_000) return `${(num / 1000).toFixed(1)} MWh`;
+    return `${Math.round(num)} kWh`;
+  };
+
+  const yearLabelSummary = useMemo(() => {
+    if (yearsDesc.length === 1) return `Tahun ${yearsDesc[0]}`;
+    if (yearsDesc.length === 2) return `${yearsDesc[1]} vs ${yearsDesc[0]}`;
+    return `${yearsDesc.length} Tahun (${yearsAsc[0]}–${yearsAsc[yearsAsc.length - 1]})`;
+  }, [yearsDesc, yearsAsc]);
+
+  const eyebrowYearText = useMemo(() => {
+    if (yearsDesc.length === 1) return String(yearsDesc[0]);
+    return yearsAsc.join(" vs ");
+  }, [yearsDesc, yearsAsc]);
+
   return (
     <div className="dashboard-card" style={{ position: "relative" }}>
       <div className="card-header-row" style={{ flexWrap: "wrap", gap: "10px" }}>
         <div>
           <span className="card-eyebrow">
             {metric === "revenue"
-              ? `REVENUE TREND · ${selectedYear}`
-              : (metric === "emission" ? `EMISSION TREND · ${selectedYear}` : `ENERGY TREND · ${selectedYear}`)}
+              ? `REVENUE TREND · ${eyebrowYearText}`
+              : (metric === "emission" ? `EMISSION TREND · ${eyebrowYearText}` : `ENERGY TREND · ${eyebrowYearText}`)}
           </span>
           <h3 className="card-title">
             {metric === "revenue"
@@ -3671,47 +3865,183 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-          {/* Dropdown Tahun */}
-          <div style={{ position: "relative", display: "inline-block" }}>
-            <select
-              aria-label="Pilih tahun"
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
+          {/* Multi-Year Selector Dropdown */}
+          <div ref={yearMenuRef} style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+            <button
+              type="button"
+              aria-label="Pilih tahun perbandingan"
+              onClick={() => setYearMenuOpen((prev) => !prev)}
+              title="Klik untuk memilih 1 atau beberapa tahun sebagai perbandingan"
               style={{
-                appearance: "none",
-                WebkitAppearance: "none",
-                MozAppearance: "none",
-                background: "#f3f6f3",
-                border: "1px solid #d4ded5",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                background: isMultiYear ? "#e6f4ea" : "#f3f6f3",
+                border: isMultiYear ? "1px solid #86efac" : "1px solid #d4ded5",
                 borderRadius: "8px",
-                padding: "5px 24px 5px 10px",
+                padding: "5px 10px",
                 fontSize: "11px",
                 fontWeight: 700,
-                color: "#1f2f24",
+                color: isMultiYear ? "#0d4a2b" : "#1f2f24",
                 cursor: "pointer",
                 outline: "none",
                 transition: "all 0.15s ease",
               }}
             >
-              {availableYears.map((yr) => (
-                <option key={yr} value={yr}>
-                  Tahun {yr}
-                </option>
-              ))}
-            </select>
-            <span
-              style={{
-                position: "absolute",
-                right: "8px",
-                top: "50%",
-                transform: "translateY(-50%)",
-                pointerEvents: "none",
-                fontSize: "8px",
-                color: "#6b7d70",
-              }}
-            >
-              ▼
-            </span>
+              <span>{yearLabelSummary}</span>
+              <span style={{ fontSize: "8px", color: isMultiYear ? "#0d4a2b" : "#6b7d70" }}>
+                {yearMenuOpen ? "▲" : "▼"}
+              </span>
+            </button>
+
+            {yearMenuOpen && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 6px)",
+                  right: 0,
+                  width: "235px",
+                  background: "#ffffff",
+                  border: "1px solid #d4ded5",
+                  borderRadius: "10px",
+                  boxShadow: "0 10px 28px rgba(15, 29, 20, 0.16)",
+                  padding: "8px",
+                  zIndex: 40,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "2px 4px 6px",
+                    borderBottom: "1px solid #edf2ee",
+                    marginBottom: "6px",
+                  }}
+                >
+                  <span style={{ fontSize: "10px", fontWeight: 800, color: "#4f6254", letterSpacing: "0.04em" }}>
+                    BANDINGKAN TAHUN
+                  </span>
+                  <div style={{ display: "flex", gap: "4px" }}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedYears(availableYears.slice(0, Math.min(2, availableYears.length)))}
+                      style={{
+                        border: "1px solid #d4ded5",
+                        background: "#f8faf8",
+                        borderRadius: "4px",
+                        padding: "2px 5px",
+                        fontSize: "9px",
+                        fontWeight: 700,
+                        color: "#2d3d32",
+                        cursor: "pointer",
+                      }}
+                      title="Bandingkan 2 tahun terakhir"
+                    >
+                      2 Thn
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedYears(availableYears.slice(0, Math.min(3, availableYears.length)))}
+                      style={{
+                        border: "1px solid #d4ded5",
+                        background: "#f8faf8",
+                        borderRadius: "4px",
+                        padding: "2px 5px",
+                        fontSize: "9px",
+                        fontWeight: 700,
+                        color: "#2d3d32",
+                        cursor: "pointer",
+                      }}
+                      title="Bandingkan 3 tahun terakhir"
+                    >
+                      3 Thn
+                    </button>
+                    {isMultiYear && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedYears([availableYears[0] || currentYear])}
+                        style={{
+                          border: "1px solid #fecaca",
+                          background: "#fef2f2",
+                          borderRadius: "4px",
+                          padding: "2px 5px",
+                          fontSize: "9px",
+                          fontWeight: 700,
+                          color: "#b91c1c",
+                          cursor: "pointer",
+                        }}
+                        title="Reset ke 1 tahun"
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ maxHeight: "190px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "2px" }}>
+                  {availableYears.map((yr) => {
+                    const isChecked = selectedYears.includes(yr);
+                    const rankIdx = yearsDesc.indexOf(yr);
+                    const palette = isChecked ? getComparisonYearPalette(metric, Math.max(0, rankIdx)) : null;
+                    const yrTotal = allYearsDataMap[yr]?.total || 0;
+
+                    return (
+                      <label
+                        key={yr}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          toggleYearSelection(yr);
+                        }}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "5px 8px",
+                          borderRadius: "6px",
+                          cursor: "pointer",
+                          background: isChecked ? "#f2f8f4" : "transparent",
+                          fontSize: "11px",
+                          fontWeight: isChecked ? 700 : 600,
+                          color: isChecked ? "#132318" : "#536658",
+                          userSelect: "none",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            readOnly
+                            style={{ accentColor: "#0d4a2b", cursor: "pointer", margin: 0 }}
+                          />
+                          {isChecked && palette && (
+                            <span
+                              style={{
+                                width: "8px",
+                                height: "8px",
+                                borderRadius: "2px",
+                                background: palette.bar,
+                                display: "inline-block",
+                              }}
+                            />
+                          )}
+                          <span>Tahun {yr}</span>
+                        </div>
+                        <span
+                          style={{
+                            fontSize: "10px",
+                            fontWeight: 600,
+                            color: yrTotal > 0 ? "#0d4a2b" : "#9ca89f",
+                          }}
+                        >
+                          {yrTotal > 0 ? formatCompactTotal(yrTotal) : "0"}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Metric Clickable Buttons: Energy vs Revenue vs Emission */}
@@ -3822,33 +4152,130 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
         </div>
       </div>
 
+      {/* Multi-Year Active Comparison Legend Strip */}
+      {isMultiYear && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            flexWrap: "wrap",
+            marginTop: "6px",
+            marginBottom: "2px",
+          }}
+        >
+          {yearsDesc.map((yr, rankIdx) => {
+            const palette = getComparisonYearPalette(metric, rankIdx);
+            const yrTotal = allYearsDataMap[yr]?.total || 0;
+            return (
+              <span
+                key={yr}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "5px",
+                  padding: "2px 8px",
+                  borderRadius: "999px",
+                  background: palette.pillBg,
+                  border: `1px solid ${palette.pillBorder}`,
+                  color: palette.pillText,
+                  fontSize: "10px",
+                  fontWeight: 700,
+                }}
+              >
+                <span
+                  style={{
+                    width: "7px",
+                    height: "7px",
+                    borderRadius: "2px",
+                    background: palette.bar,
+                  }}
+                />
+                <span>{yr}: {formatCompactTotal(yrTotal)}</span>
+                <button
+                  type="button"
+                  onClick={() => toggleYearSelection(yr)}
+                  title={`Hapus tahun ${yr} dari perbandingan`}
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    color: palette.pillText,
+                    cursor: "pointer",
+                    padding: "0 0 0 2px",
+                    fontSize: "11px",
+                    lineHeight: 1,
+                    fontWeight: 800,
+                    opacity: 0.75,
+                  }}
+                >
+                  ×
+                </button>
+              </span>
+            );
+          })}
+        </div>
+      )}
 
       {/* Floating Hover Tooltip */}
       {hoveredIdx !== null && (
         <div
           style={{
             position: "absolute",
-            top: "56px",
+            top: isMultiYear ? "62px" : "56px",
             left: "50%",
             transform: "translateX(-50%)",
             background: "#131d17",
             color: "#ffffff",
-            padding: "5px 14px",
+            padding: isMultiYear ? "6px 12px" : "5px 14px",
             borderRadius: "8px",
             fontSize: "11px",
             fontWeight: 600,
             pointerEvents: "none",
-            boxShadow: "0 4px 14px rgba(0,0,0,0.2)",
+            boxShadow: "0 4px 14px rgba(0,0,0,0.22)",
             display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            zIndex: 10,
+            flexDirection: isMultiYear ? "column" : "row",
+            alignItems: isMultiYear ? "flex-start" : "center",
+            gap: isMultiYear ? "3px" : "8px",
+            zIndex: 20,
           }}
         >
-          <span style={{ color: "#a3b8aa" }}>{months[hoveredIdx]} {selectedYear}:</span>
-          <span style={{ color: metric === "revenue" ? "#a3e635" : (metric === "emission" ? "#34d399" : "#34d399"), fontWeight: 700 }}>
-            {formatTooltip(monthlyValues[hoveredIdx] || 0)}
-          </span>
+          {!isMultiYear ? (
+            <>
+              <span style={{ color: "#a3b8aa" }}>{months[hoveredIdx]} {primaryYear}:</span>
+              <span style={{ color: metric === "revenue" ? "#a3e635" : "#34d399", fontWeight: 700 }}>
+                {formatTooltip(monthlyValues[hoveredIdx] || 0)}
+              </span>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: "10px", color: "#a3b8aa", fontWeight: 700, marginBottom: "1px" }}>
+                Bulan {months[hoveredIdx]} (Perbandingan Tahun)
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+                {yearsDesc.map((yr, rankIdx) => {
+                  const palette = getComparisonYearPalette(metric, rankIdx);
+                  const val = allYearsDataMap[yr]?.values?.[hoveredIdx] || 0;
+                  return (
+                    <div key={yr} style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}>
+                      <span
+                        style={{
+                          width: "7px",
+                          height: "7px",
+                          borderRadius: "2px",
+                          background: palette.tooltipColor,
+                          display: "inline-block",
+                        }}
+                      />
+                      <span style={{ color: "#d1ded4" }}>{yr}:</span>
+                      <span style={{ color: palette.tooltipColor, fontWeight: 700 }}>
+                        {formatTooltip(val)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -3871,9 +4298,9 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
           }}
         >
           <span style={{ fontSize: "22px", marginBottom: "4px" }}>📊</span>
-          <strong style={{ color: "#2d3d32" }}>Belum Ada Data Tercatat ({selectedYear})</strong>
+          <strong style={{ color: "#2d3d32" }}>Belum Ada Data Tercatat ({eyebrowYearText})</strong>
           <span style={{ fontSize: "11px", color: "#8a9e90" }}>
-            Tidak ada catatan {metric === "revenue" ? "pendapatan" : (metric === "emission" ? "reduksi emisi" : "produksi energi")} untuk tahun {selectedYear}
+            Tidak ada catatan {metric === "revenue" ? "pendapatan" : (metric === "emission" ? "reduksi emisi" : "produksi energi")} untuk tahun {eyebrowYearText}
           </span>
         </div>
       ) : (
@@ -3892,107 +4319,234 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
               );
             })}
 
-            {/* 12 Monthly Bars */}
-            {months.map((m, idx) => {
-              const x = 45 + idx * 39;
-              const val = Number(monthlyValues[idx]) || 0;
-              const barHeight = maxVal > 0 ? (val / maxVal) * 120 : 0;
-              const isSelected = (isCurrentYear && idx === currentMonthIdx) || idx === hoveredIdx;
-              const isHovered = idx === hoveredIdx;
+            {!isMultiYear ? (
+              <>
+                {/* 12 Monthly Bars (Single Year Mode) */}
+                {months.map((m, idx) => {
+                  const x = 45 + idx * 39;
+                  const val = Number(monthlyValues[idx]) || 0;
+                  const barHeight = maxVal > 0 ? (val / maxVal) * 120 : 0;
+                  const isSelected = (isCurrentYear && idx === currentMonthIdx) || idx === hoveredIdx;
+                  const isHovered = idx === hoveredIdx;
 
-              let barFill;
-              if (metric === "energy") {
-                barFill = isHovered
-                  ? "#08331d"
-                  : (isSelected ? "#0d4a2b" : (val > 0 ? "#d7edd9" : "#edf4ee"));
-              } else if (metric === "revenue") {
-                barFill = isHovered
-                  ? "#65a30d"
-                  : (isSelected ? "#84cc16" : (val > 0 ? "#e4f2cb" : "#f2f6ea"));
-              } else {
-                barFill = isHovered
-                  ? "#065f46"
-                  : (isSelected ? "#059669" : (val > 0 ? "#d1fae5" : "#edf7f2"));
-              }
+                  let barFill;
+                  if (metric === "energy") {
+                    barFill = isHovered
+                      ? "#08331d"
+                      : (isSelected ? "#0d4a2b" : (val > 0 ? "#d7edd9" : "#edf4ee"));
+                  } else if (metric === "revenue") {
+                    barFill = isHovered
+                      ? "#65a30d"
+                      : (isSelected ? "#84cc16" : (val > 0 ? "#e4f2cb" : "#f2f6ea"));
+                  } else {
+                    barFill = isHovered
+                      ? "#065f46"
+                      : (isSelected ? "#059669" : (val > 0 ? "#d1fae5" : "#edf7f2"));
+                  }
 
-              return (
-                <g
-                  key={m}
-                  onMouseEnter={() => setHoveredIdx(idx)}
-                  onMouseLeave={() => setHoveredIdx(null)}
-                  style={{ cursor: "pointer" }}
-                >
-                  {/* Invisible hit target for smooth hovering */}
-                  <rect x={x - 4} y="15" width="30" height="135" fill="transparent" />
+                  return (
+                    <g
+                      key={m}
+                      onMouseEnter={() => setHoveredIdx(idx)}
+                      onMouseLeave={() => setHoveredIdx(null)}
+                      style={{ cursor: "pointer" }}
+                    >
+                      <rect x={x - 4} y="15" width="30" height="135" fill="transparent" />
 
-                  {/* Rendered Bar */}
-                  <rect
-                    x={x}
-                    y={140 - barHeight}
-                    width="22"
-                    height={Math.max(barHeight, val > 0 ? 3 : 0)}
-                    rx="4"
-                    fill={barFill}
-                    style={{ transition: "all 0.2s ease" }}
+                      <rect
+                        x={x}
+                        y={140 - barHeight}
+                        width="22"
+                        height={Math.max(barHeight, val > 0 ? 3 : 0)}
+                        rx="4"
+                        fill={barFill}
+                        style={{ transition: "all 0.2s ease" }}
+                      />
+
+                      <text
+                        x={x + 11}
+                        y={154}
+                        fill={isSelected ? (metric === "revenue" ? "#4d7c0f" : (metric === "emission" ? "#047857" : "#0d4a2b")) : "#7c8e81"}
+                        fontSize="9"
+                        fontWeight={isSelected ? "800" : "600"}
+                        textAnchor="middle"
+                      >
+                        {m}
+                      </text>
+                    </g>
+                  );
+                })}
+
+                {/* Spline Line across months (Single Year Mode) */}
+                {trendlineEndIdx >= 0 && (
+                  <path
+                    d={months
+                      .slice(0, trendlineEndIdx + 1)
+                      .map((_, idx) => {
+                        const x = 45 + idx * 39 + 11;
+                        const val = Number(monthlyValues[idx]) || 0;
+                        const y = 140 - (val / (maxVal || 1)) * 120;
+                        return `${idx === 0 ? "M" : "L"} ${x} ${y}`;
+                      })
+                      .join(" ")}
+                    fill="none"
+                    stroke={metric === "revenue" ? "#0d4a2b" : (metric === "emission" ? "#059669" : "#84cc16")}
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
                   />
+                )}
 
-                  {/* Month Label */}
-                  <text
-                    x={x + 11}
-                    y={154}
-                    fill={isSelected ? (metric === "revenue" ? "#4d7c0f" : (metric === "emission" ? "#047857" : "#0d4a2b")) : "#7c8e81"}
-                    fontSize="9"
-                    fontWeight={isSelected ? "800" : "600"}
-                    textAnchor="middle"
-                  >
-                    {m}
-                  </text>
-                </g>
-              );
-            })}
-
-            {/* Spline Line across months */}
-            {trendlineEndIdx >= 0 && (
-              <path
-                d={months
-                  .slice(0, trendlineEndIdx + 1)
-                  .map((_, idx) => {
+                {/* Dots on Spline Line (Single Year Mode) */}
+                {trendlineEndIdx >= 0 &&
+                  months.slice(0, trendlineEndIdx + 1).map((_, idx) => {
                     const x = 45 + idx * 39 + 11;
                     const val = Number(monthlyValues[idx]) || 0;
                     const y = 140 - (val / (maxVal || 1)) * 120;
-                    return `${idx === 0 ? "M" : "L"} ${x} ${y}`;
-                  })
-                  .join(" ")}
-                fill="none"
-                stroke={metric === "revenue" ? "#0d4a2b" : (metric === "emission" ? "#059669" : "#84cc16")}
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
+                    const isSelected = (isCurrentYear && idx === currentMonthIdx) || idx === hoveredIdx;
+                    const strokeColor = metric === "revenue" ? "#0d4a2b" : (metric === "emission" ? "#059669" : "#84cc16");
+
+                    return (
+                      <circle
+                        key={idx}
+                        cx={x}
+                        cy={y}
+                        r={isSelected ? 4 : 2.5}
+                        fill="#ffffff"
+                        stroke={strokeColor}
+                        strokeWidth={isSelected ? 2.5 : 2}
+                        style={{ transition: "all 0.2s ease", pointerEvents: "none" }}
+                      />
+                    );
+                  })}
+              </>
+            ) : (
+              <>
+                {/* 12 Monthly Grouped Bars (Multi-Year Comparison Mode) */}
+                {months.map((m, idx) => {
+                  const slotCenter = 45 + idx * 39 + 11;
+                  const count = yearsAsc.length;
+                  const gap = count <= 2 ? 2 : 1.5;
+                  const maxGroupWidth = 28;
+                  const barW = Math.max(3.5, Math.min(11, (maxGroupWidth - (count - 1) * gap) / count));
+                  const totalGroupW = count * barW + (count - 1) * gap;
+                  const startX = slotCenter - totalGroupW / 2;
+                  const isHovered = idx === hoveredIdx;
+
+                  return (
+                    <g
+                      key={m}
+                      onMouseEnter={() => setHoveredIdx(idx)}
+                      onMouseLeave={() => setHoveredIdx(null)}
+                      style={{ cursor: "pointer" }}
+                    >
+                      {/* Hover column highlight */}
+                      <rect
+                        x={slotCenter - 17}
+                        y="15"
+                        width="34"
+                        height="125"
+                        rx="4"
+                        fill={isHovered ? "rgba(13, 74, 43, 0.05)" : "transparent"}
+                      />
+
+                      {yearsAsc.map((yr, ascIdx) => {
+                        const rankIdx = yearsDesc.indexOf(yr);
+                        const palette = getComparisonYearPalette(metric, Math.max(0, rankIdx));
+                        const val = Number(allYearsDataMap[yr]?.values?.[idx]) || 0;
+                        const barHeight = maxVal > 0 ? (val / maxVal) * 120 : 0;
+                        const bx = startX + ascIdx * (barW + gap);
+
+                        return (
+                          <rect
+                            key={yr}
+                            x={bx}
+                            y={140 - barHeight}
+                            width={barW}
+                            height={Math.max(barHeight, val > 0 ? 2.5 : 0)}
+                            rx="2"
+                            fill={isHovered ? palette.barHover : palette.bar}
+                            opacity={isHovered ? 1 : 0.88}
+                            style={{ transition: "all 0.2s ease" }}
+                          />
+                        );
+                      })}
+
+                      <text
+                        x={slotCenter}
+                        y={154}
+                        fill={isHovered ? "#0d4a2b" : "#7c8e81"}
+                        fontSize="9"
+                        fontWeight={isHovered ? "800" : "600"}
+                        textAnchor="middle"
+                      >
+                        {m}
+                      </text>
+                    </g>
+                  );
+                })}
+
+                {/* Multi-Year Trendlines & Dots */}
+                {yearsAsc.map((yr, ascIdx) => {
+                  const rankIdx = yearsDesc.indexOf(yr);
+                  const palette = getComparisonYearPalette(metric, Math.max(0, rankIdx));
+                  const yrVals = allYearsDataMap[yr]?.values || Array(12).fill(0);
+                  const endIdx = getTrendlineEndIdx(yr, yrVals);
+                  if (endIdx < 0) return null;
+
+                  const count = yearsAsc.length;
+                  const gap = count <= 2 ? 2 : 1.5;
+                  const maxGroupWidth = 28;
+                  const barW = Math.max(3.5, Math.min(11, (maxGroupWidth - (count - 1) * gap) / count));
+                  const totalGroupW = count * barW + (count - 1) * gap;
+
+                  const getPointX = (mIdx) => {
+                    const slotCenter = 45 + mIdx * 39 + 11;
+                    const startX = slotCenter - totalGroupW / 2;
+                    return startX + ascIdx * (barW + gap) + barW / 2;
+                  };
+
+                  return (
+                    <g key={`line-${yr}`} style={{ pointerEvents: "none" }}>
+                      <path
+                        d={months
+                          .slice(0, endIdx + 1)
+                          .map((_, mIdx) => {
+                            const px = getPointX(mIdx);
+                            const val = Number(yrVals[mIdx]) || 0;
+                            const py = 140 - (val / (maxVal || 1)) * 120;
+                            return `${mIdx === 0 ? "M" : "L"} ${px} ${py}`;
+                          })
+                          .join(" ")}
+                        fill="none"
+                        stroke={palette.line}
+                        strokeWidth={rankIdx === 0 ? "2" : "1.6"}
+                        strokeDasharray={rankIdx === 0 ? "none" : "3 2"}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      {months.slice(0, endIdx + 1).map((_, mIdx) => {
+                        const px = getPointX(mIdx);
+                        const val = Number(yrVals[mIdx]) || 0;
+                        const py = 140 - (val / (maxVal || 1)) * 120;
+                        const isHovered = mIdx === hoveredIdx;
+                        return (
+                          <circle
+                            key={mIdx}
+                            cx={px}
+                            cy={py}
+                            r={isHovered ? 3.5 : 2}
+                            fill="#ffffff"
+                            stroke={palette.dot}
+                            strokeWidth={isHovered ? 2 : 1.5}
+                          />
+                        );
+                      })}
+                    </g>
+                  );
+                })}
+              </>
             )}
-
-            {/* Dots on Spline Line */}
-            {trendlineEndIdx >= 0 &&
-              months.slice(0, trendlineEndIdx + 1).map((_, idx) => {
-                const x = 45 + idx * 39 + 11;
-                const val = Number(monthlyValues[idx]) || 0;
-                const y = 140 - (val / (maxVal || 1)) * 120;
-                const isSelected = (isCurrentYear && idx === currentMonthIdx) || idx === hoveredIdx;
-                const strokeColor = metric === "revenue" ? "#0d4a2b" : (metric === "emission" ? "#059669" : "#84cc16");
-
-                return (
-                  <circle
-                    key={idx}
-                    cx={x}
-                    cy={y}
-                    r={isSelected ? 4 : 2.5}
-                    fill="#ffffff"
-                    stroke={strokeColor}
-                    strokeWidth={isSelected ? 2.5 : 2}
-                    style={{ transition: "all 0.2s ease", pointerEvents: "none" }}
-                  />
-                );
-              })}
           </svg>
         </div>
       )}
