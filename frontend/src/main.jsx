@@ -3845,7 +3845,8 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
 
   const eyebrowYearText = useMemo(() => {
     if (yearsDesc.length === 1) return String(yearsDesc[0]);
-    return yearsAsc.join(" vs ");
+    if (yearsDesc.length === 2) return `${yearsAsc[0]} vs ${yearsAsc[1]}`;
+    return `${yearsAsc[0]}–${yearsAsc[yearsAsc.length - 1]} (${yearsDesc.length} Thn)`;
   }, [yearsDesc, yearsAsc]);
 
   return (
@@ -3866,7 +3867,7 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
 
         <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
           {/* Multi-Year Selector Dropdown */}
-          <div ref={yearMenuRef} style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+          <div ref={yearMenuRef} style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
             <button
               type="button"
               aria-label="Pilih tahun perbandingan"
@@ -3885,6 +3886,7 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
                 color: isMultiYear ? "#0d4a2b" : "#1f2f24",
                 cursor: "pointer",
                 outline: "none",
+                whiteSpace: "nowrap",
                 transition: "all 0.15s ease",
               }}
             >
@@ -3899,14 +3901,15 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
                 style={{
                   position: "absolute",
                   top: "calc(100% + 6px)",
-                  right: 0,
-                  width: "235px",
+                  left: 0,
+                  width: "285px",
                   background: "#ffffff",
                   border: "1px solid #d4ded5",
-                  borderRadius: "10px",
-                  boxShadow: "0 10px 28px rgba(15, 29, 20, 0.16)",
-                  padding: "8px",
-                  zIndex: 40,
+                  borderRadius: "12px",
+                  boxShadow: "0 12px 32px rgba(15, 29, 20, 0.18)",
+                  padding: "10px",
+                  zIndex: 50,
+                  boxSizing: "border-box",
                 }}
               >
                 <div
@@ -3914,27 +3917,38 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    padding: "2px 4px 6px",
+                    gap: "6px",
+                    padding: "0 2px 8px",
                     borderBottom: "1px solid #edf2ee",
                     marginBottom: "6px",
                   }}
                 >
-                  <span style={{ fontSize: "10px", fontWeight: 800, color: "#4f6254", letterSpacing: "0.04em" }}>
+                  <span
+                    style={{
+                      fontSize: "10px",
+                      fontWeight: 800,
+                      color: "#4f6254",
+                      letterSpacing: "0.04em",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
                     BANDINGKAN TAHUN
                   </span>
-                  <div style={{ display: "flex", gap: "4px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
                     <button
                       type="button"
                       onClick={() => setSelectedYears(availableYears.slice(0, Math.min(2, availableYears.length)))}
                       style={{
                         border: "1px solid #d4ded5",
                         background: "#f8faf8",
-                        borderRadius: "4px",
-                        padding: "2px 5px",
-                        fontSize: "9px",
+                        borderRadius: "5px",
+                        padding: "3px 6px",
+                        fontSize: "10px",
                         fontWeight: 700,
                         color: "#2d3d32",
                         cursor: "pointer",
+                        whiteSpace: "nowrap",
+                        lineHeight: 1.2,
                       }}
                       title="Bandingkan 2 tahun terakhir"
                     >
@@ -3946,12 +3960,14 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
                       style={{
                         border: "1px solid #d4ded5",
                         background: "#f8faf8",
-                        borderRadius: "4px",
-                        padding: "2px 5px",
-                        fontSize: "9px",
+                        borderRadius: "5px",
+                        padding: "3px 6px",
+                        fontSize: "10px",
                         fontWeight: 700,
                         color: "#2d3d32",
                         cursor: "pointer",
+                        whiteSpace: "nowrap",
+                        lineHeight: 1.2,
                       }}
                       title="Bandingkan 3 tahun terakhir"
                     >
@@ -3964,12 +3980,14 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
                         style={{
                           border: "1px solid #fecaca",
                           background: "#fef2f2",
-                          borderRadius: "4px",
-                          padding: "2px 5px",
-                          fontSize: "9px",
+                          borderRadius: "5px",
+                          padding: "3px 6px",
+                          fontSize: "10px",
                           fontWeight: 700,
                           color: "#b91c1c",
                           cursor: "pointer",
+                          whiteSpace: "nowrap",
+                          lineHeight: 1.2,
                         }}
                         title="Reset ke 1 tahun"
                       >
@@ -3979,7 +3997,17 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
                   </div>
                 </div>
 
-                <div style={{ maxHeight: "190px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "2px" }}>
+                <div
+                  style={{
+                    maxHeight: "200px",
+                    overflowY: "auto",
+                    overflowX: "hidden",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "3px",
+                    paddingRight: "2px",
+                  }}
+                >
                   {availableYears.map((yr) => {
                     const isChecked = selectedYears.includes(yr);
                     const rankIdx = yearsDesc.indexOf(yr);
@@ -3987,56 +4015,72 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
                     const yrTotal = allYearsDataMap[yr]?.total || 0;
 
                     return (
-                      <label
+                      <button
                         key={yr}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          toggleYearSelection(yr);
-                        }}
+                        type="button"
+                        onClick={() => toggleYearSelection(yr)}
                         style={{
+                          width: "100%",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "space-between",
-                          padding: "5px 8px",
-                          borderRadius: "6px",
+                          gap: "8px",
+                          padding: "6px 8px",
+                          borderRadius: "7px",
+                          border: isChecked ? "1px solid #d1e7d6" : "1px solid transparent",
                           cursor: "pointer",
                           background: isChecked ? "#f2f8f4" : "transparent",
-                          fontSize: "11px",
+                          fontSize: "11.5px",
                           fontWeight: isChecked ? 700 : 600,
                           color: isChecked ? "#132318" : "#536658",
-                          userSelect: "none",
+                          textAlign: "left",
+                          boxSizing: "border-box",
                         }}
                       >
-                        <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            readOnly
-                            style={{ accentColor: "#0d4a2b", cursor: "pointer", margin: 0 }}
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+                          <span
+                            style={{
+                              width: "15px",
+                              height: "15px",
+                              borderRadius: "4px",
+                              border: isChecked ? "1.5px solid #0d4a2b" : "1.5px solid #b8c7bc",
+                              background: isChecked ? "#0d4a2b" : "#ffffff",
+                              color: "#ffffff",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontSize: "10px",
+                              fontWeight: 800,
+                              flexShrink: 0,
+                              lineHeight: 1,
+                            }}
+                          >
+                            {isChecked ? "✓" : ""}
+                          </span>
+                          <span
+                            style={{
+                              width: "8px",
+                              height: "8px",
+                              borderRadius: "2px",
+                              background: isChecked && palette ? palette.bar : "#dce5de",
+                              display: "inline-block",
+                              flexShrink: 0,
+                            }}
                           />
-                          {isChecked && palette && (
-                            <span
-                              style={{
-                                width: "8px",
-                                height: "8px",
-                                borderRadius: "2px",
-                                background: palette.bar,
-                                display: "inline-block",
-                              }}
-                            />
-                          )}
-                          <span>Tahun {yr}</span>
+                          <span style={{ whiteSpace: "nowrap" }}>Tahun {yr}</span>
                         </div>
                         <span
                           style={{
-                            fontSize: "10px",
-                            fontWeight: 600,
+                            fontSize: "10.5px",
+                            fontWeight: 700,
                             color: yrTotal > 0 ? "#0d4a2b" : "#9ca89f",
+                            whiteSpace: "nowrap",
+                            flexShrink: 0,
                           }}
                         >
                           {yrTotal > 0 ? formatCompactTotal(yrTotal) : "0"}
                         </span>
-                      </label>
+                      </button>
                     );
                   })}
                 </div>
