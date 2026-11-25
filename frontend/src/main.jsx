@@ -4365,28 +4365,12 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
 
             {!isMultiYear ? (
               <>
-                {/* 12 Monthly Bars (Single Year Mode) */}
+                {/* 12 Monthly Hit Targets & Labels (Single Year Line-Only Mode) */}
                 {months.map((m, idx) => {
                   const x = 45 + idx * 39;
-                  const val = Number(monthlyValues[idx]) || 0;
-                  const barHeight = maxVal > 0 ? (val / maxVal) * 120 : 0;
+                  const centerX = x + 11;
                   const isSelected = (isCurrentYear && idx === currentMonthIdx) || idx === hoveredIdx;
                   const isHovered = idx === hoveredIdx;
-
-                  let barFill;
-                  if (metric === "energy") {
-                    barFill = isHovered
-                      ? "#08331d"
-                      : (isSelected ? "#0d4a2b" : (val > 0 ? "#d7edd9" : "#edf4ee"));
-                  } else if (metric === "revenue") {
-                    barFill = isHovered
-                      ? "#65a30d"
-                      : (isSelected ? "#84cc16" : (val > 0 ? "#e4f2cb" : "#f2f6ea"));
-                  } else {
-                    barFill = isHovered
-                      ? "#065f46"
-                      : (isSelected ? "#059669" : (val > 0 ? "#d1fae5" : "#edf7f2"));
-                  }
 
                   return (
                     <g
@@ -4397,18 +4381,20 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
                     >
                       <rect x={x - 4} y="15" width="30" height="135" fill="transparent" />
 
-                      <rect
-                        x={x}
-                        y={140 - barHeight}
-                        width="22"
-                        height={Math.max(barHeight, val > 0 ? 3 : 0)}
-                        rx="4"
-                        fill={barFill}
-                        style={{ transition: "all 0.2s ease" }}
-                      />
+                      {isHovered && (
+                        <line
+                          x1={centerX}
+                          y1="20"
+                          x2={centerX}
+                          y2="140"
+                          stroke="#cbd5ce"
+                          strokeWidth="1"
+                          strokeDasharray="3 3"
+                        />
+                      )}
 
                       <text
-                        x={x + 11}
+                        x={centerX}
                         y={154}
                         fill={isSelected ? (metric === "revenue" ? "#4d7c0f" : (metric === "emission" ? "#047857" : "#0d4a2b")) : "#7c8e81"}
                         fontSize="9"
@@ -4421,7 +4407,7 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
                   );
                 })}
 
-                {/* Spline Line across months (Single Year Mode) */}
+                {/* Trend Line across months (Single Year Mode) */}
                 {trendlineEndIdx >= 0 && (
                   <path
                     d={months
@@ -4434,28 +4420,29 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
                       })
                       .join(" ")}
                     fill="none"
-                    stroke={metric === "revenue" ? "#0d4a2b" : (metric === "emission" ? "#059669" : "#84cc16")}
+                    stroke={metric === "revenue" ? "#65a30d" : (metric === "emission" ? "#059669" : "#16a34a")}
                     strokeWidth="2.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"
+                    style={{ pointerEvents: "none" }}
                   />
                 )}
 
-                {/* Dots on Spline Line (Single Year Mode) */}
+                {/* Dots on Line (Single Year Mode) */}
                 {trendlineEndIdx >= 0 &&
                   months.slice(0, trendlineEndIdx + 1).map((_, idx) => {
                     const x = 45 + idx * 39 + 11;
                     const val = Number(monthlyValues[idx]) || 0;
                     const y = 140 - (val / (maxVal || 1)) * 120;
                     const isSelected = (isCurrentYear && idx === currentMonthIdx) || idx === hoveredIdx;
-                    const strokeColor = metric === "revenue" ? "#0d4a2b" : (metric === "emission" ? "#059669" : "#84cc16");
+                    const strokeColor = metric === "revenue" ? "#65a30d" : (metric === "emission" ? "#059669" : "#16a34a");
 
                     return (
                       <circle
                         key={idx}
                         cx={x}
                         cy={y}
-                        r={isSelected ? 4 : 2.5}
+                        r={isSelected ? 4 : 2.8}
                         fill="#ffffff"
                         stroke={strokeColor}
                         strokeWidth={isSelected ? 2.5 : 2}
@@ -4466,15 +4453,9 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
               </>
             ) : (
               <>
-                {/* 12 Monthly Grouped Bars (Multi-Year Comparison Mode) */}
+                {/* 12 Monthly Hit Targets & Labels (Multi-Year Line-Only Comparison Mode) */}
                 {months.map((m, idx) => {
                   const slotCenter = 45 + idx * 39 + 11;
-                  const count = yearsAsc.length;
-                  const gap = count <= 2 ? 2 : 1.5;
-                  const maxGroupWidth = 28;
-                  const barW = Math.max(3.5, Math.min(11, (maxGroupWidth - (count - 1) * gap) / count));
-                  const totalGroupW = count * barW + (count - 1) * gap;
-                  const startX = slotCenter - totalGroupW / 2;
                   const isHovered = idx === hoveredIdx;
 
                   return (
@@ -4484,37 +4465,25 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
                       onMouseLeave={() => setHoveredIdx(null)}
                       style={{ cursor: "pointer" }}
                     >
-                      {/* Hover column highlight */}
                       <rect
                         x={slotCenter - 17}
                         y="15"
                         width="34"
-                        height="125"
-                        rx="4"
-                        fill={isHovered ? "rgba(13, 74, 43, 0.05)" : "transparent"}
+                        height="135"
+                        fill="transparent"
                       />
 
-                      {yearsAsc.map((yr, ascIdx) => {
-                        const rankIdx = yearsDesc.indexOf(yr);
-                        const palette = getComparisonYearPalette(metric, Math.max(0, rankIdx));
-                        const val = Number(allYearsDataMap[yr]?.values?.[idx]) || 0;
-                        const barHeight = maxVal > 0 ? (val / maxVal) * 120 : 0;
-                        const bx = startX + ascIdx * (barW + gap);
-
-                        return (
-                          <rect
-                            key={yr}
-                            x={bx}
-                            y={140 - barHeight}
-                            width={barW}
-                            height={Math.max(barHeight, val > 0 ? 2.5 : 0)}
-                            rx="2"
-                            fill={isHovered ? palette.barHover : palette.bar}
-                            opacity={isHovered ? 1 : 0.88}
-                            style={{ transition: "all 0.2s ease" }}
-                          />
-                        );
-                      })}
+                      {isHovered && (
+                        <line
+                          x1={slotCenter}
+                          y1="20"
+                          x2={slotCenter}
+                          y2="140"
+                          stroke="#cbd5ce"
+                          strokeWidth="1"
+                          strokeDasharray="3 3"
+                        />
+                      )}
 
                       <text
                         x={slotCenter}
@@ -4530,25 +4499,13 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
                   );
                 })}
 
-                {/* Multi-Year Trendlines & Dots */}
-                {yearsAsc.map((yr, ascIdx) => {
+                {/* Multi-Year Trendlines & Dots (Centered on each month) */}
+                {yearsAsc.map((yr) => {
                   const rankIdx = yearsDesc.indexOf(yr);
                   const palette = getComparisonYearPalette(metric, Math.max(0, rankIdx));
                   const yrVals = allYearsDataMap[yr]?.values || Array(12).fill(0);
                   const endIdx = getTrendlineEndIdx(yr, yrVals);
                   if (endIdx < 0) return null;
-
-                  const count = yearsAsc.length;
-                  const gap = count <= 2 ? 2 : 1.5;
-                  const maxGroupWidth = 28;
-                  const barW = Math.max(3.5, Math.min(11, (maxGroupWidth - (count - 1) * gap) / count));
-                  const totalGroupW = count * barW + (count - 1) * gap;
-
-                  const getPointX = (mIdx) => {
-                    const slotCenter = 45 + mIdx * 39 + 11;
-                    const startX = slotCenter - totalGroupW / 2;
-                    return startX + ascIdx * (barW + gap) + barW / 2;
-                  };
 
                   return (
                     <g key={`line-${yr}`} style={{ pointerEvents: "none" }}>
@@ -4556,7 +4513,7 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
                         d={months
                           .slice(0, endIdx + 1)
                           .map((_, mIdx) => {
-                            const px = getPointX(mIdx);
+                            const px = 45 + mIdx * 39 + 11;
                             const val = Number(yrVals[mIdx]) || 0;
                             const py = 140 - (val / (maxVal || 1)) * 120;
                             return `${mIdx === 0 ? "M" : "L"} ${px} ${py}`;
@@ -4564,13 +4521,13 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
                           .join(" ")}
                         fill="none"
                         stroke={palette.line}
-                        strokeWidth={rankIdx === 0 ? "2" : "1.6"}
-                        strokeDasharray={rankIdx === 0 ? "none" : "3 2"}
+                        strokeWidth={rankIdx === 0 ? "2.5" : "2"}
+                        strokeDasharray={rankIdx === 0 ? "none" : "4 2.5"}
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       />
                       {months.slice(0, endIdx + 1).map((_, mIdx) => {
-                        const px = getPointX(mIdx);
+                        const px = 45 + mIdx * 39 + 11;
                         const val = Number(yrVals[mIdx]) || 0;
                         const py = 140 - (val / (maxVal || 1)) * 120;
                         const isHovered = mIdx === hoveredIdx;
@@ -4579,10 +4536,10 @@ function MonthlyProductionCard({ selected, locations, fleet, currentMonthKwh, on
                             key={mIdx}
                             cx={px}
                             cy={py}
-                            r={isHovered ? 3.5 : 2}
+                            r={isHovered ? 4 : 2.6}
                             fill="#ffffff"
                             stroke={palette.dot}
-                            strokeWidth={isHovered ? 2 : 1.5}
+                            strokeWidth={isHovered ? 2.4 : 1.8}
                           />
                         );
                       })}
