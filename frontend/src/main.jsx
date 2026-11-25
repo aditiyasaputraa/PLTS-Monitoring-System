@@ -5325,8 +5325,656 @@ function FullFleetMap({ locations, selectedId, onSelect }) {
 
 /* ==================== ENERGY & REVENUE TABS ==================== */
 
-function EnergyProductionChart({ series, period }) {
+function formatCompactMetricTotal(val, metric = "energy") {
+  const num = Number(val) || 0;
+  if (num <= 0) return "0";
+  if (metric === "revenue") {
+    if (num >= 1_000_000_000) return `Rp ${(num / 1e9).toFixed(2)} M`;
+    if (num >= 1_000_000) return `Rp ${(num / 1e6).toFixed(1)} Jt`;
+    return `Rp ${new Intl.NumberFormat("id-ID").format(Math.round(num))}`;
+  }
+  if (metric === "emission") {
+    if (num >= 1_000) return `${(num / 1000).toFixed(1)} ton CO₂`;
+    return `${Math.round(num)} kg CO₂`;
+  }
+  if (num >= 1_000_000) return `${(num / 1e6).toFixed(2)} GWh`;
+  if (num >= 1_000) return `${(num / 1000).toFixed(1)} MWh`;
+  return `${Math.round(num)} kWh`;
+}
+
+function MultiYearDropdownPill({
+  selectedYears,
+  onChangeYears,
+  availableYears,
+  allYearsDataMap,
+  metric = "energy",
+  align = "right",
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+  const currentYear = new Date().getFullYear();
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [menuOpen]);
+
+  const yearsDesc = useMemo(() => [...selectedYears].sort((a, b) => b - a), [selectedYears]);
+  const yearsAsc = useMemo(() => [...selectedYears].sort((a, b) => a - b), [selectedYears]);
+  const isMultiYear = yearsDesc.length > 1;
+
+  const yearLabelSummary = useMemo(() => {
+    if (yearsDesc.length === 1) return `Tahun ${yearsDesc[0]}`;
+    if (yearsDesc.length === 2) return `${yearsDesc[1]} vs ${yearsDesc[0]}`;
+    return `${yearsDesc.length} Tahun (${yearsAsc[0]}–${yearsAsc[yearsAsc.length - 1]})`;
+  }, [yearsDesc, yearsAsc]);
+
+  const toggleYear = useCallback((yr) => {
+    onChangeYears((prev) => {
+      if (prev.includes(yr)) {
+        if (prev.length <= 1) return prev;
+        return prev.filter((item) => item !== yr);
+      }
+      return [...prev, yr].sort((a, b) => b - a);
+    });
+  }, [onChangeYears]);
+
+  return (
+    <div ref={menuRef} style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+      <button
+        type="button"
+        aria-label="Pilih tahun perbandingan"
+        onClick={() => setMenuOpen((prev) => !prev)}
+        title="Klik untuk memilih 1 atau beberapa tahun sebagai perbandingan"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "6px",
+          background: isMultiYear ? "#e6f4ea" : "#f3f6f3",
+          border: isMultiYear ? "1px solid #86efac" : "1px solid #d4ded5",
+          borderRadius: "8px",
+          padding: "5px 10px",
+          fontSize: "11px",
+          fontWeight: 700,
+          color: isMultiYear ? "#0d4a2b" : "#1f2f24",
+          cursor: "pointer",
+          outline: "none",
+          whiteSpace: "nowrap",
+          transition: "all 0.15s ease",
+        }}
+      >
+        <span>{yearLabelSummary}</span>
+        <span style={{ fontSize: "8px", color: isMultiYear ? "#0d4a2b" : "#6b7d70" }}>
+          {menuOpen ? "▲" : "▼"}
+        </span>
+      </button>
+
+      {menuOpen && (
+        <div
+          style={{
+            position: "absolute",
+            top: "calc(100% + 6px)",
+            ...(align === "left" ? { left: 0 } : { right: 0 }),
+            width: "285px",
+            background: "#ffffff",
+            border: "1px solid #d4ded5",
+            borderRadius: "12px",
+            boxShadow: "0 12px 32px rgba(15, 29, 20, 0.18)",
+            padding: "10px",
+            zIndex: 50,
+            boxSizing: "border-box",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "6px",
+              padding: "0 2px 8px",
+              borderBottom: "1px solid #edf2ee",
+              marginBottom: "6px",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "10px",
+                fontWeight: 800,
+                color: "#4f6254",
+                letterSpacing: "0.04em",
+                whiteSpace: "nowrap",
+              }}
+            >
+              BANDINGKAN TAHUN
+            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
+              <button
+                type="button"
+                onClick={() => onChangeYears(availableYears.slice(0, Math.min(2, availableYears.length)))}
+                style={{
+                  border: "1px solid #d4ded5",
+                  background: "#f8faf8",
+                  borderRadius: "5px",
+                  padding: "3px 6px",
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  color: "#2d3d32",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  lineHeight: 1.2,
+                }}
+                title="Bandingkan 2 tahun terakhir"
+              >
+                2 Thn
+              </button>
+              <button
+                type="button"
+                onClick={() => onChangeYears(availableYears.slice(0, Math.min(3, availableYears.length)))}
+                style={{
+                  border: "1px solid #d4ded5",
+                  background: "#f8faf8",
+                  borderRadius: "5px",
+                  padding: "3px 6px",
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  color: "#2d3d32",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  lineHeight: 1.2,
+                }}
+                title="Bandingkan 3 tahun terakhir"
+              >
+                3 Thn
+              </button>
+              {isMultiYear && (
+                <button
+                  type="button"
+                  onClick={() => onChangeYears([availableYears[0] || currentYear])}
+                  style={{
+                    border: "1px solid #fecaca",
+                    background: "#fef2f2",
+                    borderRadius: "5px",
+                    padding: "3px 6px",
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    color: "#b91c1c",
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                    lineHeight: 1.2,
+                  }}
+                  title="Reset ke 1 tahun"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div
+            style={{
+              maxHeight: "200px",
+              overflowY: "auto",
+              overflowX: "hidden",
+              display: "flex",
+              flexDirection: "column",
+              gap: "3px",
+              paddingRight: "2px",
+            }}
+          >
+            {availableYears.map((yr) => {
+              const isChecked = selectedYears.includes(yr);
+              const rankIdx = yearsDesc.indexOf(yr);
+              const palette = isChecked ? getComparisonYearPalette(metric, Math.max(0, rankIdx)) : null;
+              const yrTotal = allYearsDataMap?.[yr]?.total || 0;
+
+              return (
+                <button
+                  key={yr}
+                  type="button"
+                  onClick={() => toggleYear(yr)}
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "8px",
+                    padding: "6px 8px",
+                    borderRadius: "7px",
+                    border: isChecked ? "1px solid #d1e7d6" : "1px solid transparent",
+                    cursor: "pointer",
+                    background: isChecked ? "#f2f8f4" : "transparent",
+                    fontSize: "11.5px",
+                    fontWeight: isChecked ? 700 : 600,
+                    color: isChecked ? "#132318" : "#536658",
+                    textAlign: "left",
+                    boxSizing: "border-box",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+                    <span
+                      style={{
+                        width: "15px",
+                        height: "15px",
+                        borderRadius: "4px",
+                        border: isChecked ? "1.5px solid #0d4a2b" : "1.5px solid #b8c7bc",
+                        background: isChecked ? "#0d4a2b" : "#ffffff",
+                        color: "#ffffff",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "10px",
+                        fontWeight: 800,
+                        flexShrink: 0,
+                        lineHeight: 1,
+                      }}
+                    >
+                      {isChecked ? "✓" : ""}
+                    </span>
+                    <span
+                      style={{
+                        width: "8px",
+                        height: "8px",
+                        borderRadius: "2px",
+                        background: isChecked && palette ? palette.bar : "#dce5de",
+                        display: "inline-block",
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span style={{ whiteSpace: "nowrap" }}>Tahun {yr}</span>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: "10.5px",
+                      fontWeight: 700,
+                      color: yrTotal > 0 ? "#0d4a2b" : "#9ca89f",
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {yrTotal > 0 ? formatCompactMetricTotal(yrTotal, metric) : "0"}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MultiYearComparisonLegendStrip({ selectedYears, onToggleYear, allYearsDataMap, metric = "energy" }) {
+  const yearsDesc = useMemo(() => [...selectedYears].sort((a, b) => b - a), [selectedYears]);
+  if (yearsDesc.length <= 1) return null;
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "6px",
+        flexWrap: "wrap",
+        marginTop: "6px",
+        marginBottom: "4px",
+      }}
+    >
+      {yearsDesc.map((yr, rankIdx) => {
+        const palette = getComparisonYearPalette(metric, rankIdx);
+        const yrTotal = allYearsDataMap?.[yr]?.total || 0;
+        return (
+          <span
+            key={yr}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "5px",
+              padding: "2px 8px",
+              borderRadius: "999px",
+              background: palette.pillBg,
+              border: `1px solid ${palette.pillBorder}`,
+              color: palette.pillText,
+              fontSize: "10px",
+              fontWeight: 700,
+            }}
+          >
+            <span
+              style={{
+                width: "7px",
+                height: "7px",
+                borderRadius: "2px",
+                background: palette.bar,
+              }}
+            />
+            <span>{yr}: {formatCompactMetricTotal(yrTotal, metric)}</span>
+            <button
+              type="button"
+              onClick={() => onToggleYear(yr)}
+              title={`Hapus tahun ${yr} dari perbandingan`}
+              style={{
+                border: "none",
+                background: "transparent",
+                color: palette.pillText,
+                cursor: "pointer",
+                padding: "0 0 0 2px",
+                fontSize: "11px",
+                lineHeight: 1,
+                fontWeight: 800,
+                opacity: 0.75,
+              }}
+            >
+              ×
+            </button>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function EnergyProductionChart({ series, period, multiYearData = null }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
+
+  if (period === "year" && multiYearData) {
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const { selectedYears = [], allYearsDataMap = {}, metric = "energy" } = multiYearData;
+    const yearsDesc = [...selectedYears].sort((a, b) => b - a);
+    const yearsAsc = [...selectedYears].sort((a, b) => a - b);
+    const primaryYear = yearsDesc[0] || new Date().getFullYear();
+    const isMultiYear = yearsDesc.length > 1;
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonthIdx = now.getMonth();
+    const isCurrentYear = primaryYear === currentYear;
+    const primaryValues = allYearsDataMap[primaryYear]?.values || Array(12).fill(0);
+
+    let rawMax = 0;
+    for (const yr of yearsDesc) {
+      const vals = allYearsDataMap[yr]?.values || [];
+      for (const v of vals) {
+        const num = Number(v) || 0;
+        if (num > rawMax) rawMax = num;
+      }
+    }
+    const maxVal = calculateMaxVal(rawMax);
+    const yTicks = [0, maxVal * 0.25, maxVal * 0.5, maxVal * 0.75, maxVal];
+
+    const getTrendlineEndIdx = (yr, vals) => {
+      let lastIdx = -1;
+      for (let i = vals.length - 1; i >= 0; i--) {
+        if (Number(vals[i]) > 0) {
+          lastIdx = i;
+          break;
+        }
+      }
+      if (yr === currentYear) {
+        return Math.max(currentMonthIdx, lastIdx);
+      }
+      return lastIdx >= 0 ? lastIdx : -1;
+    };
+
+    const svgWidth = 720;
+    const svgHeight = 290;
+    const paddingLeft = 42;
+    const paddingRight = 18;
+    const paddingTop = 18;
+    const paddingBottom = 28;
+    const plotWidth = svgWidth - paddingLeft - paddingRight;
+    const plotHeight = svgHeight - paddingTop - paddingBottom;
+    const step = plotWidth / 12;
+
+    const formatTooltipVal = (val) => {
+      return `${new Intl.NumberFormat("id-ID", { maximumFractionDigits: 3 }).format(Number(val) || 0)} ${series?.unit || "kWh"}`;
+    };
+
+    const singleEndIdx = getTrendlineEndIdx(primaryYear, primaryValues);
+
+    return (
+      <div style={{ position: "relative", width: "100%", height: "100%", flex: 1, display: "flex", alignItems: "stretch" }}>
+        <svg
+          viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+          style={{ width: "100%", height: "100%", display: "block", overflow: "visible" }}
+        >
+          {/* Y Axis Grid lines */}
+          {yTicks.map((val, tIdx) => {
+            const y = paddingTop + plotHeight - (val / (maxVal || 1)) * plotHeight;
+            return (
+              <g key={tIdx}>
+                <line
+                  x1={paddingLeft}
+                  y1={y}
+                  x2={svgWidth - paddingRight}
+                  y2={y}
+                  stroke="rgba(0, 0, 0, 0.06)"
+                  strokeDasharray={val === 0 ? "none" : "3 3"}
+                />
+                <text
+                  x={paddingLeft - 8}
+                  y={y + 3.5}
+                  textAnchor="end"
+                  fontSize="10"
+                  fontWeight="600"
+                  fill="#7e9185"
+                  fontFamily="Inter, system-ui, sans-serif"
+                >
+                  {formatYTick(val, metric)}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* 12 Monthly Hit Targets & X-Axis Labels */}
+          {months.map((m, idx) => {
+            const centerX = paddingLeft + idx * step + step / 2;
+            const isSelected = (!isMultiYear && isCurrentYear && idx === currentMonthIdx) || idx === hoveredIndex;
+            const isHovered = idx === hoveredIndex;
+
+            return (
+              <g
+                key={m}
+                onMouseEnter={() => setHoveredIndex(idx)}
+                onMouseLeave={() => setHoveredIndex(null)}
+                style={{ cursor: "pointer" }}
+              >
+                <rect
+                  x={paddingLeft + idx * step}
+                  y={paddingTop}
+                  width={step}
+                  height={plotHeight + 20}
+                  fill="transparent"
+                />
+
+                {isHovered && (
+                  <line
+                    x1={centerX}
+                    y1={paddingTop}
+                    x2={centerX}
+                    y2={paddingTop + plotHeight}
+                    stroke="#cbd5ce"
+                    strokeWidth="1.2"
+                    strokeDasharray="3 3"
+                  />
+                )}
+
+                <text
+                  x={centerX}
+                  y={paddingTop + plotHeight + 18}
+                  textAnchor="middle"
+                  fontSize="10"
+                  fontWeight={isSelected ? "800" : "600"}
+                  fill={isSelected ? "#0d4a2b" : "#7e9185"}
+                  fontFamily="Inter, system-ui, sans-serif"
+                >
+                  {m}
+                </text>
+              </g>
+            );
+          })}
+
+          {!isMultiYear ? (
+            <>
+              {singleEndIdx >= 0 && (
+                <path
+                  d={months
+                    .slice(0, singleEndIdx + 1)
+                    .map((_, idx) => {
+                      const cx = paddingLeft + idx * step + step / 2;
+                      const val = Number(primaryValues[idx]) || 0;
+                      const cy = paddingTop + plotHeight - (val / (maxVal || 1)) * plotHeight;
+                      return `${idx === 0 ? "M" : "L"} ${cx} ${cy}`;
+                    })
+                    .join(" ")}
+                  fill="none"
+                  stroke="#16a34a"
+                  strokeWidth="2.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{ pointerEvents: "none" }}
+                />
+              )}
+
+              {singleEndIdx >= 0 &&
+                months.slice(0, singleEndIdx + 1).map((_, idx) => {
+                  const cx = paddingLeft + idx * step + step / 2;
+                  const val = Number(primaryValues[idx]) || 0;
+                  const cy = paddingTop + plotHeight - (val / (maxVal || 1)) * plotHeight;
+                  const isSelected = (isCurrentYear && idx === currentMonthIdx) || idx === hoveredIndex;
+
+                  return (
+                    <circle
+                      key={idx}
+                      cx={cx}
+                      cy={cy}
+                      r={isSelected ? 4.5 : 3}
+                      fill="#ffffff"
+                      stroke="#16a34a"
+                      strokeWidth={isSelected ? 2.6 : 2}
+                      style={{ transition: "all 0.2s ease", pointerEvents: "none" }}
+                    />
+                  );
+                })}
+            </>
+          ) : (
+            <>
+              {yearsAsc.map((yr) => {
+                const rankIdx = yearsDesc.indexOf(yr);
+                const palette = getComparisonYearPalette(metric, Math.max(0, rankIdx));
+                const yrVals = allYearsDataMap[yr]?.values || Array(12).fill(0);
+                const endIdx = getTrendlineEndIdx(yr, yrVals);
+                if (endIdx < 0) return null;
+
+                return (
+                  <g key={`line-${yr}`} style={{ pointerEvents: "none" }}>
+                    <path
+                      d={months
+                        .slice(0, endIdx + 1)
+                        .map((_, mIdx) => {
+                          const px = paddingLeft + mIdx * step + step / 2;
+                          const val = Number(yrVals[mIdx]) || 0;
+                          const py = paddingTop + plotHeight - (val / (maxVal || 1)) * plotHeight;
+                          return `${mIdx === 0 ? "M" : "L"} ${px} ${py}`;
+                        })
+                        .join(" ")}
+                      fill="none"
+                      stroke={palette.line}
+                      strokeWidth={rankIdx === 0 ? "2.8" : "2.2"}
+                      strokeDasharray={rankIdx === 0 ? "none" : "4 2.5"}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    {months.slice(0, endIdx + 1).map((_, mIdx) => {
+                      const px = paddingLeft + mIdx * step + step / 2;
+                      const val = Number(yrVals[mIdx]) || 0;
+                      const py = paddingTop + plotHeight - (val / (maxVal || 1)) * plotHeight;
+                      const isHovered = mIdx === hoveredIndex;
+                      return (
+                        <circle
+                          key={mIdx}
+                          cx={px}
+                          cy={py}
+                          r={isHovered ? 4.5 : 3}
+                          fill="#ffffff"
+                          stroke={palette.dot}
+                          strokeWidth={isHovered ? 2.5 : 2}
+                        />
+                      );
+                    })}
+                  </g>
+                );
+              })}
+            </>
+          )}
+        </svg>
+
+        {hoveredIndex !== null && (
+          <div
+            style={{
+              position: "absolute",
+              top: "6px",
+              left: "50%",
+              transform: "translateX(-50%)",
+              background: "#131d17",
+              color: "#ffffff",
+              padding: isMultiYear ? "6px 12px" : "4px 12px",
+              borderRadius: "8px",
+              fontSize: "11px",
+              fontWeight: 600,
+              pointerEvents: "none",
+              boxShadow: "0 4px 14px rgba(0,0,0,0.2)",
+              display: "flex",
+              flexDirection: isMultiYear ? "column" : "row",
+              alignItems: isMultiYear ? "flex-start" : "center",
+              gap: isMultiYear ? "3px" : "8px",
+              zIndex: 10,
+            }}
+          >
+            {!isMultiYear ? (
+              <>
+                <span style={{ color: "#a3b8aa" }}>{months[hoveredIndex]} {primaryYear}:</span>
+                <span style={{ color: "#34d399", fontWeight: 700 }}>
+                  {formatTooltipVal(primaryValues[hoveredIndex] || 0)}
+                </span>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: "10px", color: "#a3b8aa", fontWeight: 700, marginBottom: "1px" }}>
+                  Bulan {months[hoveredIndex]} (Perbandingan Tahun)
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+                  {yearsDesc.map((yr, rankIdx) => {
+                    const palette = getComparisonYearPalette(metric, rankIdx);
+                    const val = allYearsDataMap[yr]?.values?.[hoveredIndex] || 0;
+                    return (
+                      <div key={yr} style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}>
+                        <span
+                          style={{
+                            width: "7px",
+                            height: "7px",
+                            borderRadius: "2px",
+                            background: palette.tooltipColor,
+                            display: "inline-block",
+                          }}
+                        />
+                        <span style={{ color: "#d1ded4" }}>{yr}:</span>
+                        <span style={{ color: palette.tooltipColor, fontWeight: 700 }}>
+                          {formatTooltipVal(val)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   if (series?.available === false) {
     return (
@@ -6905,6 +7553,7 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
   const [selectedDate, setSelectedDate] = useState(getTodayDateStr);
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
+  const [selectedYears, setSelectedYears] = useState(() => [new Date().getFullYear()]);
 
   // Fleet curve controls
   const [fleetRegion, setFleetRegion] = useState(selectedRegion || "all");
@@ -6912,6 +7561,7 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
   const [fleetSelectedDate, setFleetSelectedDate] = useState(getTodayDateStr);
   const [fleetSelectedMonth, setFleetSelectedMonth] = useState(() => new Date().getMonth());
   const [fleetSelectedYear, setFleetSelectedYear] = useState(() => new Date().getFullYear());
+  const [fleetSelectedYears, setFleetSelectedYears] = useState(() => [new Date().getFullYear()]);
 
   useEffect(() => {
     if (location?.uid) {
@@ -7022,6 +7672,74 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
   const availableYears = useMemo(() => {
     return getAvailableProductionYears(allLocations || locations, activeStation);
   }, [allLocations, locations, activeStation]);
+
+  const fleetAvailableYears = useMemo(() => {
+    return getAvailableProductionYears(targetLocations, null);
+  }, [targetLocations]);
+
+  const stationYearsDesc = useMemo(() => [...selectedYears].sort((a, b) => b - a), [selectedYears]);
+  const stationYearsAsc = useMemo(() => [...selectedYears].sort((a, b) => a - b), [selectedYears]);
+
+  const fleetYearsDesc = useMemo(() => [...fleetSelectedYears].sort((a, b) => b - a), [fleetSelectedYears]);
+  const fleetYearsAsc = useMemo(() => [...fleetSelectedYears].sort((a, b) => a - b), [fleetSelectedYears]);
+
+  useEffect(() => {
+    if (stationYearsDesc.length > 0 && stationYearsDesc[0] !== selectedYear) {
+      setSelectedYear(stationYearsDesc[0]);
+    }
+  }, [stationYearsDesc, selectedYear]);
+
+  useEffect(() => {
+    if (fleetYearsDesc.length > 0 && fleetYearsDesc[0] !== fleetSelectedYear) {
+      setFleetSelectedYear(fleetYearsDesc[0]);
+    }
+  }, [fleetYearsDesc, fleetSelectedYear]);
+
+  const stationYearsDataMap = useMemo(() => {
+    const map = {};
+    for (const yr of availableYears) {
+      const vals = activeStation ? getStationMonthlyValues(activeStation, yr, "energy") : Array(12).fill(0);
+      const total = vals.reduce((acc, v) => acc + (Number(v) || 0), 0);
+      map[yr] = { values: vals, total };
+    }
+    return map;
+  }, [availableYears, activeStation]);
+
+  const fleetYearsDataMap = useMemo(() => {
+    const map = {};
+    for (const yr of fleetAvailableYears) {
+      const vals = getAggregateMonthlyValues(
+        targetLocations,
+        null,
+        yr,
+        "energy",
+        { monthly: fleetMonthKwhVal }
+      );
+      const total = vals.reduce((acc, v) => acc + (Number(v) || 0), 0);
+      map[yr] = { values: vals, total };
+    }
+    return map;
+  }, [fleetAvailableYears, targetLocations, fleetMonthKwhVal]);
+
+  const toggleStationYear = useCallback((yr) => {
+    setSelectedYears((prev) => {
+      if (prev.includes(yr)) {
+        if (prev.length <= 1) return prev;
+        return prev.filter((item) => item !== yr);
+      }
+      return [...prev, yr].sort((a, b) => b - a);
+    });
+  }, []);
+
+  const toggleFleetYear = useCallback((yr) => {
+    setFleetSelectedYears((prev) => {
+      if (prev.includes(yr)) {
+        if (prev.length <= 1) return prev;
+        return prev.filter((item) => item !== yr);
+      }
+      return [...prev, yr].sort((a, b) => b - a);
+    });
+  }, []);
 
   const series = useMemo(() => {
     if (!activeStation || !(activeStation.id || activeStation.station_id || activeStation.uid || activeStation.name)) {
@@ -7238,9 +7956,12 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
     if (period === "day" || period === "today") return `${stationName} · Hourly generation (${formatToDisplayDate(selectedDate)}) - ${platformName}`;
     if (period === "week") return `${stationName} · Daily generation week (${formatToDisplayDate(selectedDate)}) - ${platformName}`;
     if (period === "month") return `${stationName} · Daily generation (${MONTH_NAMES[selectedMonth]} ${selectedYear}) - ${platformName}`;
-    if (period === "year") return `${stationName} · Monthly generation (${selectedYear}) - ${platformName}`;
+    if (period === "year") {
+      const yrText = stationYearsAsc.length > 1 ? stationYearsAsc.join(" vs ") : String(selectedYear);
+      return `${stationName} · Monthly generation (${yrText}) - ${platformName}`;
+    }
     return `${stationName} · Yearly generation reported by ${platformName}`;
-  }, [hasLocations, stationName, platformName, period, selectedDate, selectedMonth, selectedYear]);
+  }, [hasLocations, stationName, platformName, period, selectedDate, selectedMonth, selectedYear, stationYearsAsc]);
 
   const curveTitle = useMemo(() => {
     if (period === "day" || period === "today") return "Daily production curve";
@@ -7264,9 +7985,12 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
     if (fleetPeriod === "day" || fleetPeriod === "today") return `${prefix} · Total produksi energi (${formatToDisplayDate(fleetSelectedDate)}) - ${formatNumber(fleetTodayKwhVal, 1)} kWh`;
     if (fleetPeriod === "week") return `${prefix} · Total produksi 7 hari (${formatToDisplayDate(fleetSelectedDate)})`;
     if (fleetPeriod === "month") return `${prefix} · Total produksi (${MONTH_NAMES[fleetSelectedMonth]} ${fleetSelectedYear})`;
-    if (fleetPeriod === "year") return `${prefix} · Total produksi tahunan (${fleetSelectedYear})`;
+    if (fleetPeriod === "year") {
+      const yrText = fleetYearsAsc.length > 1 ? fleetYearsAsc.join(" vs ") : String(fleetSelectedYear);
+      return `${prefix} · Total produksi tahunan (${yrText})`;
+    }
     return `${prefix} · Akumulasi produksi keseluruhan`;
-  }, [fleetRegion, regionLabel, targetLocations, fleetPeriod, fleetSelectedDate, fleetSelectedMonth, fleetSelectedYear, fleetTodayKwhVal]);
+  }, [fleetRegion, regionLabel, targetLocations, fleetPeriod, fleetSelectedDate, fleetSelectedMonth, fleetSelectedYear, fleetTodayKwhVal, fleetYearsAsc]);
 
   const fleetRecordCount = useMemo(() => {
     if (fleetPeriod === "day" || fleetPeriod === "today") return `${fleetSeries?.values?.length || 24} / 24`;
@@ -7358,7 +8082,14 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
                   </div>
                 )}
                 {period === "year" && (
-                  <YearDropdownPill value={selectedYear} onChange={setSelectedYear} years={availableYears} />
+                  <MultiYearDropdownPill
+                    selectedYears={selectedYears}
+                    onChangeYears={setSelectedYears}
+                    availableYears={availableYears}
+                    allYearsDataMap={stationYearsDataMap}
+                    metric="energy"
+                    align="right"
+                  />
                 )}
                 <span className="unit-pill-badge">{series?.unit || "kWh"}</span>
                 {canUserExportData(currentUser) && onOpenChartExport && (
@@ -7375,9 +8106,30 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
               </div>
             </div>
 
+            {period === "year" && (
+              <MultiYearComparisonLegendStrip
+                selectedYears={selectedYears}
+                onToggleYear={toggleStationYear}
+                allYearsDataMap={stationYearsDataMap}
+                metric="energy"
+              />
+            )}
+
             {/* Inner Chart Box */}
             <div className="energy-chart-stage">
-              <EnergyProductionChart series={series} period={period} />
+              <EnergyProductionChart
+                series={series}
+                period={period}
+                multiYearData={
+                  period === "year"
+                    ? {
+                        selectedYears: stationYearsDesc,
+                        allYearsDataMap: stationYearsDataMap,
+                        metric: "energy",
+                      }
+                    : null
+                }
+              />
             </div>
 
             {/* 5 Stats underneath chart as shown in design */}
@@ -7495,7 +8247,14 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
                   </div>
                 )}
                 {fleetPeriod === "year" && (
-                  <YearDropdownPill value={fleetSelectedYear} onChange={setFleetSelectedYear} years={availableYears} />
+                  <MultiYearDropdownPill
+                    selectedYears={fleetSelectedYears}
+                    onChangeYears={setFleetSelectedYears}
+                    availableYears={fleetAvailableYears}
+                    allYearsDataMap={fleetYearsDataMap}
+                    metric="energy"
+                    align="right"
+                  />
                 )}
                 <span className="unit-pill-badge">{fleetSeries?.unit || "kWh"}</span>
                 {canUserExportData(currentUser) && onOpenChartExport && (
@@ -7512,9 +8271,30 @@ function EnergyView({ location, fleet, locations, allLocations, onSelect, select
               </div>
             </div>
 
+            {fleetPeriod === "year" && (
+              <MultiYearComparisonLegendStrip
+                selectedYears={fleetSelectedYears}
+                onToggleYear={toggleFleetYear}
+                allYearsDataMap={fleetYearsDataMap}
+                metric="energy"
+              />
+            )}
+
             {/* Inner Chart Box */}
             <div className="energy-chart-stage">
-              <EnergyProductionChart series={fleetSeries} period={fleetPeriod} />
+              <EnergyProductionChart
+                series={fleetSeries}
+                period={fleetPeriod}
+                multiYearData={
+                  fleetPeriod === "year"
+                    ? {
+                        selectedYears: fleetYearsDesc,
+                        allYearsDataMap: fleetYearsDataMap,
+                        metric: "energy",
+                      }
+                    : null
+                }
+              />
             </div>
 
             {/* 3 Stats underneath chart */}
@@ -7849,6 +8629,7 @@ function RevenueView({
   const [selectedDate, setSelectedDate] = useState(getTodayDateStr);
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
+  const [selectedYears, setSelectedYears] = useState(() => [new Date().getFullYear()]);
 
   // Fleet curve controls
   const [fleetRegion, setFleetRegion] = useState(selectedRegion || "all");
@@ -7856,6 +8637,7 @@ function RevenueView({
   const [fleetSelectedDate, setFleetSelectedDate] = useState(getTodayDateStr);
   const [fleetSelectedMonth, setFleetSelectedMonth] = useState(() => new Date().getMonth());
   const [fleetSelectedYear, setFleetSelectedYear] = useState(() => new Date().getFullYear());
+  const [fleetSelectedYears, setFleetSelectedYears] = useState(() => [new Date().getFullYear()]);
 
   useEffect(() => {
     if (location?.uid) {
