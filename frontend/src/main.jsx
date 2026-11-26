@@ -733,9 +733,63 @@ function buildSnapshotVersionKey(meta) {
   return `${meta.run_id || ""}|${meta.updated_at || meta.scraped_at || ""}`;
 }
 
+function makeCompactCachePayload(payload) {
+  if (!payload?.by_site) return payload;
+  try {
+    const clone = { ...payload, by_site: {} };
+    for (const [siteKey, siteVal] of Object.entries(payload.by_site)) {
+      if (!siteVal || typeof siteVal !== "object") continue;
+      const stations = Array.isArray(siteVal.stations)
+        ? siteVal.stations.map((st) => {
+            const copy = { ...st };
+            delete copy.daily_power_5min;
+            if (copy.energy_charts) {
+              const ec = { ...copy.energy_charts };
+              delete ec.hourly_by_date;
+              copy.energy_charts = ec;
+            }
+            if (copy.charts) {
+              const ch = { ...copy.charts };
+              delete ch.station_power_trend;
+              copy.charts = ch;
+            }
+            return copy;
+          })
+        : [];
+      clone.by_site[siteKey] = { ...siteVal, stations };
+    }
+    return clone;
+  } catch (_) {
+    return payload;
+  }
+}
+
+function persistSnapshotToLocalStorage(payload, versionKey) {
+  try {
+    localStorage.removeItem("plts_last_snapshot");
+    const compact = makeCompactCachePayload(payload);
+    localStorage.setItem("plts_last_snapshot", JSON.stringify(compact));
+    if (versionKey) {
+      localStorage.setItem(SNAPSHOT_VERSION_KEY, versionKey);
+    }
+  } catch (_) {
+    try {
+      localStorage.removeItem("plts_last_snapshot");
+      if (versionKey) {
+        localStorage.setItem(SNAPSHOT_VERSION_KEY, versionKey);
+      }
+    } catch (_) { }
+  }
+}
+
 function useMonitoringData(session, onUnauthorized) {
   const [data, setData] = useState(() => {
     try {
+      const ver = localStorage.getItem(SNAPSHOT_VERSION_KEY);
+      if (!ver) {
+        localStorage.removeItem("plts_last_snapshot");
+        return null;
+      }
       const cached = localStorage.getItem("plts_last_snapshot");
       if (cached) {
         const parsed = JSON.parse(cached);
@@ -781,7 +835,7 @@ function useMonitoringData(session, onUnauthorized) {
           const metaRes = await fetchWithTimeout(
             `${url}/rest/v1/monitoring_current?select=run_id,scraped_at,updated_at&limit=1`,
             { headers: sbHeaders },
-            6_000
+            15_000
           );
           if (metaRes.ok) {
             const metaRows = await metaRes.json();
@@ -793,11 +847,11 @@ function useMonitoringData(session, onUnauthorized) {
           }
         }
 
-        // 2. Unduh payload penuh hanya saat pertama kali, versi berubah, atau manual refresh
+        // 2. Unduh payload penuh (timeout 30 detik agar jaringan mobile selesai mengunduh payload ~2.6 MB)
         const sbResponse = await fetchWithTimeout(
           `${url}/rest/v1/monitoring_current?select=run_id,scraped_at,updated_at,payload&limit=1`,
           { headers: sbHeaders },
-          8_000
+          30_000
         );
 
         if (sbResponse.ok) {
@@ -808,12 +862,7 @@ function useMonitoringData(session, onUnauthorized) {
             snapshotVersionRef.current = versionKey;
             dataRef.current = row.payload;
             setData(row.payload);
-            try {
-              localStorage.setItem("plts_last_snapshot", JSON.stringify(row.payload));
-              if (versionKey) {
-                localStorage.setItem(SNAPSHOT_VERSION_KEY, versionKey);
-              }
-            } catch (_) { }
+            persistSnapshotToLocalStorage(row.payload, versionKey);
             setError(null);
             return;
           }
@@ -902,7 +951,7 @@ function useStationMetadata() {
               Accept: "application/json",
             },
           },
-          4000
+          15000
         );
         if (!res.ok) return;
         const rows = await res.json();
@@ -910,6 +959,7 @@ function useStationMetadata() {
           const map = readLocalMetadata();
           for (const r of rows) {
             const k = r.station_key || `${r.platform}-${r.station_id}`;
+            if (k === "__tariff_settings__") continue;
             map[k] = {
               custom_name: r.custom_name,
               asset_owner: r.asset_owner,
@@ -7298,21 +7348,34 @@ function getFleetQuarterlyValues({ targetLocations, selectedYear, metricType = "
   // TW 3: Juli - September (Bulan 7 - 9 -> index 6, 7, 8)
   // TW 4: Oktober - Desember (Bulan 10 - 12 -> index 9, 10, 11)
   const yearlyMonthlyTotals = Array(12).fill(0);
+  const seenKehuaTrendKeys = new Set();
 
-  locs.forEach((loc) => {
-    const mVals = getStationMonthlyValues(loc, yr, metricType);
+  for (const loc of locs) {
+    const source = (loc.source || loc.platform || loc.site?.platform || "").toLowerCase();
+    if (source === "kehua") {
+      const trends = loc.charts?.company_power_trends || loc.site?.charts?.company_power_trends;
+      const seriesGroup = trends?.year_monthly;
+      const yearSeries = seriesGroup?.series?.[String(yr)];
+      if (yearSeries) {
+        const key = `${loc.id || loc.station_id || loc.uid || "kehua"}-${JSON.stringify(yearSeries.x || [])}-${JSON.stringify(yearSeries.y || [])}`;
+        if (seenKehuaTrendKeys.has(key)) {
+          continue;
+        }
+        seenKehuaTrendKeys.add(key);
+      }
+    }
+
+    const mVals = getStationMonthlyValues(loc, yr, metricType, loc.tariff_per_kwh);
     if (Array.isArray(mVals)) {
       for (let m = 0; m < 12; m++) {
         yearlyMonthlyTotals[m] += Number(mVals[m]) || 0;
       }
     }
-  });
+  }
 
-  // Jika tahun berjalan dan currentMonthVal diberikan, pastikan bulan berjalan mencerminkan nilai realtime
-  if (isCurrentYear && currentMonthVal !== null && currentMonthVal !== undefined && Number(currentMonthVal) >= 0) {
-    if (yearlyMonthlyTotals[currentMonthIdx] < Number(currentMonthVal)) {
-      yearlyMonthlyTotals[currentMonthIdx] = Number(currentMonthVal);
-    }
+  // Jika tahun berjalan dan currentMonthVal diberikan, sinkronkan bulan berjalan secara konsisten dengan THIS MONTH
+  if (isCurrentYear && currentMonthVal !== null && currentMonthVal !== undefined && Number(currentMonthVal) > 0) {
+    yearlyMonthlyTotals[currentMonthIdx] = Number(currentMonthVal);
   }
 
   // Jumlahkan nilai 3 bulan untuk masing-masing Triwulan

@@ -183,11 +183,58 @@ export function getStationTariff(station, tariffConfig = null) {
   return DEFAULT_TARIFF_CATEGORIES[cat]?.defaultRate || 1444.7;
 }
 
+const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL || "https://ioxfjbwlhsbfxmgrgwhh.supabase.co").replace(/\/$/, "");
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_RAYfBkC2nAU4IQXt4cyF8Q_TpYIv-B_";
+const CLOUD_TARIFF_KEY = "__tariff_settings__";
+
 /**
- * React Hook untuk mengelola pengaturan tarif di frontend
+ * React Hook untuk mengelola pengaturan tarif di frontend (tersinkronisasi ke Supabase agar Desktop & Mobile selalu sama)
  */
 export function useTariffSettings() {
   const [config, setConfig] = useState(() => readTariffSettings());
+
+  useEffect(() => {
+    let active = true;
+    const fetchCloudTariffs = async () => {
+      try {
+        if (!SUPABASE_URL || !SUPABASE_KEY) return;
+        const res = await fetch(
+          `${SUPABASE_URL}/rest/v1/station_metadata?station_key=eq.${CLOUD_TARIFF_KEY}&select=notes,updated_at&limit=1`,
+          {
+            headers: {
+              apikey: SUPABASE_KEY,
+              Authorization: `Bearer ${SUPABASE_KEY}`,
+              Accept: "application/json",
+            },
+          }
+        );
+        if (!res.ok) return;
+        const rows = await res.json();
+        if (Array.isArray(rows) && rows[0]?.notes && active) {
+          const parsed = JSON.parse(rows[0].notes);
+          if (parsed && typeof parsed === "object") {
+            const fallback = readTariffSettings();
+            const merged = {
+              categoryRates: {
+                ...fallback.categoryRates,
+                ...(parsed.categoryRates || {}),
+                school: DEFAULT_TARIFF_CATEGORIES.school.defaultRate,
+              },
+              customRates: parsed.customRates || {},
+            };
+            try {
+              localStorage.setItem(TARIFF_STORAGE_KEY, JSON.stringify(merged));
+            } catch (_) {}
+            setConfig(merged);
+          }
+        }
+      } catch (_) {}
+    };
+    fetchCloudTariffs();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const saveSettings = useCallback((newConfig) => {
     const sanitized = {
@@ -201,6 +248,29 @@ export function useTariffSettings() {
       localStorage.setItem(TARIFF_STORAGE_KEY, JSON.stringify(sanitized));
     } catch (_) {}
     setConfig(sanitized);
+
+    // Simpan juga ke Supabase agar tampilan Desktop dan Mobile selalu identik
+    try {
+      if (SUPABASE_URL && SUPABASE_KEY) {
+        fetch(`${SUPABASE_URL}/rest/v1/station_metadata`, {
+          method: "POST",
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+            "Content-Type": "application/json",
+            Prefer: "resolution=merge-duplicates,return=minimal",
+          },
+          body: JSON.stringify({
+            station_key: CLOUD_TARIFF_KEY,
+            station_id: CLOUD_TARIFF_KEY,
+            platform: "system",
+            custom_name: "Tariff Settings",
+            notes: JSON.stringify(sanitized),
+            updated_at: new Date().toISOString(),
+          }),
+        }).catch(() => {});
+      }
+    } catch (_) {}
   }, []);
 
   const updateCategoryRate = useCallback((catId, rate) => {
