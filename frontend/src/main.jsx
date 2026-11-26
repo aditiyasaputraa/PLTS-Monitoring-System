@@ -17,6 +17,7 @@ import {
   canUserExportData,
 } from "./auth_roles.js";
 import TariffSettingsModal from "./TariffSettingsModal.jsx";
+import AccountManagerModal, { useAccountManager } from "./AccountManagerModal.jsx";
 import ChartExportModal, { downloadExcel, downloadCsv } from "./ChartExportModal.jsx";
 import { MOCK_MONITORING_DATA } from "./mock_data.js";
 import "./styles.css";
@@ -1368,6 +1369,15 @@ function Dashboard({ session, onSignOut }) {
   const { data, error, refresh } = useMonitoringData(session, onSignOut);
   const { metadata: stationMetadata, updateStation: updateStationMetadata } = useStationMetadata();
   const {
+    accountManagerConfig,
+    addVendorAccount,
+    removeVendorAccount,
+    blockEnvVendorAccount,
+    unblockEnvVendorAccount,
+    toggleStationHidden,
+  } = useAccountManager();
+  const [accountManagerOpen, setAccountManagerOpen] = useState(false);
+  const {
     tariffConfig,
     updateCategoryRate,
     updateStationRate,
@@ -1397,7 +1407,7 @@ function Dashboard({ session, onSignOut }) {
     return Object.entries(data.by_site).map(([key, site]) => ({ key, ...site }));
   }, [data]);
 
-  const allLocations = useMemo(() => {
+  const allLocationsRaw = useMemo(() => {
     return sites.flatMap((site) => (site.stations || []).map((station) => {
       const id = String(station.station_id || station.station_numeric_id || station.id);
       const rawName = station.station_name || station.name || `Station ${id}`;
@@ -1599,6 +1609,20 @@ function Dashboard({ session, onSignOut }) {
       };
     }));
   }, [sites, stationMetadata, tariffConfig]);
+
+  const allLocations = useMemo(() => {
+    const disabledSet = new Set(
+      (accountManagerConfig?.disabled_stations || []).map((x) => String(x).trim())
+    );
+    if (disabledSet.size === 0) return allLocationsRaw;
+    return allLocationsRaw.filter(
+      (st) =>
+        !disabledSet.has(st.uid) &&
+        !disabledSet.has(String(st.id)) &&
+        !disabledSet.has(String(st.station_id || "")) &&
+        !disabledSet.has(String(st.name || ""))
+    );
+  }, [allLocationsRaw, accountManagerConfig?.disabled_stations]);
 
   // Filter locations based on chosen region
   const locations = useMemo(() => {
@@ -1918,6 +1942,30 @@ function Dashboard({ session, onSignOut }) {
               <RefreshIcon style={{ width: "15px", height: "15px", animation: isSyncing ? "spin 1s linear infinite" : "none" }} />
             </button>
 
+            {/* Super Admin Only: Kelola Akun & Stasiun PLTS Button */}
+            {(session?.user?.role === "super_admin" || session?.user?.user_metadata?.role === "super_admin") && (
+              <button
+                type="button"
+                className="sync-header-btn"
+                onClick={() => setAccountManagerOpen(true)}
+                title="Kelola Akun Vendor & Stasiun PLTS (Khusus Super Admin)"
+                aria-label="Kelola Akun Vendor & Stasiun PLTS"
+                style={{
+                  width: "auto",
+                  padding: "0 11px",
+                  gap: "6px",
+                  fontSize: "11.5px",
+                  fontWeight: 700,
+                  color: "#a7f3d0",
+                  border: "1px solid rgba(16, 185, 129, 0.35)",
+                  background: "rgba(16, 185, 129, 0.14)",
+                }}
+              >
+                <span style={{ fontSize: "13px" }}>⚙️</span>
+                <span>Kelola PLTS</span>
+              </button>
+            )}
+
             {/* Export Slot */}
             <div id="top-nav-export-slot" style={{ display: "inline-flex", alignItems: "center" }} />
 
@@ -2117,6 +2165,20 @@ function Dashboard({ session, onSignOut }) {
         initialStationId={exportInitialStationId}
         getStationMonthlyValuesFn={getStationMonthlyValues}
         tariffConfig={tariffConfig}
+      />
+
+      <AccountManagerModal
+        isOpen={accountManagerOpen}
+        onClose={() => setAccountManagerOpen(false)}
+        accountManagerConfig={accountManagerConfig}
+        onAddVendorAccount={addVendorAccount}
+        onRemoveVendorAccount={removeVendorAccount}
+        onBlockEnvAccount={blockEnvVendorAccount}
+        onUnblockEnvAccount={unblockEnvVendorAccount}
+        onToggleStationHidden={toggleStationHidden}
+        onTriggerSync={handleSyncNow}
+        allStationsRaw={allLocationsRaw}
+        currentUser={session?.user}
       />
 
       {/* Sync Toast */}

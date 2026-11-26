@@ -70,6 +70,36 @@ class SupabaseStoreHistoryMergeTests(unittest.TestCase):
         self.assertIn("2022-01", dbm)
         self.assertIn("2026-10", dbm)
 
+    def test_merge_payload_filters_disabled_stations(self):
+        existing = {
+            "by_site": {
+                "huawei": {
+                    "stations": [
+                        {"station_id": "ST-1", "name": "PLTS Aktif"},
+                        {"station_id": "ST-2", "name": "PLTS Mati"},
+                    ]
+                }
+            }
+        }
+        incoming = {
+            "by_site": {
+                "huawei": {
+                    "stations": [
+                        {"station_id": "ST-1", "name": "PLTS Aktif"},
+                        {"station_id": "ST-2", "name": "PLTS Mati"},
+                    ]
+                }
+            }
+        }
+        merged = merge_payload_preserve_history(
+            existing,
+            incoming,
+            disabled_station_ids={"huawei-ST-2"},
+        )
+        stations = merged["by_site"]["huawei"]["stations"]
+        self.assertEqual(len(stations), 1)
+        self.assertEqual(stations[0]["station_id"], "ST-1")
+
 
 class SupabaseStoreEnvironmentTests(unittest.TestCase):
     def test_reads_optional_daily_rollup_table_name(self):

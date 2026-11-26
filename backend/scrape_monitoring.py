@@ -507,7 +507,103 @@ def prepare_session(
     return session, meta
 
 
-def load_kehua_accounts_from_env() -> list[dict[str, Any]]:
+def load_cloud_account_manager_config() -> dict[str, Any]:
+    """Fetch cloud-managed PLTS accounts & disabled station/account lists from Supabase station_metadata."""
+    raw_override = os.getenv("PLTS_ACCOUNT_MANAGER_JSON", "").strip()
+    if raw_override:
+        try:
+            parsed = json.loads(raw_override)
+            if isinstance(parsed, dict):
+                return parsed
+        except Exception:
+            pass
+
+    supabase_url = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
+    supabase_key = (
+        os.getenv("SUPABASE_SECRET_KEY", "").strip()
+        or os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+        or os.getenv("VITE_SUPABASE_PUBLISHABLE_KEY", "").strip()
+    )
+    if not supabase_url or not supabase_key:
+        return {}
+
+    try:
+        res = requests.get(
+            f"{supabase_url}/rest/v1/station_metadata?station_key=eq.__plts_account_manager__&select=notes&limit=1",
+            headers={
+                "apikey": supabase_key,
+                "Authorization": f"Bearer {supabase_key}",
+                "Accept": "application/json",
+            },
+            timeout=8,
+        )
+        if res.ok:
+            rows = res.json()
+            if isinstance(rows, list) and rows and isinstance(rows[0], dict) and rows[0].get("notes"):
+                parsed = json.loads(str(rows[0]["notes"]))
+                if isinstance(parsed, dict):
+                    return parsed
+    except Exception as exc:
+        print(f"Notice: Cloud account manager config fetch skipped: {exc}")
+
+    return {}
+
+
+def _merge_cloud_vendor_accounts(
+    vendor: str,
+    env_accounts: list[dict[str, Any]],
+    cloud_cfg: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    cfg = cloud_cfg if isinstance(cloud_cfg, dict) else load_cloud_account_manager_config()
+    added_list = cfg.get("added_accounts") if isinstance(cfg.get("added_accounts"), list) else []
+    disabled_usernames = {
+        str(u).strip().lower()
+        for u in (cfg.get("disabled_accounts") if isinstance(cfg.get("disabled_accounts"), list) else [])
+        if str(u).strip()
+    }
+
+    combined = list(env_accounts)
+    for index, item in enumerate(added_list, start=1):
+        if not isinstance(item, dict):
+            continue
+        item_vendor = str(item.get("vendor") or item.get("platform") or "").strip().lower()
+        if item_vendor != vendor.lower():
+            continue
+        if item.get("enabled") is False:
+            continue
+        username = str(item.get("username") or "").strip()
+        password = str(item.get("password") or "").strip()
+        if not username or not password:
+            continue
+        acc: dict[str, Any] = {
+            "name": str(item.get("label") or item.get("name") or f"web_{vendor}_{index}"),
+            "username": username,
+            "password": password,
+            "use_shared_cookies": False,
+            "source": "cloud_web",
+        }
+        region = str(item.get("region") or "").strip()
+        if region and region.lower() not in ("auto", "otomatis", "all", ""):
+            acc["region"] = region
+        for key in ("company_id", "station_id", "area_code", "company_name"):
+            if item.get(key) not in (None, ""):
+                acc[key] = str(item[key])
+        combined.append(acc)
+
+    unique: list[dict[str, Any]] = []
+    seen_usernames: set[str] = set()
+    for account in combined:
+        uname_clean = str(account.get("username") or "").strip()
+        uname_lower = uname_clean.lower()
+        if not uname_clean or uname_lower in disabled_usernames or f"{vendor.lower()}:{uname_lower}" in disabled_usernames:
+            continue
+        if uname_lower not in seen_usernames:
+            unique.append(account)
+            seen_usernames.add(uname_lower)
+    return unique
+
+
+def load_kehua_accounts_from_env(cloud_cfg: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     accounts: list[dict[str, Any]] = []
     legacy_username = os.getenv("KEHUA_USERNAME", "").strip()
     legacy_password = os.getenv("KEHUA_PASSWORD", "").strip()
@@ -567,16 +663,10 @@ def load_kehua_accounts_from_env() -> list[dict[str, Any]]:
                     account[key] = str(item[key])
             accounts.append(account)
 
-    unique: list[dict[str, Any]] = []
-    seen_usernames: set[str] = set()
-    for account in accounts:
-        if account["username"] not in seen_usernames:
-            unique.append(account)
-            seen_usernames.add(account["username"])
-    return unique
+    return _merge_cloud_vendor_accounts("kehua", accounts, cloud_cfg)
 
 
-def load_huawei_accounts_from_env() -> list[dict[str, Any]]:
+def load_huawei_accounts_from_env(cloud_cfg: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     accounts: list[dict[str, Any]] = []
     legacy_username = os.getenv("HUAWEI_USERNAME", "").strip()
     legacy_password = os.getenv("HUAWEI_PASSWORD", "").strip()
@@ -630,16 +720,10 @@ def load_huawei_accounts_from_env() -> list[dict[str, Any]]:
                 "region": str(item.get("region") or "").strip() or None,
             })
 
-    unique: list[dict[str, Any]] = []
-    seen_usernames: set[str] = set()
-    for account in accounts:
-        if account["username"] not in seen_usernames:
-            unique.append(account)
-            seen_usernames.add(account["username"])
-    return unique
+    return _merge_cloud_vendor_accounts("huawei", accounts, cloud_cfg)
 
 
-def load_sma_accounts_from_env() -> list[dict[str, Any]]:
+def load_sma_accounts_from_env(cloud_cfg: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     accounts: list[dict[str, Any]] = []
     legacy_username = os.getenv("SMA_USERNAME", "").strip()
     legacy_password = os.getenv("SMA_PASSWORD", "").strip()
@@ -697,13 +781,7 @@ def load_sma_accounts_from_env() -> list[dict[str, Any]]:
                 acc["region"] = str(item["region"]).strip()
             accounts.append(acc)
 
-    unique: list[dict[str, Any]] = []
-    seen_usernames: set[str] = set()
-    for account in accounts:
-        if account["username"] not in seen_usernames:
-            unique.append(account)
-            seen_usernames.add(account["username"])
-    return unique
+    return _merge_cloud_vendor_accounts("sma", accounts, cloud_cfg)
 
 
 def discover_kehua_account_identifiers(session: requests.Session, account: dict[str, Any], timeout: int = 15) -> dict[str, Any]:

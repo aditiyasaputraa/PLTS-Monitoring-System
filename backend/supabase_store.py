@@ -14,14 +14,41 @@ from supabase import Client, create_client
 from site_rollups import extract_site_daily_rollups, extract_site_hourly_rollups
 
 
-def merge_payload_preserve_history(existing: dict[str, Any] | None, incoming: dict[str, Any]) -> dict[str, Any]:
+def merge_payload_preserve_history(
+    existing: dict[str, Any] | None,
+    incoming: dict[str, Any],
+    disabled_station_ids: set[str] | None = None,
+) -> dict[str, Any]:
     """Preserve historical chart series (e.g. multi-year month_daily, daily_by_month) across scrape snapshots."""
-    if not isinstance(existing, dict) or not isinstance(incoming, dict):
+    if not isinstance(incoming, dict):
+        return incoming
+
+    blocked_ids = {"38722", "50483", "50639"}
+    if disabled_station_ids:
+        blocked_ids.update(str(x).strip() for x in disabled_station_ids if str(x).strip())
+
+    incoming_by_site = incoming.get("by_site")
+    if isinstance(incoming_by_site, dict) and blocked_ids:
+        for plat, site_data in incoming_by_site.items():
+            if not isinstance(site_data, dict) or not isinstance(site_data.get("stations"), list):
+                continue
+            filtered = []
+            for st in site_data["stations"]:
+                if not isinstance(st, dict):
+                    continue
+                sid = str(st.get("station_id") or st.get("id") or "")
+                uid = f"{plat}-{sid}"
+                sname = str(st.get("name") or "")
+                if sid in blocked_ids or uid in blocked_ids or (sname and sname in blocked_ids):
+                    continue
+                filtered.append(st)
+            site_data["stations"] = filtered
+
+    if not isinstance(existing, dict) or not isinstance(incoming_by_site, dict):
         return incoming
 
     existing_by_site = existing.get("by_site")
-    incoming_by_site = incoming.get("by_site")
-    if not isinstance(existing_by_site, dict) or not isinstance(incoming_by_site, dict):
+    if not isinstance(existing_by_site, dict):
         return incoming
 
     for plat, incoming_site in incoming_by_site.items():
@@ -111,8 +138,9 @@ def merge_payload_preserve_history(existing: dict[str, Any] | None, incoming: di
             if not isinstance(old_st, dict):
                 continue
             old_id = str(old_st.get("station_id") or old_st.get("id") or "")
+            old_uid = f"{plat}-{old_id}"
             old_name = str(old_st.get("name") or "")
-            if old_id in ("38722", "50483", "50639"):
+            if old_id in blocked_ids or old_uid in blocked_ids or (old_name and old_name in blocked_ids):
                 continue
             if old_id and old_id not in incoming_ids and (not old_name or old_name not in incoming_names):
                 incoming_stations.append(old_st)
@@ -291,12 +319,30 @@ class SupabaseStore:
         updated_at = utc_iso()
 
         with self._lock:
+            disabled_ids: set[str] = set()
+            try:
+                meta_query = (
+                    client.table("station_metadata")
+                    .select("notes")
+                    .eq("station_key", "__plts_account_manager__")
+                    .limit(1)
+                    .execute()
+                )
+                if meta_query.data and isinstance(meta_query.data, list) and meta_query.data[0].get("notes"):
+                    parsed_meta = json.loads(str(meta_query.data[0]["notes"]))
+                    if isinstance(parsed_meta, dict) and isinstance(parsed_meta.get("disabled_stations"), list):
+                        disabled_ids = {str(x).strip() for x in parsed_meta["disabled_stations"] if str(x).strip()}
+            except Exception:
+                pass
+
             try:
                 current_query = client.table(config.current_table).select("payload").eq("id", 1).limit(1).execute()
                 if current_query.data and isinstance(current_query.data, list) and len(current_query.data) > 0:
                     existing_payload = current_query.data[0].get("payload")
                     if isinstance(existing_payload, dict):
-                        payload = merge_payload_preserve_history(existing_payload, payload)
+                        payload = merge_payload_preserve_history(existing_payload, payload, disabled_station_ids=disabled_ids)
+                elif disabled_ids:
+                    payload = merge_payload_preserve_history(None, payload, disabled_station_ids=disabled_ids)
             except Exception:
                 pass
 
