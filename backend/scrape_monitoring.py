@@ -947,11 +947,255 @@ def scrape_extended_vendor_account(
                             "status": "normal",
                         })
 
-        elif site_name in ("solis", "solax", "sungrow", "deye", "solaredge", "fronius"):
-            # Generic Portal REST / Token Discovery for SolisCloud, SolaX, Sungrow, Deye, SolarEdge, Fronius
-            base_url = str(site.get("api_base") or site.get("base_url") or "").rstrip("/")
-            if site_name == "solaredge":
-                # SolarEdge supports username/password or API Key in password field
+        elif site_name == "sungrow":
+            # Sungrow iSolarCloud Mobile Gateway API (No CAPTCHA, standard username + password)
+            appkey = "B0455FBE7AA0328DB57B59AA729F05D8"
+            for gateway in ("https://gateway.isolarcloud.com.hk", "https://gateway.isolarcloud.com"):
+                r_sg = session.post(
+                    f"{gateway}/v1/userService/login",
+                    json={
+                        "appkey": appkey,
+                        "user_account": username,
+                        "user_password": password,
+                        "login_type": "1",
+                        "sys_code": "200",
+                    },
+                    timeout=timeout,
+                )
+                sg_body = try_parse_json(r_sg.text)
+                res_data = sg_body.get("result_data") if isinstance(sg_body, dict) else None
+                if isinstance(res_data, dict) and res_data.get("token"):
+                    auth_ok = True
+                    token = res_data["token"]
+                    user_id = res_data.get("user_id")
+                    r_ps = session.post(
+                        f"{gateway}/v1/powerStationService/getPsList",
+                        json={"appkey": appkey, "token": token, "user_id": user_id, "curPage": 1, "size": 50, "sys_code": "200"},
+                        timeout=timeout,
+                    )
+                    ps_body = try_parse_json(r_ps.text)
+                    page_list = (ps_body.get("result_data", {}).get("pageList") if isinstance(ps_body, dict) and isinstance(ps_body.get("result_data"), dict) else []) or []
+                    for item in page_list if isinstance(page_list, list) else []:
+                        if not isinstance(item, dict):
+                            continue
+                        ps_id = str(item.get("ps_id") or "")
+                        cap_val = to_float((item.get("design_capacity") or {}).get("value") if isinstance(item.get("design_capacity"), dict) else item.get("design_capacity")) or 15.0
+                        pwr_val = to_float((item.get("curr_power") or {}).get("value") if isinstance(item.get("curr_power"), dict) else item.get("curr_power")) or 0.0
+                        day_val = to_float((item.get("today_energy") or {}).get("value") if isinstance(item.get("today_energy"), dict) else item.get("today_energy")) or 0.0
+                        tot_val = to_float((item.get("total_energy") or {}).get("value") if isinstance(item.get("total_energy"), dict) else item.get("total_energy")) or 0.0
+                        stations_list.append({
+                            "station_id": ps_id,
+                            "name": str(item.get("ps_name") or f"Sungrow {ps_id}"),
+                            "capacity_kwp": cap_val,
+                            "current_power_kw": pwr_val,
+                            "daily_energy_kwh": day_val,
+                            "cumulative_energy_kwh": tot_val,
+                            "latitude": to_float(item.get("latitude")),
+                            "longitude": to_float(item.get("longitude")),
+                            "address": item.get("ps_location"),
+                            "status": "normal" if str(item.get("ps_status")) in ("1", "normal") or pwr_val > 0 else "offline",
+                        })
+                    break
+
+        elif site_name == "deye":
+            # Deye Cloud / Solarman Smart Mobile Portal API (SHA-256 password hash, no CAPTCHA)
+            pwd_sha256 = hashlib.sha256(password.encode("utf-8")).hexdigest()
+            r_deye = session.post(
+                "https://globalpro.solarmanpv.com/maintain-s/acc/login",
+                json={"username": username, "password": pwd_sha256, "rememberMe": True},
+                timeout=timeout,
+            )
+            deye_body = try_parse_json(r_deye.text)
+            access_tok = (deye_body.get("access_token") or (deye_body.get("data") or {}).get("access_token")) if isinstance(deye_body, dict) else None
+            if access_tok:
+                auth_ok = True
+                r_plants = session.post(
+                    "https://globalpro.solarmanpv.com/maintain-s/operating/station/v2/search?page=1&size=50",
+                    json={},
+                    headers={"Authorization": f"Bearer {access_tok}"},
+                    timeout=timeout,
+                )
+                p_body = try_parse_json(r_plants.text)
+                items = (p_body.get("data") or p_body.get("stationList") or (p_body.get("result") or {}).get("data")) if isinstance(p_body, dict) else []
+                for item in (items if isinstance(items, list) else []):
+                    if not isinstance(item, dict):
+                        continue
+                    sid = str(item.get("id") or item.get("stationId") or "")
+                    pwr_w = to_float(item.get("generationPower") or item.get("power")) or 0.0
+                    pwr_kw = round(pwr_w / 1000.0, 3) if pwr_w > 200 else pwr_w
+                    stations_list.append({
+                        "station_id": sid,
+                        "name": str(item.get("name") or f"Deye {sid}"),
+                        "capacity_kwp": to_float(item.get("installedCapacity")) or 15.0,
+                        "current_power_kw": pwr_kw,
+                        "daily_energy_kwh": to_float(item.get("generationValue") or item.get("dayPower")) or 0.0,
+                        "monthly_energy_kwh": to_float(item.get("monthPower")) or 0.0,
+                        "yearly_energy_kwh": to_float(item.get("yearPower")) or 0.0,
+                        "cumulative_energy_kwh": to_float(item.get("generationTotal") or item.get("totalPower")) or 0.0,
+                        "latitude": to_float(item.get("locationLat") or item.get("lat")),
+                        "longitude": to_float(item.get("locationLng") or item.get("lng")),
+                        "address": item.get("locationAddress"),
+                        "status": "normal" if str(item.get("networkStatus")) in ("NORMAL", "1", "ALL_ONLINE") or pwr_kw > 0 else "offline",
+                    })
+
+        elif site_name == "solis":
+            # SolisCloud Mobile / Web Login (MD5 password) + OpenAPI HMAC-SHA1 support
+            import hmac
+            pwd_md5 = hashlib.md5(password.encode("utf-8")).hexdigest()
+            r_solis = session.post(
+                "https://www.soliscloud.com:15555/v2/api/login",
+                json={"userInfo": username, "password": pwd_md5, "language": "2"},
+                timeout=timeout,
+            )
+            sol_body = try_parse_json(r_solis.text)
+            sol_tok = (sol_body.get("data", {}).get("token") or sol_body.get("csrfToken")) if isinstance(sol_body, dict) else None
+            if sol_tok:
+                auth_ok = True
+                r_st = session.post(
+                    "https://www.soliscloud.com:15555/station/StationList",
+                    json={"pageNo": 1, "pageSize": 50},
+                    headers={"token": str(sol_tok)},
+                    timeout=timeout,
+                )
+                st_body = try_parse_json(r_st.text)
+                records = (st_body.get("data", {}).get("page", {}).get("records") if isinstance(st_body, dict) and isinstance(st_body.get("data"), dict) else []) or []
+                for item in (records if isinstance(records, list) else []):
+                    if not isinstance(item, dict):
+                        continue
+                    sid = str(item.get("id") or item.get("stationId") or "")
+                    stations_list.append({
+                        "station_id": sid,
+                        "name": str(item.get("stationName") or item.get("sno") or f"Solis {sid}"),
+                        "capacity_kwp": to_float(item.get("capacity")) or 15.0,
+                        "current_power_kw": to_float(item.get("power")) or 0.0,
+                        "daily_energy_kwh": to_float(item.get("dayEnergy")) or 0.0,
+                        "monthly_energy_kwh": to_float(item.get("monthEnergy")) or 0.0,
+                        "yearly_energy_kwh": to_float(item.get("yearEnergy")) or 0.0,
+                        "cumulative_energy_kwh": to_float(item.get("allEnergy")) or 0.0,
+                        "latitude": to_float(item.get("lat")),
+                        "longitude": to_float(item.get("lon") or item.get("lng")),
+                        "address": item.get("addr") or item.get("cityStr"),
+                        "status": "normal" if str(item.get("state")) == "1" else "offline",
+                    })
+            else:
+                # Fallback: SolisCloud OpenAPI HMAC-SHA1 (if username=KeyId, password=KeySecret)
+                body_str = json.dumps({"pageNo": 1, "pageSize": 50})
+                content_md5 = base64.b64encode(hashlib.md5(body_str.encode("utf-8")).digest()).decode("utf-8")
+                date_gmt = datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S GMT")
+                sign_str = f"POST\n{content_md5}\napplication/json\n{date_gmt}\n/v1/api/userStationList"
+                sig = base64.b64encode(hmac.new(password.encode("utf-8"), sign_str.encode("utf-8"), hashlib.sha1).digest()).decode("utf-8")
+                r_open = session.post(
+                    "https://www.soliscloud.com:13333/v1/api/userStationList",
+                    data=body_str,
+                    headers={"Content-Type": "application/json", "Content-MD5": content_md5, "Date": date_gmt, "Authorization": f"API {username}:{sig}"},
+                    timeout=timeout,
+                )
+                o_body = try_parse_json(r_open.text)
+                records = (o_body.get("data", {}).get("page", {}).get("records") if isinstance(o_body, dict) and isinstance(o_body.get("data"), dict) else []) or []
+                if isinstance(records, list) and records:
+                    auth_ok = True
+                    for item in records:
+                        if not isinstance(item, dict):
+                            continue
+                        sid = str(item.get("id") or "")
+                        stations_list.append({
+                            "station_id": sid,
+                            "name": str(item.get("stationName") or f"Solis {sid}"),
+                            "capacity_kwp": to_float(item.get("capacity")) or 15.0,
+                            "current_power_kw": to_float(item.get("power")) or 0.0,
+                            "daily_energy_kwh": to_float(item.get("dayEnergy")) or 0.0,
+                            "monthly_energy_kwh": to_float(item.get("monthEnergy")) or 0.0,
+                            "yearly_energy_kwh": to_float(item.get("yearEnergy")) or 0.0,
+                            "cumulative_energy_kwh": to_float(item.get("allEnergy")) or 0.0,
+                            "address": item.get("cityStr"),
+                            "status": "normal" if str(item.get("state")) == "1" else "offline",
+                        })
+
+        elif site_name == "solax":
+            # SolaX Cloud Mobile App Login (username + MD5 password) + Token fallback
+            pwd_md5 = hashlib.md5(password.encode("utf-8")).hexdigest()
+            r_sx_login = session.post(
+                "https://www.solaxcloud.com/proxyApp/proxy/api/login",
+                data={"userName": username, "password": pwd_md5},
+                timeout=timeout,
+            )
+            sxl_body = try_parse_json(r_sx_login.text)
+            sx_token = (sxl_body.get("result", {}).get("tokenId") if isinstance(sxl_body, dict) and isinstance(sxl_body.get("result"), dict) else None)
+            if sx_token:
+                auth_ok = True
+                r_sites = session.post(
+                    "https://www.solaxcloud.com/proxyApp/proxy/api/getSiteList",
+                    data={"tokenId": sx_token, "current": 1, "size": 50},
+                    timeout=timeout,
+                )
+                st_body = try_parse_json(r_sites.text)
+                rows = (st_body.get("result", {}).get("rows") if isinstance(st_body, dict) and isinstance(st_body.get("result"), dict) else []) or []
+                for item in (rows if isinstance(rows, list) else []):
+                    if not isinstance(item, dict):
+                        continue
+                    sid = str(item.get("siteId") or item.get("id") or "")
+                    stations_list.append({
+                        "station_id": sid,
+                        "name": str(item.get("siteName") or f"SolaX {sid}"),
+                        "capacity_kwp": to_float(item.get("capacity")) or 15.0,
+                        "current_power_kw": round((to_float(item.get("gridPower")) or 0.0) / 1000.0, 3),
+                        "daily_energy_kwh": to_float(item.get("yieldToday")) or 0.0,
+                        "cumulative_energy_kwh": to_float(item.get("yieldTotal")) or 0.0,
+                        "latitude": to_float(item.get("latitude")),
+                        "longitude": to_float(item.get("longitude")),
+                        "address": item.get("address"),
+                        "status": "normal",
+                    })
+            else:
+                r_sx = session.get(
+                    f"https://www.solaxcloud.com/proxyApp/proxy/api/getRealtimeInfo.do?tokenId={quote(password)}&sn={quote(username)}",
+                    timeout=timeout,
+                )
+                sx_body = try_parse_json(r_sx.text)
+                if isinstance(sx_body, dict) and sx_body.get("success") and isinstance(sx_body.get("result"), dict):
+                    auth_ok = True
+                    res_d = sx_body["result"]
+                    stations_list.append({
+                        "station_id": str(res_d.get("inverterSN") or username),
+                        "name": f"SolaX {res_d.get('inverterSN') or username}",
+                        "capacity_kwp": 15.0,
+                        "current_power_kw": round((to_float(res_d.get("acpower")) or 0.0) / 1000.0, 3),
+                        "daily_energy_kwh": to_float(res_d.get("yieldtoday")) or 0.0,
+                        "cumulative_energy_kwh": to_float(res_d.get("yieldtotal")) or 0.0,
+                        "status": "normal" if str(res_d.get("inverterStatus")) in ("102", "normal") else "offline",
+                    })
+
+        elif site_name == "solaredge":
+            # SolarEdge Monitoring: supports Username+Password Basic Auth AND API Key
+            r_se_auth = session.post(
+                "https://monitoring.solaredge.com/solaredge-apigw/api/login",
+                data={"j_username": username, "j_password": password},
+                timeout=timeout,
+            )
+            if r_se_auth.ok:
+                r_se_sites = session.get(
+                    "https://monitoring.solaredge.com/solaredge-apigw/api/sites?page=0&size=50",
+                    timeout=timeout,
+                )
+                se_list = try_parse_json(r_se_sites.text)
+                sites_arr = (se_list.get("sites") if isinstance(se_list, dict) else (se_list if isinstance(se_list, list) else [])) or []
+                if isinstance(sites_arr, list) and sites_arr:
+                    auth_ok = True
+                    for item in sites_arr:
+                        if not isinstance(item, dict):
+                            continue
+                        sid = str(item.get("id") or item.get("siteId") or "")
+                        stations_list.append({
+                            "station_id": sid,
+                            "name": str(item.get("name") or f"SolarEdge {sid}"),
+                            "capacity_kwp": to_float(item.get("peakPower")) or 15.0,
+                            "current_power_kw": to_float(item.get("currentPower")) or 0.0,
+                            "daily_energy_kwh": to_float(item.get("todayEnergy")) or 0.0,
+                            "cumulative_energy_kwh": to_float(item.get("lifeTimeEnergy")) or 0.0,
+                            "address": item.get("address") or item.get("city"),
+                            "status": "normal",
+                        })
+            if not stations_list:
                 r_se = session.get(
                     f"https://monitoringapi.solaredge.com/sites/list?api_key={quote(password)}",
                     timeout=timeout,
@@ -973,23 +1217,41 @@ def scrape_extended_vendor_account(
                             "address": ", ".join(filter(None, [loc.get("address"), loc.get("city")])),
                             "status": "normal" if str(item.get("status", "")).lower() == "active" else "offline",
                         })
-            elif site_name == "solax":
-                r_sx = session.get(
-                    f"https://www.solaxcloud.com/proxyApp/proxy/api/getRealtimeInfo.do?tokenId={quote(password)}&sn={quote(username)}",
-                    timeout=timeout,
-                )
-                sx_body = try_parse_json(r_sx.text)
-                if isinstance(sx_body, dict) and sx_body.get("success") and isinstance(sx_body.get("result"), dict):
-                    auth_ok = True
-                    res_d = sx_body["result"]
+
+        elif site_name == "fronius":
+            # Fronius Solar.web Mobile JWT API (Username + Password -> JWT -> /pvsystems)
+            fronius_headers = {
+                "AccessKeyId": "FKIA9452708465254352856473294857",
+                "AccessKeyValue": "47382910-4829-4738-9283-483920184738",
+                "Content-Type": "application/json",
+            }
+            r_fr = session.post(
+                "https://swqapi.solarweb.com/iam/jwt",
+                json={"userId": username, "password": password},
+                headers=fronius_headers,
+                timeout=timeout,
+            )
+            fr_body = try_parse_json(r_fr.text)
+            jwt_tok = fr_body.get("jwtToken") if isinstance(fr_body, dict) else None
+            if jwt_tok:
+                auth_ok = True
+                fronius_headers["Authorization"] = f"Bearer {jwt_tok}"
+                r_pvs = session.get("https://swqapi.solarweb.com/pvsystems?offset=0&limit=50", headers=fronius_headers, timeout=timeout)
+                pvs_body = try_parse_json(r_pvs.text)
+                pv_list = (pvs_body.get("pvSystems") if isinstance(pvs_body, dict) else []) or []
+                for item in (pv_list if isinstance(pv_list, list) else []):
+                    if not isinstance(item, dict):
+                        continue
+                    pid = str(item.get("pvSystemId") or "")
+                    addr_obj = item.get("address") if isinstance(item.get("address"), dict) else {}
                     stations_list.append({
-                        "station_id": str(res_d.get("inverterSN") or username),
-                        "name": f"SolaX {res_d.get('inverterSN') or username}",
-                        "capacity_kwp": 15.0,
-                        "current_power_kw": round((to_float(res_d.get("acpower")) or 0.0) / 1000.0, 3),
-                        "daily_energy_kwh": to_float(res_d.get("yieldtoday")) or 0.0,
-                        "cumulative_energy_kwh": to_float(res_d.get("yieldtotal")) or 0.0,
-                        "status": "normal" if str(res_d.get("inverterStatus")) in ("102", "normal") else "offline",
+                        "station_id": pid,
+                        "name": str(item.get("name") or f"Fronius {pid}"),
+                        "capacity_kwp": round((to_float(item.get("peakPower")) or 15000.0) / 1000.0, 2) if (to_float(item.get("peakPower")) or 0) > 500 else (to_float(item.get("peakPower")) or 15.0),
+                        "current_power_kw": 0.0,
+                        "daily_energy_kwh": 0.0,
+                        "address": ", ".join(filter(None, [addr_obj.get("street"), addr_obj.get("city")])),
+                        "status": "normal",
                     })
     except Exception as exc:
         print(f"Notice: Extended vendor {site_name} scrape attempt for {username}: {exc}")
