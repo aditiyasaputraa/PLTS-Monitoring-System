@@ -250,6 +250,62 @@ const VENDOR_INFO = {
     border: "#fecaca",
     badge: "SMA",
   },
+  solis: {
+    name: "Solis (SolisCloud)",
+    color: "#ea580c",
+    bg: "#fff7ed",
+    border: "#fed7aa",
+    badge: "SOLIS",
+  },
+  solax: {
+    name: "SolaX Power (SolaX Cloud)",
+    color: "#d97706",
+    bg: "#fffbeb",
+    border: "#fde68a",
+    badge: "SOLAX",
+  },
+  sungrow: {
+    name: "Sungrow (iSolarCloud)",
+    color: "#c2410c",
+    bg: "#ffedd5",
+    border: "#fdba74",
+    badge: "SUNGROW",
+  },
+  growatt: {
+    name: "Growatt (ShineServer)",
+    color: "#16a34a",
+    bg: "#f0fdf4",
+    border: "#bbf7d0",
+    badge: "GROWATT",
+  },
+  deye: {
+    name: "Deye (Deye Cloud / Solarman)",
+    color: "#0284c7",
+    bg: "#f0f9ff",
+    border: "#bae6fd",
+    badge: "DEYE",
+  },
+  goodwe: {
+    name: "GoodWe (SEMS Portal)",
+    color: "#e11d48",
+    bg: "#fff1f2",
+    border: "#fecdd3",
+    badge: "GOODWE",
+  },
+  solaredge: {
+    name: "SolarEdge Monitoring",
+    color: "#7c3aed",
+    bg: "#f5f3ff",
+    border: "#ddd6fe",
+    badge: "SOLAREDGE",
+  },
+  fronius: {
+    name: "Fronius (Solar.web)",
+    color: "#991b1b",
+    bg: "#fef2f2",
+    border: "#fca5a5",
+    badge: "FRONIUS",
+  },
 };
 
 export default function AccountManagerModal({
@@ -488,6 +544,14 @@ export default function AccountManagerModal({
                       <option value="huawei">Huawei FusionSolar</option>
                       <option value="kehua">Kehua Tech (energy.kehua.com)</option>
                       <option value="sma">SMA Sunny Portal (ennexOS)</option>
+                      <option value="solis">Solis (SolisCloud)</option>
+                      <option value="solax">SolaX Power (SolaX Cloud)</option>
+                      <option value="sungrow">Sungrow (iSolarCloud)</option>
+                      <option value="growatt">Growatt (ShineServer)</option>
+                      <option value="deye">Deye (Deye Cloud / Solarman)</option>
+                      <option value="goodwe">GoodWe (SEMS Portal)</option>
+                      <option value="solaredge">SolarEdge Monitoring</option>
+                      <option value="fronius">Fronius (Solar.web)</option>
                     </select>
                   </div>
 

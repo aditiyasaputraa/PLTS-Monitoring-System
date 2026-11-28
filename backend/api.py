@@ -40,7 +40,7 @@ from env_loader import load_env_file
 ROOT = Path(__file__).resolve().parent
 load_env_file(ROOT / ".env")
 
-from scrape_monitoring import run_once
+from scrape_monitoring import EXTENDED_VENDORS, load_cloud_account_manager_config, load_vendor_accounts_from_env, run_once
 from supabase_store import SupabaseStore
 
 RUNTIME_DIR = Path(os.getenv("RUNTIME_DIR", "/tmp/plts-monitoring"))
@@ -138,6 +138,13 @@ def build_scrape_args() -> SimpleNamespace:
         if cookie_path:
             binding += f":{cookie_path}"
         sites.append(binding)
+
+    cloud_cfg = load_cloud_account_manager_config()
+    for ext_vendor in EXTENDED_VENDORS:
+        if env_enabled(f"ENABLE_{ext_vendor.upper()}", default=True):
+            ext_accounts = load_vendor_accounts_from_env(ext_vendor, cloud_cfg)
+            if ext_accounts:
+                sites.append(f"{ext_vendor}:{ROOT / 'sma_api_blueprint.json'}")
 
     if not sites:
         raise RuntimeError("No monitoring sites are enabled")

@@ -66,5 +66,77 @@
       "/measurements/search",
       "/forecast/weather"
     ]
+  },
+  "solis": {
+    "base_url": "https://www.soliscloud.com",
+    "base_domain": "soliscloud.com",
+    "api_base": "https://www.soliscloud.com:13333",
+    "login_url": "https://www.soliscloud.com",
+    "dashboard_url": "https://www.soliscloud.com/#/station",
+    "cookie_domains": ["soliscloud.com", ".soliscloud.com"],
+    "auth_type": "solis_cloud"
+  },
+  "solax": {
+    "base_url": "https://www.solaxcloud.com",
+    "base_domain": "solaxcloud.com",
+    "api_base": "https://www.solaxcloud.com/proxyApp/proxy/api",
+    "login_url": "https://www.solaxcloud.com",
+    "dashboard_url": "https://www.solaxcloud.com/#/powerStation",
+    "cookie_domains": ["solaxcloud.com", ".solaxcloud.com"],
+    "auth_type": "solax_cloud"
+  },
+  "sungrow": {
+    "base_url": "https://web3.isolarcloud.com.hk",
+    "base_domain": "isolarcloud.com.hk",
+    "api_base": "https://gateway.isolarcloud.com.hk",
+    "login_url": "https://web3.isolarcloud.com.hk/#/login",
+    "dashboard_url": "https://web3.isolarcloud.com.hk/#/overview",
+    "cookie_domains": ["isolarcloud.com.hk", ".isolarcloud.com"],
+    "auth_type": "sungrow_isolarcloud"
+  },
+  "growatt": {
+    "base_url": "https://server.growatt.com",
+    "base_domain": "server.growatt.com",
+    "api_base": "https://server.growatt.com",
+    "login_url": "https://server.growatt.com/login",
+    "dashboard_url": "https://server.growatt.com/index",
+    "cookie_domains": ["server.growatt.com", ".growatt.com"],
+    "auth_type": "growatt_shineserver"
+  },
+  "deye": {
+    "base_url": "https://globalhome.solarmanpv.com",
+    "base_domain": "solarmanpv.com",
+    "api_base": "https://globalpro.solarmanpv.com/maintain-s",
+    "login_url": "https://globalhome.solarmanpv.com/login",
+    "dashboard_url": "https://globalhome.solarmanpv.com/plant/infos",
+    "cookie_domains": ["solarmanpv.com", ".deyecloud.com"],
+    "auth_type": "deye_solarman"
+  },
+  "goodwe": {
+    "base_url": "https://www.semsportal.com",
+    "base_domain": "semsportal.com",
+    "api_base": "https://www.semsportal.com/api",
+    "login_url": "https://www.semsportal.com/home/login",
+    "dashboard_url": "https://www.semsportal.com/PowerStation/PowerStatusSnMin",
+    "cookie_domains": ["semsportal.com", ".semsportal.com"],
+    "auth_type": "goodwe_sems"
+  },
+  "solaredge": {
+    "base_url": "https://monitoring.solaredge.com",
+    "base_domain": "monitoring.solaredge.com",
+    "api_base": "https://monitoring.solaredge.com/solaredge-apigw/api",
+    "login_url": "https://monitoring.solaredge.com/solaredge-web/p/login",
+    "dashboard_url": "https://monitoring.solaredge.com/solaredge-web/p/home",
+    "cookie_domains": ["monitoring.solaredge.com", ".solaredge.com"],
+    "auth_type": "solaredge_monitoring"
+  },
+  "fronius": {
+    "base_url": "https://www.solarweb.com",
+    "base_domain": "solarweb.com",
+    "api_base": "https://www.solarweb.com",
+    "login_url": "https://www.solarweb.com/Account/ExternalLogin",
+    "dashboard_url": "https://www.solarweb.com/PvSystems/PvSystem",
+    "cookie_domains": ["solarweb.com", ".solarweb.com"],
+    "auth_type": "fronius_solarweb"
   }
 }
